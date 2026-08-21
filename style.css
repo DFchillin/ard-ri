@@ -1,0 +1,100 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1418;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #f2ead6;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#world {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* The UI overlay is transparent to pointers except on its actual controls,
+   so taps fall through to the world for placement. */
+#ui-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+#ui-overlay button { pointer-events: auto; }
+
+#topbar {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(11,20,24,0.92), rgba(11,20,24,0.55) 70%, transparent);
+  font-size: 15px;
+  flex-wrap: wrap;
+}
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #e8c96b;
+  margin-right: 6px;
+}
+.stat { opacity: 0.92; }
+.stat b { color: #fff; }
+.stat.season { margin-left: auto; opacity: 0.85; }
+
+#buildbar {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+.build-btn {
+  background: #223b30;
+  color: #f2ead6;
+  border: 1px solid #3c6b4f;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.build-btn.active { background: #e8c96b; color: #1c130a; border-color: #e8c96b; }
+.hint {
+  font-size: 13px;
+  opacity: 0.8;
+  background: rgba(0,0,0,0.4);
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.hint.hidden { display: none; }
+
+#speedbar {
+  align-self: flex-end;
+  display: flex;
+  gap: 6px;
+  padding: 0 14px 16px;
+}
+.speed-btn {
+  width: 46px;
+  height: 46px;
+  background: rgba(15,28,34,0.85);
+  color: #f2ead6;
+  border: 1px solid #2c4a3a;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.speed-btn.active { background: #e8c96b; color: #1c130a; border-color: #e8c96b; }

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Ard Rí</title>
+<link rel="stylesheet" href="style.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="world"></canvas>
+
+<div id="ui-overlay">
+  <header id="topbar">
+    <span class="brand">Ard Rí</span>
+    <span class="stat" title="Cattle — the measure of wealth">🐄 <b id="stat-cattle">40</b></span>
+    <span class="stat" title="Silver">🪙 <b id="stat-silver">100</b></span>
+    <span class="stat" title="Folk">👤 <b id="stat-folk">0</b></span>
+    <span class="stat season" title="The wheel of the year">🌱 <b id="stat-season">Imbolc</b> · <span id="stat-day">Day 1</span></span>
+  </header>
+
+  <div id="buildbar">
+    <button class="build-btn" data-build="rath">Ráth</button>
+    <span id="build-hint" class="hint hidden">Tap the land to place · Esc to cancel</span>
+  </div>
+
+  <div id="speedbar">
+    <button class="speed-btn" data-speed="0" title="Pause">⏸</button>
+    <button class="speed-btn active" data-speed="1">1×</button>
+    <button class="speed-btn" data-speed="2">2×</button>
+    <button class="speed-btn" data-speed="3">3×</button>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
