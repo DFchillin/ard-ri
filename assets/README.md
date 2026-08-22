@@ -16,6 +16,10 @@ assets/
       druid_S.png  druid_W.png  druid_N.png  druid_E.png    (down, left, up, right)
     water_carrier/
       water_carrier_S.png  water_carrier_W.png  water_carrier_N.png  water_carrier_E.png
+    dagda/          (gods & heroes are walkers too — 4 frames each)
+      dagda_S.png  dagda_W.png  dagda_N.png  dagda_E.png
+  manifestations/   (one "visiting" scene per god)
+    dagda.png  brigid.png  lugh.png  …
 ```
 
 ## Rules

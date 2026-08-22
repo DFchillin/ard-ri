@@ -145,6 +145,30 @@ Each walker is spawned by a building and carries a service along the roads
   altar / druid's hut).
 - **warrior** — war-band spearman with a round shield → defence (training ground).
 
+## GODS & HEROES
+
+Two forms per figure:
+1. **Walker** — 4 directional frames like any villager, saved to
+   `assets/walkers/<id>/<id>_<DIR>.png`. Used when a god or hero walks the
+   settlement.
+2. **Manifestation** — one larger "visiting your settlement" scene (the bottom
+   row of the sheet), saved to `assets/manifestations/<id>.png`. Shown when the
+   god appears at their site.
+
+Prompt add for walkers: *"…mid-stride walking pose, isometric ¾ view, 4
+directional frames (down/left/up/right), consistent design."* For manifestations:
+*"…standing at a sacred site (stones / well / grove / shrine), a moment of divine
+presence, richer detail, isometric ¾ view, transparent background."*
+
+**Gods of Éire** (ids match `src/data/gods.js`): dagda, brigid, lugh, morrigan,
+manannan, tailtiu, cernunnos, nuada, aengus — with their domains and boons.
+
+**Heroes** (ids match `src/data/heroes.js`): cu_chulainn, scathach, caech,
+ferdiad, fionn, grainne, diarmuid, deirdre, conchobar.
+
+Keep gods/heroes slightly larger and more richly coloured than common folk so
+they read as special in-world.
+
 ## Consistency tips
 
 - Generate a **whole row of 5 stages in one image** (as the reference sheet did)
