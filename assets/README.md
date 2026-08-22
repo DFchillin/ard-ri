@@ -13,10 +13,9 @@ assets/
     altar.png
   walkers/
     druid/
-      druid_N.png  druid_NE.png  druid_E.png  druid_SE.png
-      druid_S.png  druid_SW.png  druid_W.png  druid_NW.png
+      druid_S.png  druid_W.png  druid_N.png  druid_E.png    (down, left, up, right)
     water_carrier/
-      water_carrier_N.png … _NW.png
+      water_carrier_S.png  water_carrier_W.png  water_carrier_N.png  water_carrier_E.png
 ```
 
 ## Rules
@@ -25,9 +24,10 @@ assets/
 - **Buildings**: a single frame drawn at the iso angle (one frame is enough
   while the camera doesn't rotate). Anchor: the tile the building sits on is the
   bottom-centre of the sprite.
-- **Walkers**: **8 frames**, one per compass direction, suffix `_N _NE _E _SE
-  _S _SW _W _NW`. The loader picks the frame from the walker's heading. Anchor:
-  bottom-centre = the walker's feet.
+- **Walkers**: **4 frames** — down/left/up/right, saved as compass suffixes
+  `_S _W _N _E`. The loader picks the nearest frame from the walker's heading,
+  so 4 is enough; 8 (`_NE _SE _SW _NW` too) is supported if you ever draw them.
+  Anchor: bottom-centre = the walker's feet.
 - Keep a consistent pixel scale across a set (e.g. a walker ~24px tall, a bothy
   ~32px) so nothing looks mismatched in-world.
 

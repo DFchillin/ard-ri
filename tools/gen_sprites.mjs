@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const KEY = process.env.PIXELLAB_API_KEY;
-const DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const DIRS = ['S', 'W', 'N', 'E']; // down, left, up, right — matches the concept art
 
 // What to generate. Buildings = one iso frame; walkers = 8 compass frames.
 const MANIFEST = [

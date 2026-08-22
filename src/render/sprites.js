@@ -51,8 +51,9 @@ export function makeBuildingSprite(name, label = name[0].toUpperCase()) {
   return spr;
 }
 
-// A walker: 8 compass frames, chosen from world heading. Camera is fixed iso,
-// so the heading→frame map is constant.
+// A walker chosen from world heading. Concept art ships 4 frames
+// (down/left/up/right = S/W/N/E); 8 is supported too. Any direction the art
+// doesn't provide falls back to the nearest frame that did load.
 export function makeWalkerSprite(name, label = name[0].toUpperCase()) {
   const mat = new THREE.SpriteMaterial({ map: placeholderTexture(label, '#9ad0ff') });
   const frames = {};
@@ -67,8 +68,11 @@ export function makeWalkerSprite(name, label = name[0].toUpperCase()) {
   const spr = new THREE.Sprite(mat);
   spr.center.set(0.5, 0);
   spr.setHeading = (rad) => {
-    const idx = ((Math.round(rad / (Math.PI / 4)) % 8) + 8) % 8;
-    const tex = frames[DIRS[idx]];
+    const target = ((Math.round(rad / (Math.PI / 4)) % 8) + 8) % 8;
+    let tex;
+    for (let step = 0; step < 8 && !tex; step++) {
+      tex = frames[DIRS[(target + step) % 8]] || frames[DIRS[(target - step + 8) % 8]];
+    }
     if (tex && mat.map !== tex) {
       mat.map = tex;
       mat.needsUpdate = true;

@@ -102,22 +102,48 @@ scale, transparent gaps between."*
 
 ---
 
-## WALKERS  (8 compass frames each)
+## WALKERS  (4 directional frames each: down / left / up / right)
 
-For each, generate the 8 directions `N NE E SE S SW W NW`. Add to the prompt:
-*"A single small character sprite, full body, mid-stride walking pose, facing
-<DIR> in isometric view. Generate the same character in all 8 compass directions,
-consistent design and scale."* (Or use a tool's rotate-to-8-directions feature
-from one front view — cleaner.)
+Per the concept sheet, every walker has **4 frames** — down, left, up, right —
+saved as `_S _W _N _E`. Add to each prompt: *"A single small character sprite,
+full body, mid-stride walking pose, in isometric ¾ view. Generate 4 directional
+frames — facing down, left, up, and right — as a consistent character at
+identical scale."* (Or draw one and mirror left↔right for two of the four.)
 
-- **villager** — A plain Gaelic villager in a wool tunic and cloak.
-- **water_carrier** — A villager carrying two water pails on a yoke.
-- **druid** — A hooded druid in a long robe with a staff.
-- **food_carrier** — A villager carrying a basket of grain/bread.
-- **market_trader** — A trader with a laden shoulder pack.
-- **bard** — A filí (poet) with a small harp.
-- **steward** — A well-dressed steward with a tally stick, collecting tribute.
-- **warrior** — A war-band spearman with a round shield.
+Each walker is spawned by a building and carries a service along the roads
+(a few are ambient folk). Files go in `assets/walkers/<name>/<name>_<DIR>.png`.
+
+**Vendors / Merchants** — market & trade
+- **trader**, **food_merchant**, **herbalist**, **fishmonger**, **weaponsmith**,
+  **jeweler** — market/craft vendors; spread *goods/appeal* from their stalls.
+
+**Resource carriers & laborers** — the core service walkers
+- **water_carrier** — pails on a yoke → spreads **water** (from the well).
+- **wood_cutter**, **stone_carrier**, **grain_carrier** → carry raw goods to store.
+- **pack_mule_handler** — leads a laden mule; long-haul goods.
+- **laborer** — general worker (construction, ambient).
+
+**Maintenance & builders** — keep buildings from decaying
+- **builder**, **carpenter**, **stone_mason**, **thatcher**, **repairer** →
+  spread **upkeep** (prevent devolution).
+
+**Service & civic roles**
+- **bard_storyteller**, **bard_musician** → spread **culture** (from the bard circle).
+- **herald**, **messenger** → carry orders/announcements.
+- **seneschal** — the steward with a tally stick → collects **tribute/tax**.
+
+**Animal handlers**
+- **cow_herder** (cattle = wealth), **sheep_herder**, **pig_keeper**,
+  **goose_herder**, **horse_handler** → tend the animal pens.
+
+**Utility & support** — the food/craft chain
+- **cook**, **brewer**, **baker** → spread **food/hospitality** (feasting hall,
+  granary). **tanner**, **fire_keeper** → hides/leather and the community fire.
+
+**Special**
+- **druid** — hooded robe and staff → spreads **religious favour** (from the
+  altar / druid's hut).
+- **warrior** — war-band spearman with a round shield → defence (training ground).
 
 ## Consistency tips
 
