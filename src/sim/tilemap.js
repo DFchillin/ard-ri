@@ -95,11 +95,10 @@ export class Tilemap {
         if (!this.isBuildable(x + dx, z + dz)) return false;
     return true;
   }
-  place(x, z, w, h, name) {
-    const occ = { name, ox: x, oz: z };
+  place(x, z, w, h, occupant) {
     for (let dz = 0; dz < h; dz++)
       for (let dx = 0; dx < w; dx++)
-        this.get(x + dx, z + dz).occupant = occ;
+        this.get(x + dx, z + dz).occupant = occupant;
   }
 
   isRoadable(x, z) {

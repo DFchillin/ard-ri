@@ -16,6 +16,7 @@ export class UI {
       season: document.getElementById('stat-season'),
       day: document.getElementById('stat-day'),
     };
+    this.missionList = document.getElementById('mission-list');
 
     this.activeBuild = null;
 
@@ -45,6 +46,13 @@ export class UI {
     );
     this.buildHint.classList.toggle('hidden', !kind);
     this.onBuildSelect(kind);
+  }
+
+  setObjectives(objectives) {
+    if (!this.missionList) return;
+    this.missionList.innerHTML = objectives
+      .map((o) => `<li class="${o.done ? 'done' : ''}">${o.done ? '✓' : '○'} ${o.text}</li>`)
+      .join('');
   }
 
   setStats({ cattle, silver, folk, season, day }) {

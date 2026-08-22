@@ -53,11 +53,33 @@ html, body {
 .stat b { color: #fff; }
 .stat.season { margin-left: auto; opacity: 0.85; }
 
+#mission {
+  position: absolute;
+  top: 60px;
+  left: 14px;
+  background: rgba(11, 20, 24, 0.78);
+  border: 1px solid #2c4a3a;
+  border-radius: 10px;
+  padding: 10px 14px;
+  max-width: 220px;
+}
+#mission h4 {
+  font-size: 13px;
+  color: #e8c96b;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+#mission-list { list-style: none; }
+#mission-list li { font-size: 13px; padding: 3px 0; opacity: 0.9; }
+#mission-list li.done { color: #8fd48a; opacity: 0.75; text-decoration: line-through; }
+
 #buildbar {
   align-self: flex-start;
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
   padding: 0 14px 14px;
 }
 .build-btn {
