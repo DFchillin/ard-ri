@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js';
-import { makeBuildingSprite } from '../render/sprites.js';
+import { makeBuildingChip } from '../render/chips.js';
 import { Walker } from './walkers.js';
 import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js';
 
@@ -49,12 +49,11 @@ export class Game {
     const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, timer: 0 };
     this.map.place(f.x, f.z, f.w, f.h, inst);
 
-    const spr = makeBuildingSprite(def.sprite, def.label[0]);
-    spr.scale.setScalar(Math.max(f.w, f.h) * 1.3 + 0.6);
+    const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile);
     const c = this._center(f);
-    spr.position.set(c.x, 0, c.z);
-    this.buildingGroup.add(spr);
-    inst.sprite = spr;
+    chip.position.set(c.x, 0, c.z);
+    this.buildingGroup.add(chip);
+    inst.sprite = chip;
 
     this.buildings.push(inst);
     this.silver -= def.cost;

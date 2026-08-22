@@ -1,4 +1,4 @@
-import { makeWalkerSprite } from '../render/sprites.js';
+import { makeWalkerChip } from '../render/chips.js';
 import { roadNeighbors } from './roads.js';
 
 // A walker random-walks the road network for a fixed number of steps, running
@@ -15,8 +15,7 @@ export class Walker {
     this.t = 0;
     this.done = false;
 
-    this.sprite = makeWalkerSprite(type, label || 'W');
-    this.sprite.scale.setScalar(1.0);
+    this.sprite = makeWalkerChip(type);
     this._moveSpriteTo(this.cur, this.cur, 0);
     if (onTile) onTile(this.cur.x, this.cur.z);
     this._pickNext(null);
@@ -25,7 +24,7 @@ export class Walker {
   _moveSpriteTo(a, b, k) {
     const wa = this.map.tileToWorld(a.x, a.z);
     const wb = this.map.tileToWorld(b.x, b.z);
-    this.sprite.position.set(wa.x + (wb.x - wa.x) * k, 0.12, wa.z + (wb.z - wa.z) * k);
+    this.sprite.position.set(wa.x + (wb.x - wa.x) * k, 0.05, wa.z + (wb.z - wa.z) * k);
   }
 
   _pickNext(prev) {
@@ -35,9 +34,11 @@ export class Walker {
     const pool = forward.length ? forward : opts;
     if (!pool.length) { this.next = null; return; }
     this.next = pool[(Math.random() * pool.length) | 0];
-    const wa = this.map.tileToWorld(this.cur.x, this.cur.z);
-    const wb = this.map.tileToWorld(this.next.x, this.next.z);
-    this.sprite.setHeading(Math.atan2(-(wb.z - wa.z), wb.x - wa.x));
+    if (this.sprite.setHeading) {
+      const wa = this.map.tileToWorld(this.cur.x, this.cur.z);
+      const wb = this.map.tileToWorld(this.next.x, this.next.z);
+      this.sprite.setHeading(Math.atan2(-(wb.z - wa.z), wb.x - wa.x));
+    }
   }
 
   update(dt) {
@@ -57,7 +58,11 @@ export class Walker {
   }
 
   dispose() {
-    this.sprite.material.map = null;
-    this.sprite.material.dispose();
+    this.sprite.traverse?.((o) => {
+      o.geometry?.dispose();
+      o.material?.dispose();
+    });
+    if (this.sprite.geometry) this.sprite.geometry.dispose();
+    if (this.sprite.material) this.sprite.material.dispose();
   }
 }

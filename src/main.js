@@ -125,6 +125,8 @@ window.addEventListener('resize', () => {
   resizeIsoCamera(camera, aspect);
 });
 
+window.ardri = { game, map, view, sim }; // debug hook
+
 // --- Fixed-timestep sim scaled by speed. ---
 let acc = 0;
 const clock = new THREE.Clock();

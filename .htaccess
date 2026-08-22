@@ -1,0 +1,4 @@
+DirectoryIndex index.html
+# This is a standalone static app living beside WordPress — don't let WP rewrite it.
+RewriteEngine Off
+AddType application/javascript .js .mjs
