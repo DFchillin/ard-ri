@@ -37,14 +37,12 @@ jobs:
           set net:timeout 15
           set net:max-retries 1
           set cmd:fail-exit no
-          echo "=== pwd ==="
-          pwd
-          echo "=== root ==="
-          ls
-          echo "=== httpdocs ==="
-          ls httpdocs
-          echo "=== htdocs ==="
-          ls htdocs
+          echo "=== webspace ==="
+          ls webspace
+          echo "=== webspace/httpdocs ==="
+          ls webspace/httpdocs
+          echo "=== webspace/htdocs ==="
+          ls webspace/htdocs
           echo "=== done ==="
           bye
           SCRIPT
