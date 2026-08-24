@@ -25,7 +25,7 @@ jobs:
           FTP_DIR: ${{ secrets.FTP_DIR }}
         run: |
           sudo apt-get -qq update && sudo apt-get -qq install -y lftp >/dev/null
-          TARGET="${FTP_DIR:-ardri}"
+          TARGET="${FTP_DIR:-htdocs/ardri}"
           echo "Deploying to: $TARGET"
           lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<SCRIPT
           set ftp:ssl-force true
@@ -33,6 +33,7 @@ jobs:
           set ssl:verify-certificate no
           set net:max-retries 2
           set net:timeout 20
+          mkdir -f -p "$TARGET"
           mirror --reverse --verbose --delete --continue \
             --exclude .git/ \
             --exclude .github/ \
