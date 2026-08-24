@@ -25,24 +25,27 @@ jobs:
           FTP_DIR: ${{ secrets.FTP_DIR }}
         run: |
           sudo apt-get -qq update && sudo apt-get -qq install -y lftp >/dev/null
-          # DIAGNOSTIC: list the server layout so we can find the real web root.
           # Data channel sent in the clear (control stays TLS) + plain PASV to
           # avoid the FTPS data-channel hang in CI.
-          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<'SCRIPT'
+          TARGET="${FTP_DIR:-webspace/httpdocs/ardri}"
+          echo "Deploying to: $TARGET"
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<SCRIPT
           set ftp:ssl-force true
           set ftp:ssl-protect-data false
           set ssl:verify-certificate no
           set ftp:prefer-epsv false
           set ftp:passive-mode true
-          set net:timeout 15
-          set net:max-retries 1
-          set cmd:fail-exit no
-          echo "=== webspace ==="
-          ls webspace
-          echo "=== webspace/httpdocs ==="
-          ls webspace/httpdocs
-          echo "=== webspace/htdocs ==="
-          ls webspace/htdocs
-          echo "=== done ==="
+          set net:timeout 20
+          set net:max-retries 2
+          mkdir -f -p "$TARGET"
+          mirror --reverse --verbose --delete --continue \
+            --exclude .git/ \
+            --exclude .github/ \
+            --exclude node_modules/ \
+            --exclude docs/ \
+            --exclude tools/ \
+            --exclude-glob *.md \
+            --exclude .preview.png \
+            ./ "$TARGET"
           bye
           SCRIPT
