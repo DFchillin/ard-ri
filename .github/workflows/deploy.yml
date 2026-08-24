@@ -27,7 +27,7 @@ jobs:
           sudo apt-get -qq update && sudo apt-get -qq install -y lftp >/dev/null
           # Data channel sent in the clear (control stays TLS) + plain PASV to
           # avoid the FTPS data-channel hang in CI.
-          TARGET="${FTP_DIR:-webspace/siteapps/WordPress-174457/ardri}"
+          TARGET="${FTP_DIR:-webspace/siteapps/WordPress-174457/htdocs/ardri}"
           echo "Deploying to: $TARGET"
           lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<SCRIPT
           set ftp:ssl-force true
