@@ -46,9 +46,11 @@ export class Walker {
   update(dt) {
     if (this.done) return;
     if (!this.next) { this.done = true; return; }
+    this.age = (this.age || 0) + dt;
     this.t += dt * this.speed;
     const k = Math.min(this.t, 1);
     this._moveSpriteTo(this.cur, this.next, k);
+    this.sprite.position.y = 0.05 + Math.abs(Math.sin(this.age * 7)) * 0.16; // bob
     if (this.t >= 1) {
       this.t -= 1;
       const prev = this.cur;

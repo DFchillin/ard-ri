@@ -20,7 +20,7 @@ scene.background = new THREE.Color(0x0b1418);
 scene.fog = new THREE.Fog(0x0b1418, 70, 170);
 
 let aspect = window.innerWidth / window.innerHeight;
-const camera = createIsoCamera(18, aspect);
+const camera = createIsoCamera(15, aspect);
 
 scene.add(new THREE.HemisphereLight(0xdff0ff, 0x3a4a2a, 1.0));
 const sun = new THREE.DirectionalLight(0xfff2d0, 1.0);

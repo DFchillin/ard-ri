@@ -41,8 +41,34 @@ export function makeBuildingChip(role, w, h, ts) {
 }
 
 export function makeWalkerChip(type) {
-  const geo = new THREE.ConeGeometry(0.2, 0.6, 6);
-  geo.translate(0, 0.3, 0); // base at origin
-  const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: WALKER[type] || 0xffffff }));
-  return m;
+  const g = new THREE.Group();
+  const geo = new THREE.ConeGeometry(0.32, 1.1, 7);
+  geo.translate(0, 0.55, 0); // base at origin
+  // MeshBasic so walkers stay vivid regardless of lighting.
+  const body = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: WALKER[type] || 0xffffff }));
+  g.add(body);
+  const cap = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xfff4d8 })
+  );
+  cap.position.y = 1.2;
+  g.add(cap);
+  return g;
+}
+
+export function makeAlertMarker() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const x = c.getContext('2d');
+  x.fillStyle = '#e0432f';
+  x.beginPath(); x.arc(32, 32, 26, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#fff';
+  x.font = 'bold 42px sans-serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText('!', 32, 35);
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.NearestFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+  s.scale.set(1.1, 1.1, 1.1);
+  return s;
 }

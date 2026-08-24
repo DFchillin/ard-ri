@@ -128,7 +128,7 @@ export class WorldView {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setIndex(idx);
     this.roadGroup.add(
-      new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x6b5b43, side: THREE.DoubleSide }))
+      new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x8a7350, side: THREE.DoubleSide }))
     );
   }
 }

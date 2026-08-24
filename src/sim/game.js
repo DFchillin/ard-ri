@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js';
-import { makeBuildingChip } from '../render/chips.js';
+import { makeBuildingChip, makeAlertMarker } from '../render/chips.js';
 import { Walker } from './walkers.js';
 import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js';
 import { randomName } from '../data/names.js';
@@ -54,6 +54,11 @@ export class Game {
     const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile);
     const c = this._center(f);
     chip.position.set(c.x, 0, c.z);
+    const alert = makeAlertMarker();
+    alert.position.set(0, 2.7, 0);
+    alert.visible = false;
+    chip.add(alert);
+    inst.alert = alert;
     this.buildingGroup.add(chip);
     inst.sprite = chip;
 
@@ -72,7 +77,10 @@ export class Game {
 
   // --- Economy, one call per sim tick ---
   tick() {
-    for (const b of this.buildings) this._tickBuilding(b);
+    for (const b of this.buildings) {
+      if (b.alert) b.alert.visible = !entryRoadTile(this.map, b); // flag buildings with no road
+      this._tickBuilding(b);
+    }
     for (const o of this.objectives) if (!o.done && o.check(this)) o.done = true;
   }
 
