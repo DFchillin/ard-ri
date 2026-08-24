@@ -15,24 +15,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Upload site via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          # Switch to `ftp` if Blacknight rejects FTPS on the first run.
-          protocol: ftps
-          # FTP account is chrooted into the web root, so the path is just the
-          # subfolder. If files land in the wrong place, this is the line to edit.
-          server-dir: ardri/
-          # Only ship the playable site — not dev files.
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            .github/**
-            docs/**
-            tools/**
-            **/*.md
-            .preview.png
+      - name: Upload site via lftp
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          # Target directory on the server. Set the FTP_DIR secret to the exact
+          # path your FTP client shows for the site folder; defaults to ardri.
+          FTP_DIR: ${{ secrets.FTP_DIR }}
+        run: |
+          sudo apt-get -qq update && sudo apt-get -qq install -y lftp >/dev/null
+          TARGET="${FTP_DIR:-ardri}"
+          echo "Deploying to: $TARGET"
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<SCRIPT
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set ssl:verify-certificate no
+          set net:max-retries 2
+          set net:timeout 20
+          mirror --reverse --verbose --delete --continue \
+            --exclude .git/ \
+            --exclude .github/ \
+            --exclude node_modules/ \
+            --exclude docs/ \
+            --exclude tools/ \
+            --exclude-glob *.md \
+            --exclude .preview.png \
+            ./ "$TARGET"
+          bye
+          SCRIPT
