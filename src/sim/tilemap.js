@@ -10,6 +10,15 @@ export const TERRAIN_COLOR = {
   [T.SAND]: 0xb8a468,
 };
 
+export const TERRAIN_INFO = {
+  [T.GRASS]: { name: 'Pasture', desc: 'Good grazing and tillage — the land you build on.' },
+  [T.WATER]: { name: 'Water', desc: 'A lough or river. Impassable, but rich in fish.' },
+  [T.BOG]: { name: 'Bog', desc: 'Waterlogged ground. Yields turf and bog-iron, but nothing is built here.' },
+  [T.ROCK]: { name: 'Rocky Ground', desc: 'Bare stone. Nothing grows and nothing stands here.' },
+  [T.WOODS]: { name: 'Woodland', desc: 'Oak and hazel — a source of timber. Must be cleared to build.' },
+  [T.SAND]: { name: 'Shore', desc: 'Sand and shingle at the water’s edge.' },
+};
+
 const BUILDABLE = new Set([T.GRASS]);
 const ROADABLE = new Set([T.GRASS, T.SAND]);
 

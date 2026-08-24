@@ -3,6 +3,8 @@ import { BUILDINGS } from '../data/buildings.js';
 import { makeBuildingChip } from '../render/chips.js';
 import { Walker } from './walkers.js';
 import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js';
+import { randomName } from '../data/names.js';
+import { personFor } from '../data/phrases.js';
 
 const MARKET_CAP = 12;
 const HOUSE_CAP = 10;
@@ -62,7 +64,8 @@ export class Game {
   }
 
   _spawn(entry, opts) {
-    const w = new Walker(this.map, entry, opts);
+    const person = { name: randomName(), ...personFor(opts.type) };
+    const w = new Walker(this.map, entry, { ...opts, person });
     this.walkers.push(w);
     this.walkerGroup.add(w.sprite);
   }

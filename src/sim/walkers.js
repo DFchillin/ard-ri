@@ -5,17 +5,19 @@ import { roadNeighbors } from './roads.js';
 // its onTile callback as it enters each tile, then finishes. This one mechanic
 // carries every service in the game.
 export class Walker {
-  constructor(map, spawn, { type, label, steps = 20, speed = 2.5, onTile } = {}) {
+  constructor(map, spawn, { type, label, steps = 20, speed = 2.5, onTile, person } = {}) {
     this.map = map;
     this.steps = steps;
     this.speed = speed;
     this.onTile = onTile;
+    this.person = person || null;
     this.cur = { x: spawn.x, z: spawn.z };
     this.next = null;
     this.t = 0;
     this.done = false;
 
     this.sprite = makeWalkerChip(type);
+    this.sprite.userData = { kind: 'walker', person: this.person, type };
     this._moveSpriteTo(this.cur, this.cur, 0);
     if (onTile) onTile(this.cur.x, this.cur.z);
     this._pickNext(null);
