@@ -1,5 +1,5 @@
-import { makeWalkerChip } from '../render/chips.js';
-import { roadNeighbors } from './roads.js';
+import { makeWalkerChip } from '../render/chips.js?v=3';
+import { roadNeighbors } from './roads.js?v=3';
 
 // A walker random-walks the road network for a fixed number of steps, running
 // its onTile callback as it enters each tile, then finishes. This one mechanic
