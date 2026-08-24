@@ -2,3 +2,10 @@ DirectoryIndex index.html
 # This is a standalone static app living beside WordPress — don't let WP rewrite it.
 RewriteEngine Off
 AddType application/javascript .js .mjs
+
+# Always revalidate app code so deploys show up without a hard refresh.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|mjs|css|html)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>
