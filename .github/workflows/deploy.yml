@@ -25,23 +25,24 @@ jobs:
           FTP_DIR: ${{ secrets.FTP_DIR }}
         run: |
           sudo apt-get -qq update && sudo apt-get -qq install -y lftp >/dev/null
-          TARGET="${FTP_DIR:-htdocs/ardri}"
-          echo "Deploying to: $TARGET"
-          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<SCRIPT
+          # DIAGNOSTIC: list the server layout so we can find the real web root.
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<'SCRIPT'
           set ftp:ssl-force true
           set ftp:ssl-protect-data true
           set ssl:verify-certificate no
-          set net:max-retries 2
-          set net:timeout 20
-          mkdir -f -p "$TARGET"
-          mirror --reverse --verbose --delete --continue \
-            --exclude .git/ \
-            --exclude .github/ \
-            --exclude node_modules/ \
-            --exclude docs/ \
-            --exclude tools/ \
-            --exclude-glob *.md \
-            --exclude .preview.png \
-            ./ "$TARGET"
+          set cmd:fail-exit no
+          echo "=== pwd ==="
+          pwd
+          echo "=== root ==="
+          ls
+          echo "=== httpdocs ==="
+          ls httpdocs
+          echo "=== htdocs ==="
+          ls htdocs
+          echo "=== web ==="
+          ls web
+          echo "=== public_html ==="
+          ls public_html
+          echo "=== done ==="
           bye
           SCRIPT
