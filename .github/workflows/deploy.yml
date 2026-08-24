@@ -23,8 +23,9 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           # Switch to `ftp` if Blacknight rejects FTPS on the first run.
           protocol: ftps
-          # The web-served folder you set aside. Adjust if your path differs.
-          server-dir: htdocs/ardri/
+          # FTP account is chrooted into the web root, so the path is just the
+          # subfolder. If files land in the wrong place, this is the line to edit.
+          server-dir: ardri/
           # Only ship the playable site — not dev files.
           exclude: |
             **/.git*
