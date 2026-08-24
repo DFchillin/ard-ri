@@ -115,6 +115,10 @@ html, body {
   right: 14px; bottom: 16px;
   display: flex; gap: 6px;
 }
+/* On desktop the build panel is docked right; keep speed clear of it. */
+@media (min-width: 901px) {
+  #speedbar { right: 224px; }
+}
 .speed-btn {
   width: 44px; height: 44px;
   background: var(--panel);
@@ -221,6 +225,56 @@ html, body {
   font-style: italic;
 }
 #inspect-body blockquote .en { opacity: 0.7; font-size: 13px; }
+
+.continue-btn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px;
+  background: var(--gold);
+  color: #1c130a;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+.continue-btn.hidden { display: none; }
+
+/* Festival announcement */
+#festival-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background: radial-gradient(ellipse at center, rgba(20,12,4,0.55), rgba(6,10,12,0.9));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fest-fade 0.5s ease;
+}
+#festival-overlay.hidden { display: none; }
+.fest-card {
+  text-align: center;
+  padding: 30px 40px;
+  background: var(--panel);
+  border: 1px solid var(--gold);
+  border-radius: 16px;
+  max-width: 90vw;
+  box-shadow: 0 0 60px rgba(232,201,107,0.25);
+  animation: fest-rise 0.5s ease;
+}
+.fest-emoji { font-size: 64px; animation: fest-pulse 1.8s ease-in-out infinite; }
+.fest-card h2 {
+  font-family: var(--font-display);
+  color: var(--gold);
+  font-size: 34px;
+  font-weight: normal;
+  margin: 6px 0;
+}
+.fest-card p { font-size: 15px; opacity: 0.9; max-width: 340px; margin: 0 auto; line-height: 1.4; }
+.fest-card .continue-btn { width: auto; padding: 10px 28px; margin-top: 18px; }
+
+@keyframes fest-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fest-rise { from { transform: translateY(24px) scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fest-pulse { 0%,100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(232,201,107,0.5)); } 50% { transform: scale(1.15); filter: drop-shadow(0 0 20px rgba(232,201,107,0.9)); } }
 
 /* Mobile: build panel becomes a persistent slide-in drawer */
 @media (max-width: 900px) {

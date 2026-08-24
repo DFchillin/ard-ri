@@ -2,19 +2,26 @@ import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js';
 
 // DOM overlay. Owns the HTML controls; the world never reads the DOM directly.
 export class UI {
-  constructor({ onTool, onSpeed, onRotate, onZoom }) {
+  constructor({ onTool, onSpeed, onRotate, onZoom, onInspectClose, onFestivalContinue }) {
     this.onTool = onTool;
     this.onSpeed = onSpeed;
+    this.onInspectClose = onInspectClose || (() => {});
+    this.onFestivalContinue = onFestivalContinue || (() => {});
     this.activeTool = null;
 
     this.panel = document.getElementById('build-panel');
     this.tabsEl = document.getElementById('build-tabs');
     this.listEl = document.getElementById('build-list');
     this.inspectTool = document.getElementById('inspect-tool');
+    this.demolishTool = document.getElementById('demolish-tool');
     this.compassLabel = document.getElementById('compass-label');
+    this.seasonIcon = document.getElementById('stat-season-icon');
     this.missionList = document.getElementById('mission-list');
     this.popup = document.getElementById('inspect-popup');
     this.popupBody = document.getElementById('inspect-body');
+    this.inspectContinue = document.getElementById('inspect-continue');
+    this.speedBtns = [...document.querySelectorAll('.speed-btn')];
+    this.festival = document.getElementById('festival-overlay');
 
     this.el = {
       cattle: document.getElementById('stat-cattle'),
@@ -25,9 +32,9 @@ export class UI {
     };
 
     // Speed
-    [...document.querySelectorAll('.speed-btn')].forEach((b) =>
+    this.speedBtns.forEach((b) =>
       b.addEventListener('click', () => {
-        document.querySelectorAll('.speed-btn').forEach((o) => o.classList.toggle('active', o === b));
+        this.reflectSpeed(Number(b.dataset.speed));
         onSpeed(Number(b.dataset.speed));
       })
     );
@@ -43,7 +50,10 @@ export class UI {
     this.fab.addEventListener('click', () => this._setDrawer(true));
     document.getElementById('build-close').addEventListener('click', () => this._setDrawer(false));
     this.inspectTool.addEventListener('click', () => this.selectTool('inspect'));
+    this.demolishTool.addEventListener('click', () => this.selectTool('demolish'));
     document.getElementById('inspect-close').addEventListener('click', () => this.hideInspect());
+    this.inspectContinue.addEventListener('click', () => this.hideInspect());
+    document.getElementById('fest-continue').addEventListener('click', () => this.hideFestival());
 
     this._buildTabs();
     this._renderList(CATEGORIES[0].id);
@@ -101,15 +111,41 @@ export class UI {
 
   _applyToolHighlight() {
     this.inspectTool.classList.toggle('active', this.activeTool === 'inspect');
+    this.demolishTool.classList.toggle('active', this.activeTool === 'demolish');
     [...this.listEl.querySelectorAll('.build-btn')].forEach((b) =>
       b.classList.toggle('active', b.dataset.key === this.activeTool)
     );
   }
 
   setCompass(label) { if (this.compassLabel) this.compassLabel.textContent = label; }
+  setSeasonIcon(icon) { if (this.seasonIcon) this.seasonIcon.textContent = icon; }
 
-  showInspect(html) { this.popupBody.innerHTML = html; this.popup.classList.remove('hidden'); }
-  hideInspect() { this.popup.classList.add('hidden'); }
+  reflectSpeed(s) {
+    this.speedBtns.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === s));
+  }
+
+  showInspect(html, withContinue = false) {
+    this.popupBody.innerHTML = html;
+    this.inspectContinue.classList.toggle('hidden', !withContinue);
+    this.popup.classList.remove('hidden');
+  }
+  hideInspect() {
+    if (this.popup.classList.contains('hidden')) return;
+    this.popup.classList.add('hidden');
+    this.onInspectClose();
+  }
+
+  showFestival({ name, emoji, sub }) {
+    document.getElementById('fest-name').textContent = name;
+    document.getElementById('fest-emoji').textContent = emoji;
+    document.getElementById('fest-sub').textContent = sub;
+    this.festival.classList.remove('hidden');
+  }
+  hideFestival() {
+    if (this.festival.classList.contains('hidden')) return;
+    this.festival.classList.add('hidden');
+    this.onFestivalContinue();
+  }
 
   setObjectives(objectives) {
     this.missionList.innerHTML = objectives
@@ -122,6 +158,6 @@ export class UI {
     if (silver != null) this.el.silver.textContent = silver;
     if (folk != null) this.el.folk.textContent = folk;
     if (season != null) this.el.season.textContent = season;
-    if (day != null) this.el.day.textContent = `Day ${day}`;
+    if (day != null) this.el.day.textContent = day;
   }
 }

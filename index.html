@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Spectral:wght@400;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css?v=2" />
+<link rel="stylesheet" href="style.css?v=3" />
 <script type="importmap">
 {
   "imports": {
@@ -25,7 +25,7 @@
     <span class="stat" title="Cattle — the measure of wealth">🐄 <b id="stat-cattle">40</b></span>
     <span class="stat" title="Silver">🪙 <b id="stat-silver">200</b></span>
     <span class="stat" title="Folk">👤 <b id="stat-folk">0</b></span>
-    <span class="stat season" title="The wheel of the year">🌱 <b id="stat-season">Imbolc</b> · <span id="stat-day">Day 1</span></span>
+    <span class="stat season" title="The wheel of the year"><span id="stat-season-icon">🌱</span> <b id="stat-season">Earrach</b> · <span id="stat-day">Feb 1</span></span>
   </header>
 
   <section id="mission">
@@ -57,6 +57,7 @@
   <aside id="build-panel">
     <div id="build-tools">
       <button id="inspect-tool" class="tool-btn" title="Inspect a tile or person">🔍</button>
+      <button id="demolish-tool" class="tool-btn" title="Demolish a building or road">🗑️</button>
       <button id="build-close" class="tool-btn" title="Close">✕</button>
     </div>
     <div id="build-tabs"></div>
@@ -66,9 +67,19 @@
   <div id="inspect-popup" class="hidden">
     <button id="inspect-close" title="Close">✕</button>
     <div id="inspect-body"></div>
+    <button id="inspect-continue" class="continue-btn hidden">Continue ▸</button>
+  </div>
+
+  <div id="festival-overlay" class="hidden">
+    <div class="fest-card">
+      <div id="fest-emoji" class="fest-emoji">🔥</div>
+      <h2 id="fest-name">Bealtaine</h2>
+      <p id="fest-sub"></p>
+      <button id="fest-continue" class="continue-btn">Continue ▸</button>
+    </div>
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=2"></script>
+<script type="module" src="src/main.js?v=3"></script>
 </body>
 </html>

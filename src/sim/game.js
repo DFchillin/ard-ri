@@ -68,6 +68,26 @@ export class Game {
     return true;
   }
 
+  // Remove a building (refund half) or a road at a tile.
+  demolish(x, z) {
+    const t = this.map.get(x, z);
+    if (t && t.occupant) {
+      const inst = t.occupant;
+      for (let dz = 0; dz < inst.h; dz++)
+        for (let dx = 0; dx < inst.w; dx++) {
+          const tt = this.map.get(inst.x + dx, inst.z + dz);
+          if (tt) tt.occupant = null;
+        }
+      this.buildingGroup.remove(inst.sprite);
+      this.buildings = this.buildings.filter((b) => b !== inst);
+      if (inst.def.folk) this.folk = Math.max(0, this.folk - inst.def.folk);
+      this.silver += Math.floor(inst.def.cost / 2);
+      return 'building';
+    }
+    if (t && t.road) { this.map.setRoad(x, z, false); return 'road'; }
+    return null;
+  }
+
   _spawn(entry, opts) {
     const person = { name: randomName(), ...personFor(opts.type) };
     const w = new Walker(this.map, entry, { ...opts, person });
