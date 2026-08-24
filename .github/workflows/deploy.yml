@@ -26,10 +26,16 @@ jobs:
         run: |
           sudo apt-get -qq update && sudo apt-get -qq install -y lftp >/dev/null
           # DIAGNOSTIC: list the server layout so we can find the real web root.
+          # Data channel sent in the clear (control stays TLS) + plain PASV to
+          # avoid the FTPS data-channel hang in CI.
           lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_SERVER" <<'SCRIPT'
           set ftp:ssl-force true
-          set ftp:ssl-protect-data true
+          set ftp:ssl-protect-data false
           set ssl:verify-certificate no
+          set ftp:prefer-epsv false
+          set ftp:passive-mode true
+          set net:timeout 15
+          set net:max-retries 1
           set cmd:fail-exit no
           echo "=== pwd ==="
           pwd
@@ -39,10 +45,6 @@ jobs:
           ls httpdocs
           echo "=== htdocs ==="
           ls htdocs
-          echo "=== web ==="
-          ls web
-          echo "=== public_html ==="
-          ls public_html
           echo "=== done ==="
           bye
           SCRIPT
