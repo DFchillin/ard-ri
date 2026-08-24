@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Ard Rí</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Spectral:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 <script type="importmap">
 {
@@ -20,7 +23,7 @@
   <header id="topbar">
     <span class="brand">Ard Rí</span>
     <span class="stat" title="Cattle — the measure of wealth">🐄 <b id="stat-cattle">40</b></span>
-    <span class="stat" title="Silver">🪙 <b id="stat-silver">100</b></span>
+    <span class="stat" title="Silver">🪙 <b id="stat-silver">200</b></span>
     <span class="stat" title="Folk">👤 <b id="stat-folk">0</b></span>
     <span class="stat season" title="The wheel of the year">🌱 <b id="stat-season">Imbolc</b> · <span id="stat-day">Day 1</span></span>
   </header>
@@ -30,14 +33,16 @@
     <ul id="mission-list"></ul>
   </section>
 
-  <div id="buildbar">
-    <button class="build-btn" data-build="road">Road</button>
-    <button class="build-btn" data-build="roundhouse">Dwelling</button>
-    <button class="build-btn" data-build="field">Field</button>
-    <button class="build-btn" data-build="granary">Store</button>
-    <button class="build-btn" data-build="market">Market</button>
-    <button class="build-btn" data-build="well">Well</button>
-    <span id="build-hint" class="hint hidden">Tap the land to place · drag for roads · Esc to cancel</span>
+  <div id="map-controls">
+    <div class="mc-row">
+      <button id="rot-left" class="mc-btn" title="Rotate left">⟲</button>
+      <div id="compass" title="View">🧭<span id="compass-label">N</span></div>
+      <button id="rot-right" class="mc-btn" title="Rotate right">⟳</button>
+    </div>
+    <div class="mc-row">
+      <button id="zoom-out" class="mc-btn" title="Zoom out">－</button>
+      <button id="zoom-in" class="mc-btn" title="Zoom in">＋</button>
+    </div>
   </div>
 
   <div id="speedbar">
@@ -45,6 +50,22 @@
     <button class="speed-btn active" data-speed="1">1×</button>
     <button class="speed-btn" data-speed="2">2×</button>
     <button class="speed-btn" data-speed="3">3×</button>
+  </div>
+
+  <button id="build-toggle" title="Build menu">🔨</button>
+
+  <aside id="build-panel">
+    <div id="build-tools">
+      <button id="inspect-tool" class="tool-btn" title="Inspect a tile or person">🔍</button>
+      <button id="build-close" class="tool-btn" title="Close">✕</button>
+    </div>
+    <div id="build-tabs"></div>
+    <div id="build-list"></div>
+  </aside>
+
+  <div id="inspect-popup" class="hidden">
+    <button id="inspect-close" title="Close">✕</button>
+    <div id="inspect-body"></div>
   </div>
 </div>
 
