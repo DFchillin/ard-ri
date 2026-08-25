@@ -6,8 +6,8 @@
 <title>Ard Rí</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Spectral:wght@400;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css?v=4" />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Uncial+Antiqua&family=Spectral:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css?v=5" />
 <script type="importmap" data-cfasync="false">
 {
   "imports": {
@@ -56,13 +56,18 @@
 
   <aside id="build-panel">
     <div id="build-tools">
+      <button id="roam-tool" class="tool-btn" title="Roam — deselect and move the map">✋</button>
       <button id="inspect-tool" class="tool-btn" title="Inspect a tile or person">🔍</button>
       <button id="demolish-tool" class="tool-btn" title="Demolish a building or road">🗑️</button>
-      <button id="build-close" class="tool-btn" title="Close">✕</button>
     </div>
     <div id="build-tabs"></div>
     <div id="build-list"></div>
   </aside>
+
+  <div id="place-confirm" class="hidden">
+    <button id="place-do">Build here ✓</button>
+    <button id="place-cancel">✕</button>
+  </div>
 
   <div id="inspect-popup" class="hidden">
     <button id="inspect-close" title="Close">✕</button>
@@ -78,8 +83,20 @@
       <button id="fest-continue" class="continue-btn">Continue ▸</button>
     </div>
   </div>
+
+  <div id="title-screen">
+    <div class="title-card">
+      <h1 class="game-title">Ard Rí</h1>
+      <p class="title-sub">Rise from a lone ráth to High King of Ériu</p>
+      <div class="mission-menu">
+        <button class="mission-btn" data-mission="1">Mission One · First Steps</button>
+        <button class="mission-btn locked" disabled>Mission Two · locked 🔒</button>
+        <button class="mission-btn locked" disabled>Mission Three · locked 🔒</button>
+      </div>
+    </div>
+  </div>
 </div>
 
-<script type="module" src="src/main.js?v=4" data-cfasync="false"></script>
+<script type="module" src="src/main.js?v=5" data-cfasync="false"></script>
 </body>
 </html>

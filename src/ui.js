@@ -1,8 +1,8 @@
-import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=4';
+import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=5';
 
 // DOM overlay. Owns the HTML controls; the world never reads the DOM directly.
 export class UI {
-  constructor({ onTool, onSpeed, onRotate, onZoom, onInspectClose, onFestivalContinue }) {
+  constructor({ onTool, onSpeed, onRotate, onZoom, onInspectClose, onFestivalContinue, onStartMission, onPlaceConfirm, onPlaceCancel }) {
     this.onTool = onTool;
     this.onSpeed = onSpeed;
     this.onInspectClose = onInspectClose || (() => {});
@@ -14,6 +14,9 @@ export class UI {
     this.listEl = document.getElementById('build-list');
     this.inspectTool = document.getElementById('inspect-tool');
     this.demolishTool = document.getElementById('demolish-tool');
+    this.roamTool = document.getElementById('roam-tool');
+    this.titleScreen = document.getElementById('title-screen');
+    this.placeConfirm = document.getElementById('place-confirm');
     this.compassLabel = document.getElementById('compass-label');
     this.seasonIcon = document.getElementById('stat-season-icon');
     this.missionList = document.getElementById('mission-list');
@@ -48,16 +51,34 @@ export class UI {
     // Drawer + tools
     this.fab = document.getElementById('build-toggle');
     this.fab.addEventListener('click', () => this._setDrawer(true));
-    document.getElementById('build-close').addEventListener('click', () => this._setDrawer(false));
     this.inspectTool.addEventListener('click', () => this.selectTool('inspect'));
     this.demolishTool.addEventListener('click', () => this.selectTool('demolish'));
+    this.roamTool.addEventListener('click', () => this.roam());
     document.getElementById('inspect-close').addEventListener('click', () => this.hideInspect());
     this.inspectContinue.addEventListener('click', () => this.hideInspect());
     document.getElementById('fest-continue').addEventListener('click', () => this.hideFestival());
+    document.getElementById('place-do').addEventListener('click', () => (onPlaceConfirm || (() => {}))());
+    document.getElementById('place-cancel').addEventListener('click', () => (onPlaceCancel || (() => {}))());
+    [...document.querySelectorAll('.mission-btn:not(.locked)')].forEach((b) =>
+      b.addEventListener('click', () => { this.hideTitle(); (onStartMission || (() => {}))(); })
+    );
 
     this._buildTabs();
     this._renderList(CATEGORIES[0].id);
   }
+
+  roam() {
+    this.activeTool = null;
+    this._applyToolHighlight();
+    this.hideInspect();
+    this.onTool(null);
+    this._setDrawer(false);
+  }
+
+  showTitle() { if (this.titleScreen) this.titleScreen.classList.remove('hidden'); }
+  hideTitle() { if (this.titleScreen) this.titleScreen.classList.add('hidden'); }
+  showPlaceConfirm() { if (this.placeConfirm) this.placeConfirm.classList.remove('hidden'); }
+  hidePlaceConfirm() { if (this.placeConfirm) this.placeConfirm.classList.add('hidden'); }
 
   _setDrawer(open) {
     this.panel.classList.toggle('open', open);
@@ -112,6 +133,7 @@ export class UI {
   _applyToolHighlight() {
     this.inspectTool.classList.toggle('active', this.activeTool === 'inspect');
     this.demolishTool.classList.toggle('active', this.activeTool === 'demolish');
+    if (this.roamTool) this.roamTool.classList.toggle('active', this.activeTool === null);
     [...this.listEl.querySelectorAll('.build-btn')].forEach((b) =>
       b.classList.toggle('active', b.dataset.key === this.activeTool)
     );

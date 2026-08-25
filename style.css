@@ -1,5 +1,6 @@
 :root {
   --font-display: 'Uncial Antiqua', 'Cinzel', Georgia, serif;
+  --font-title: 'Cinzel Decorative', 'Uncial Antiqua', Georgia, serif;
   --font-body: 'Spectral', Georgia, 'Times New Roman', serif;
   --gold: #e8c96b;
   --panel: rgba(11, 20, 24, 0.9);
@@ -275,6 +276,69 @@ html, body {
 @keyframes fest-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes fest-rise { from { transform: translateY(24px) scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes fest-pulse { 0%,100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(232,201,107,0.5)); } 50% { transform: scale(1.15); filter: drop-shadow(0 0 20px rgba(232,201,107,0.9)); } }
+
+/* Place confirmation bar (ghost placement) */
+#place-confirm {
+  position: absolute;
+  left: 50%;
+  bottom: 78px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+#place-confirm.hidden { display: none; }
+#place-do {
+  background: var(--gold); color: #1c130a; border: none;
+  border-radius: 10px; padding: 12px 22px; font-size: 16px; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+#place-cancel {
+  background: rgba(15,28,34,0.95); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 10px;
+  width: 46px; font-size: 16px;
+}
+
+/* Title screen */
+#title-screen {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background: radial-gradient(ellipse at center, rgba(18,26,20,0.7), rgba(6,10,12,0.96));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#title-screen.hidden { display: none; }
+.title-card { text-align: center; padding: 30px; max-width: 92vw; }
+.game-title {
+  font-family: var(--font-title);
+  font-weight: 900;
+  font-size: clamp(48px, 12vw, 96px);
+  color: var(--gold);
+  letter-spacing: 2px;
+  text-shadow: 0 0 40px rgba(232,201,107,0.35);
+  line-height: 1.05;
+}
+.title-sub {
+  font-family: var(--font-display);
+  font-size: clamp(14px, 3.4vw, 20px);
+  opacity: 0.85;
+  margin: 10px 0 28px;
+}
+.mission-menu { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.mission-btn {
+  width: min(320px, 84vw);
+  padding: 14px 18px;
+  background: #223b30;
+  color: var(--ink);
+  border: 1px solid #3c6b4f;
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+.mission-btn:not(.locked):hover { background: var(--gold); color: #1c130a; border-color: var(--gold); }
+.mission-btn.locked { opacity: 0.4; cursor: default; }
 
 /* Mobile: build panel becomes a persistent slide-in drawer */
 @media (max-width: 900px) {

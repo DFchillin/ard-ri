@@ -71,11 +71,12 @@ export class Tilemap {
         const e = elev(x + 0.5, z + 0.5);
         const m = moist(x + 0.5, z + 0.5);
         let terrain = T.GRASS;
-        if (e < 0.30) terrain = T.WATER;
-        else if (e < 0.35) terrain = T.SAND;
-        else if (e > 0.76) terrain = T.ROCK;
-        else if (m > 0.70) terrain = T.BOG;
-        else if (m < 0.34 && scatter() < 0.55) terrain = T.WOODS;
+        // Obstacles kept sparse so the player has plenty of buildable land.
+        if (e < 0.13) terrain = T.WATER;
+        else if (e < 0.16) terrain = T.SAND;
+        else if (e > 0.91) terrain = T.ROCK;
+        else if (m > 0.89) terrain = T.BOG;
+        else if (m < 0.15 && scatter() < 0.35) terrain = T.WOODS;
         this.tiles[this.idx(x, z)] = { terrain, road: false, occupant: null };
       }
     }

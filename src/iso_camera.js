@@ -54,6 +54,6 @@ export function resizeIsoCamera(cam, aspect) {
 
 // factor < 1 zooms in (smaller view), > 1 zooms out.
 export function zoomIsoCamera(cam, factor, aspect) {
-  cam.userData.viewSize = Math.max(6, Math.min(38, cam.userData.viewSize * factor));
+  cam.userData.viewSize = Math.max(3.5, Math.min(38, cam.userData.viewSize * factor));
   resizeIsoCamera(cam, aspect);
 }

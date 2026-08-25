@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=4';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=4';
-import { WorldView } from './render/world_view.js?v=4';
-import { BUILDINGS } from './data/buildings.js?v=4';
-import { Game } from './sim/game.js?v=4';
-import { UI } from './ui.js?v=4';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=4';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=5';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=5';
+import { WorldView } from './render/world_view.js?v=5';
+import { BUILDINGS } from './data/buildings.js?v=5';
+import { Game } from './sim/game.js?v=5';
+import { UI } from './ui.js?v=5';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=5';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -23,9 +23,9 @@ scene.fog = new THREE.Fog(0x0b1418, 70, 175);
 let aspect = window.innerWidth / window.innerHeight;
 const camera = createIsoCamera(15, aspect);
 
-const hemi = new THREE.HemisphereLight(0xd6f0cf, 0x40602f, 0.85);
+const hemi = new THREE.HemisphereLight(0xd6f0cf, 0x40602f, 1.6);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xdfffcf, 1.0);
+const sun = new THREE.DirectionalLight(0xdfffcf, 1.8);
 sun.position.set(40, 70, 20);
 scene.add(sun);
 
@@ -38,15 +38,22 @@ const cal = { day: 1, month: 1 }; // start Feb — Imbolc, Spring
 let curSeason = seasonOfMonth(cal.month);
 let tool = null;
 let savedSpeed = null;
+let started = false;
+let missionDone = false;
 
 const ui = new UI({
-  onTool: (kind) => { tool = kind; if (!(tool === 'road' || BUILDINGS[tool])) preview.visible = false; },
+  onTool: (kind) => { cancelPending(); tool = kind; if (!(tool === 'road' || BUILDINGS[tool])) preview.visible = false; },
   onSpeed: (s) => { sim.speed = s; savedSpeed = null; },
   onRotate: (d) => ui.setCompass(rotateIsoCamera(camera, d)),
   onZoom: (f) => zoomIsoCamera(camera, f, aspect),
   onInspectClose: () => resumeGame(),
   onFestivalContinue: () => resumeGame(),
+  onStartMission: () => startMission(),
+  onPlaceConfirm: () => confirmBuild(),
+  onPlaceCancel: () => cancelPending(),
 });
+
+function startMission() { started = true; triggerFestival(FESTIVALS[1]); }
 
 function pauseGame() { if (savedSpeed === null) savedSpeed = sim.speed; sim.speed = 0; ui.reflectSpeed(0); }
 function resumeGame() { if (savedSpeed !== null) { sim.speed = savedSpeed; ui.reflectSpeed(sim.speed); savedSpeed = null; } }
@@ -85,7 +92,7 @@ applySeason(curSeason);
 pushStats();
 updateDate();
 ui.setCompass(cameraDirLabel(camera));
-triggerFestival(FESTIVALS[1]); // open the year at Imbolc
+ui.showTitle(); // title screen; Mission One starts the game
 
 // --- Placement preview ---
 const preview = new THREE.Mesh(
@@ -176,7 +183,33 @@ function demolishAt(e) {
 // --- Input: build / road-paint / demolish / inspect + pan + pinch ---
 const pointers = new Map();
 let painting = false, demolishing = false, panLast = null, pinchDist = 0;
+let pendingBuild = null, movingBuild = false;
 const _fwd = new THREE.Vector3(), _right = new THREE.Vector3();
+
+// Ghost placement: drop a building, drag to relocate, then "Build here".
+function showGhostAt(t) {
+  if (!t || !BUILDINGS[tool]) return;
+  pendingBuild = t;
+  const f = footprint(tool, t);
+  const cx = f.x * map.tile - map.half + (f.w * map.tile) / 2;
+  const cz = f.z * map.tile - map.half + (f.h * map.tile) / 2;
+  preview.position.set(cx, 0.08, cz);
+  preview.scale.set(f.w * map.tile, f.h * map.tile, 1);
+  preview.material.color.set(game.canAfford(tool) && map.canPlace(f.x, f.z, f.w, f.h) ? 0x66ff66 : 0xff5555);
+  preview.visible = true;
+  ui.showPlaceConfirm();
+}
+function confirmBuild() {
+  if (!pendingBuild || !BUILDINGS[tool]) return;
+  const f = footprint(tool, pendingBuild);
+  if (game.place(tool, f)) { pushStats(); cancelPending(); }
+}
+function cancelPending() {
+  pendingBuild = null;
+  movingBuild = false;
+  preview.visible = false;
+  if (ui.hidePlaceConfirm) ui.hidePlaceConfirm();
+}
 
 function pointerDist() {
   const p = [...pointers.values()];
@@ -186,7 +219,7 @@ function panByScreen(dxPix, dyPix) {
   camera.getWorldDirection(_fwd); _fwd.y = 0; _fwd.normalize();
   _right.set(_fwd.z, 0, -_fwd.x);
   const wpp = (2 * camera.userData.viewSize) / window.innerHeight;
-  const mx = -dxPix * wpp, my = dyPix * wpp;
+  const mx = dxPix * wpp, my = -dyPix * wpp; // inverted drag
   panIsoCamera(camera, _right.x * mx + _fwd.x * my, _right.z * mx + _fwd.z * my);
 }
 
@@ -200,7 +233,7 @@ canvas.addEventListener('pointerdown', (e) => {
     if (tool === 'inspect') { inspectAt(e); return; }
     if (tool === 'demolish') { demolishing = true; demolishAt(e); return; }
     if (tool === 'road') { const t = tileUnderPointer(e); if (t) { painting = true; if (map.setRoad(t.x, t.z, true)) view.rebuildRoads(); } return; }
-    if (BUILDINGS[tool]) { const t = tileUnderPointer(e); if (t && game.place(tool, footprint(tool, t))) pushStats(); return; }
+    if (BUILDINGS[tool]) { movingBuild = true; showGhostAt(tileUnderPointer(e)); return; }
   }
   panLast = { x: e.clientX, y: e.clientY }; // no build tool, or right-drag → pan
 });
@@ -209,6 +242,8 @@ canvas.addEventListener('pointermove', (e) => {
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2) { const d = pointerDist(); if (pinchDist && d > 0) zoomIsoCamera(camera, pinchDist / d, aspect); pinchDist = d; return; }
   if (panLast) { panByScreen(e.clientX - panLast.x, e.clientY - panLast.y); panLast = { x: e.clientX, y: e.clientY }; return; }
+  if (movingBuild && BUILDINGS[tool]) { const t = tileUnderPointer(e); if (t) showGhostAt(t); return; }
+  if (pendingBuild) return; // ghost locked awaiting "Build here"
   updatePreview(e);
   if (painting && tool === 'road') { const t = tileUnderPointer(e); if (t && map.setRoad(t.x, t.z, true)) view.rebuildRoads(); }
   if (demolishing && tool === 'demolish') demolishAt(e);
@@ -218,7 +253,7 @@ function endPointer(e) {
   pointers.delete(e.pointerId);
   canvas.releasePointerCapture?.(e.pointerId);
   if (pointers.size < 2) pinchDist = 0;
-  if (pointers.size === 0) { painting = false; demolishing = false; panLast = null; }
+  if (pointers.size === 0) { painting = false; demolishing = false; panLast = null; movingBuild = false; }
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
@@ -230,8 +265,16 @@ canvas.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { tool = null; ui.setTool(null); preview.visible = false; ui.hideInspect(); }
+  if (e.key === 'Escape') { cancelPending(); tool = null; ui.setTool(null); preview.visible = false; ui.hideInspect(); }
 });
+
+function checkMission() {
+  if (!missionDone && game.objectives.every((o) => o.done)) {
+    missionDone = true;
+    pauseGame();
+    ui.showFestival({ name: 'Mission Complete', emoji: '🏆', sub: 'Comhghairdeas! Your settlement thrives — the first steps are taken.' });
+  }
+}
 
 window.addEventListener('resize', () => {
   aspect = window.innerWidth / window.innerHeight;
@@ -248,10 +291,10 @@ const clock = new THREE.Clock();
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
-  const scaled = dt * sim.speed;
+  const scaled = started ? dt * sim.speed : 0;
   game.update(scaled);
   econAcc += scaled;
-  while (econAcc >= ECON_TICK) { econAcc -= ECON_TICK; game.tick(); pushStats(); }
+  while (econAcc >= ECON_TICK) { econAcc -= ECON_TICK; game.tick(); pushStats(); checkMission(); }
   dayAcc += scaled;
   while (dayAcc >= SECONDS_PER_DAY) { dayAcc -= SECONDS_PER_DAY; advanceDay(); }
   renderer.render(scene, camera);
