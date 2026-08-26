@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=6';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=6';
-import { WorldView } from './render/world_view.js?v=6';
-import { BUILDINGS } from './data/buildings.js?v=6';
-import { Game } from './sim/game.js?v=6';
-import { UI } from './ui.js?v=6';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=6';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=7';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=7';
+import { WorldView } from './render/world_view.js?v=7';
+import { BUILDINGS } from './data/buildings.js?v=7';
+import { Game } from './sim/game.js?v=7';
+import { UI } from './ui.js?v=7';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=7';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -29,7 +29,7 @@ const sun = new THREE.DirectionalLight(0xdfffcf, 1.8);
 sun.position.set(40, 70, 20);
 scene.add(sun);
 // Seasonal accent: a coloured light from a different corner each season.
-const accent = new THREE.DirectionalLight(0x8fe06a, 0.75);
+const accent = new THREE.DirectionalLight(0x8fe06a, 2.4);
 scene.add(accent);
 scene.add(accent.target);
 const SEASON_ACCENT = {
@@ -77,6 +77,8 @@ function applySeason(key) {
   const a = SEASON_ACCENT[key];
   accent.color.setHex(a.color);
   accent.position.set(a.pos[0], a.pos[1], a.pos[2]);
+  scene.background.setHex(L.bg);
+  scene.fog.color.setHex(L.bg);
   ui.setSeasonIcon(SEASONS[key].icon);
 }
 function pushStats() {
@@ -116,6 +118,20 @@ preview.rotation.x = -Math.PI / 2;
 preview.position.y = 0.06;
 preview.visible = false;
 scene.add(preview);
+
+// Raised ghost volume for building placement — clearly visible after you drop it.
+const ghostBox = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshBasicMaterial({ color: 0x66ff66, transparent: true, opacity: 0.28, depthWrite: false })
+);
+const ghostEdges = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
+  new THREE.LineBasicMaterial({ color: 0xffffff })
+);
+ghostBox.add(ghostEdges);
+ghostBox.visible = false;
+scene.add(ghostBox);
+const GHOST_H = 1.4;
 
 const raycaster = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
@@ -206,10 +222,13 @@ function showGhostAt(t) {
   const f = footprint(tool, t);
   const cx = f.x * map.tile - map.half + (f.w * map.tile) / 2;
   const cz = f.z * map.tile - map.half + (f.h * map.tile) / 2;
-  preview.position.set(cx, 0.08, cz);
-  preview.scale.set(f.w * map.tile, f.h * map.tile, 1);
-  preview.material.color.set(game.canAfford(tool) && map.canPlace(f.x, f.z, f.w, f.h) ? 0x66ff66 : 0xff5555);
-  preview.visible = true;
+  const ok = game.canAfford(tool) && map.canPlace(f.x, f.z, f.w, f.h);
+  ghostBox.position.set(cx, GHOST_H / 2, cz);
+  ghostBox.scale.set(f.w * map.tile, GHOST_H, f.h * map.tile);
+  ghostBox.material.color.set(ok ? 0x66ff66 : 0xff5555);
+  ghostEdges.material.color.set(ok ? 0xffffff : 0xffbbaa);
+  ghostBox.visible = true;
+  preview.visible = false;
   ui.showPlaceConfirm();
 }
 function confirmBuild() {
@@ -221,6 +240,7 @@ function cancelPending() {
   pendingBuild = null;
   movingBuild = false;
   preview.visible = false;
+  ghostBox.visible = false;
   if (ui.hidePlaceConfirm) ui.hidePlaceConfirm();
 }
 
@@ -270,7 +290,7 @@ function endPointer(e) {
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
-canvas.addEventListener('pointerleave', () => { preview.visible = false; });
+canvas.addEventListener('pointerleave', () => { if (!pendingBuild) preview.visible = false; });
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();

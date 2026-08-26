@@ -4,13 +4,13 @@ export const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June'
 
 export const SEASONS = {
   earrach:    { en: 'Spring', ga: 'Earrach',    icon: '🌱',
-    light: { sky: 0xe6f7df, ground: 0x5a7a44, sun: 0xeaffdc, intensity: 1.9 } },
+    light: { sky: 0xe6f7df, ground: 0x5a7a44, sun: 0xeaffdc, intensity: 1.9, bg: 0x16281c } },
   samhradh:   { en: 'Summer', ga: 'Samhradh',   icon: '☀️',
-    light: { sky: 0xfff6db, ground: 0x66723a, sun: 0xffeeb8, intensity: 2.3 } },
+    light: { sky: 0xfff6db, ground: 0x66723a, sun: 0xffeeb8, intensity: 2.3, bg: 0x20260f } },
   fomhar:     { en: 'Autumn', ga: 'Fómhar',     icon: '🍂',
-    light: { sky: 0xffecc0, ground: 0x6e5a34, sun: 0xffd07e, intensity: 2.0 } },
+    light: { sky: 0xffecc0, ground: 0x6e5a34, sun: 0xffd07e, intensity: 2.0, bg: 0x2a1c0d } },
   geimhreadh: { en: 'Winter', ga: 'Geimhreadh', icon: '❄️',
-    light: { sky: 0xdce8ff, ground: 0x4a5461, sun: 0xdcebff, intensity: 1.55 } },
+    light: { sky: 0xdce8ff, ground: 0x4a5461, sun: 0xdcebff, intensity: 1.55, bg: 0x111a26 } },
 };
 
 // month index (0=Jan) -> season key

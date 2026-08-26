@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../data/buildings.js?v=6';
-import { makeBuildingChip, makeAlertMarker } from '../render/chips.js?v=6';
-import { Walker, Traveler } from './walkers.js?v=6';
-import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=6';
-import { randomName } from '../data/names.js?v=6';
-import { personFor } from '../data/phrases.js?v=6';
+import { BUILDINGS } from '../data/buildings.js?v=7';
+import { makeBuildingChip, makeAlertMarker } from '../render/chips.js?v=7';
+import { Walker, Traveler } from './walkers.js?v=7';
+import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=7';
+import { randomName } from '../data/names.js?v=7';
+import { personFor } from '../data/phrases.js?v=7';
 
 const MARKET_CAP = 12;
 const HOUSE_CAP = 10;
@@ -44,6 +44,10 @@ export class Game {
 
   count(role) { return this.buildings.filter((b) => b.def.role === role).length; }
   anyStock(role) { return this.buildings.some((b) => b.def.role === role && b.stock > 0); }
+
+  // Half the folk are able workers — the rest are children and elders.
+  workforce() { return Math.floor(this.folk * 0.5); }
+  _activeWorkers() { return this.walkers.reduce((n, w) => n + (w instanceof Walker && !w.done ? 1 : 0), 0); }
 
   _center(f) {
     return {
@@ -108,6 +112,7 @@ export class Game {
   // --- Economy, one call per sim tick ---
   tick() {
     if (++this._immTimer >= 3) { this._immTimer = 0; this._sendImmigrant(); } // settlers move in
+    this._labour = Math.max(0, this.workforce() - this._activeWorkers()); // spare hands this tick
     for (const b of this.buildings) {
       if (b.alert) b.alert.visible = !entryRoadTile(this.map, b); // flag buildings with no road
       this._tickBuilding(b);
@@ -118,13 +123,13 @@ export class Game {
   _tickBuilding(b) {
     switch (b.def.role) {
       case 'farm': {
-        // No workers until people live here — dwellings before workers.
-        if (this.folk > 0 && ++b.timer >= b.def.rate) { b.timer = 0; this._sendGrain(b); }
+        // No workers until people live here, and never more workers than spare hands.
+        if (this._labour > 0 && ++b.timer >= b.def.rate) { b.timer = 0; this._labour--; this._sendGrain(b); }
         break;
       }
       case 'market': {
         this._restock(b);
-        if (this.folk > 0 && b.stock > 0 && ++b.timer >= 3) { b.timer = 0; this._sendTrader(b); }
+        if (this._labour > 0 && b.stock > 0 && ++b.timer >= 3) { b.timer = 0; this._labour--; this._sendTrader(b); }
         break;
       }
       case 'dwelling': {

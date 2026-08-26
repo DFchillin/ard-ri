@@ -46,10 +46,24 @@ html, body {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 8px 14px;
+  padding: 8px 52px 8px 14px;
   background: linear-gradient(180deg, rgba(11,20,24,0.94), transparent);
   font-size: 15px;
   flex-wrap: wrap;
+}
+
+/* Full-screen toggle, top-right corner */
+#fullscreen-btn {
+  position: absolute;
+  top: 6px; right: 8px;
+  width: 36px; height: 36px;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 17px;
+  line-height: 1;
+  z-index: 5;
 }
 .brand {
   font-family: var(--font-display);
@@ -200,6 +214,8 @@ html, body {
 }
 #build-toggle { bottom: 70px; background: var(--gold); color: #1c130a; }
 #inspect-fab { bottom: 132px; background: rgba(15,28,34,0.95); color: var(--ink); border: 1px solid var(--border); }
+#inspect-fab.active { background: var(--gold); color: #1c130a; border-color: var(--gold); box-shadow: 0 0 14px rgba(232,201,107,0.6); }
+#build-toggle.active { box-shadow: 0 0 14px rgba(232,201,107,0.7); outline: 2px solid #fff; }
 
 /* Inspect popup */
 #inspect-popup {

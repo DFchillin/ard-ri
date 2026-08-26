@@ -1,4 +1,4 @@
-import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=6';
+import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=7';
 
 // DOM overlay. Owns the HTML controls; the world never reads the DOM directly.
 export class UI {
@@ -64,6 +64,26 @@ export class UI {
     [...document.querySelectorAll('.mission-btn:not(.locked)')].forEach((b) =>
       b.addEventListener('click', () => { this.hideTitle(); (onStartMission || (() => {}))(); })
     );
+
+    // Full-screen toggle (top corner)
+    this.fsBtn = document.getElementById('fullscreen-btn');
+    if (this.fsBtn) {
+      this.fsBtn.addEventListener('click', () => {
+        const el = document.documentElement;
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+          (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+        } else {
+          (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+        }
+      });
+      const sync = () => {
+        const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        this.fsBtn.textContent = on ? '🡼' : '⛶';
+        this.fsBtn.title = on ? 'Exit full screen' : 'Play full screen';
+      };
+      document.addEventListener('fullscreenchange', sync);
+      document.addEventListener('webkitfullscreenchange', sync);
+    }
 
     this._buildTabs();
     this._renderList(CATEGORIES[0].id);
@@ -138,6 +158,8 @@ export class UI {
   _applyToolHighlight() {
     this.inspectTool.classList.toggle('active', this.activeTool === 'inspect');
     this.demolishTool.classList.toggle('active', this.activeTool === 'demolish');
+    if (this.inspectFab) this.inspectFab.classList.toggle('active', this.activeTool === 'inspect');
+    if (this.fab) this.fab.classList.toggle('active', !!this.activeTool && this.activeTool !== 'inspect' && this.activeTool !== 'demolish');
     if (this.roamTool) this.roamTool.classList.toggle('active', this.activeTool === null);
     [...this.listEl.querySelectorAll('.build-btn')].forEach((b) =>
       b.classList.toggle('active', b.dataset.key === this.activeTool)
