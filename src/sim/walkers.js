@@ -1,5 +1,5 @@
-import { makeWalkerChip } from '../render/chips.js?v=5';
-import { roadNeighbors } from './roads.js?v=5';
+import { makeWalkerChip } from '../render/chips.js?v=6';
+import { roadNeighbors } from './roads.js?v=6';
 
 // A walker random-walks the road network for a fixed number of steps, running
 // its onTile callback as it enters each tile, then finishes. This one mechanic
@@ -62,11 +62,47 @@ export class Walker {
   }
 
   dispose() {
-    this.sprite.traverse?.((o) => {
-      o.geometry?.dispose();
-      o.material?.dispose();
-    });
-    if (this.sprite.geometry) this.sprite.geometry.dispose();
-    if (this.sprite.material) this.sprite.material.dispose();
+    disposeSprite(this.sprite);
   }
+}
+
+function disposeSprite(sprite) {
+  sprite.traverse?.((o) => { o.geometry?.dispose(); o.material?.dispose(); });
+  if (sprite.geometry) sprite.geometry.dispose();
+  if (sprite.material) sprite.material.dispose();
+}
+
+// A traveller moves in a straight line from one tile to another, ignoring roads
+// — used for settlers walking in from the map entrance into their new dwelling.
+export class Traveler {
+  constructor(map, startTile, targetTile, { type = 'villager', speed = 2.2, onArrive, person } = {}) {
+    this.map = map;
+    this.speed = speed;
+    this.onArrive = onArrive;
+    this.person = person || null;
+    this.done = false;
+    this.t = 0;
+    this.age = 0;
+    this.a = map.tileToWorld(startTile.x, startTile.z);
+    this.b = map.tileToWorld(targetTile.x, targetTile.z);
+    this.dist = Math.hypot(this.b.x - this.a.x, this.b.z - this.a.z) || 1;
+    this.sprite = makeWalkerChip(type);
+    this.sprite.userData = { kind: 'walker', person: this.person, type };
+    this.sprite.position.set(this.a.x, 0.05, this.a.z);
+  }
+
+  update(dt) {
+    if (this.done) return;
+    this.age += dt;
+    this.t += (dt * this.speed) / this.dist;
+    const k = Math.min(this.t, 1);
+    this.sprite.position.set(
+      this.a.x + (this.b.x - this.a.x) * k,
+      0.05 + Math.abs(Math.sin(this.age * 7)) * 0.16,
+      this.a.z + (this.b.z - this.a.z) * k
+    );
+    if (this.t >= 1) { this.done = true; if (this.onArrive) this.onArrive(); }
+  }
+
+  dispose() { disposeSprite(this.sprite); }
 }

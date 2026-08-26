@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../data/buildings.js?v=5';
-import { makeBuildingChip, makeAlertMarker } from '../render/chips.js?v=5';
-import { Walker } from './walkers.js?v=5';
-import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=5';
-import { randomName } from '../data/names.js?v=5';
-import { personFor } from '../data/phrases.js?v=5';
+import { BUILDINGS } from '../data/buildings.js?v=6';
+import { makeBuildingChip, makeAlertMarker } from '../render/chips.js?v=6';
+import { Walker, Traveler } from './walkers.js?v=6';
+import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=6';
+import { randomName } from '../data/names.js?v=6';
+import { personFor } from '../data/phrases.js?v=6';
 
 const MARKET_CAP = 12;
 const HOUSE_CAP = 10;
@@ -22,6 +22,16 @@ export class Game {
     this.silver = 200;
     this.folk = 0;
     this.cattle = 40;
+    this._immTimer = 0;
+    this.entrance = { x: 0, z: Math.floor(map.size / 2) }; // settlers arrive here
+
+    const ew = map.tileToWorld(this.entrance.x, this.entrance.z);
+    const gate = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.22, 1.6, 6),
+      new THREE.MeshBasicMaterial({ color: 0xe8c96b })
+    );
+    gate.position.set(ew.x, 0.8, ew.z);
+    scene.add(gate);
 
     this.objectives = [
       { text: 'Build 4 dwellings', done: false, check: (g) => g.count('dwelling') >= 4 },
@@ -48,7 +58,8 @@ export class Game {
     const def = BUILDINGS[key];
     if (this.silver < def.cost || !this.map.canPlace(f.x, f.z, f.w, f.h)) return false;
 
-    const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, timer: 0 };
+    const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, timer: 0,
+      pop: 0, cap: def.folk || 0, incoming: 0 };
     this.map.place(f.x, f.z, f.w, f.h, inst);
 
     const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile);
@@ -64,8 +75,7 @@ export class Game {
 
     this.buildings.push(inst);
     this.silver -= def.cost;
-    if (def.folk) this.folk += def.folk;
-    return true;
+    return true; // dwellings fill via immigrants, not instantly
   }
 
   // Remove a building (refund half) or a road at a tile.
@@ -80,7 +90,7 @@ export class Game {
         }
       this.buildingGroup.remove(inst.sprite);
       this.buildings = this.buildings.filter((b) => b !== inst);
-      if (inst.def.folk) this.folk = Math.max(0, this.folk - inst.def.folk);
+      if (inst.pop) this.folk = Math.max(0, this.folk - inst.pop);
       this.silver += Math.floor(inst.def.cost / 2);
       return 'building';
     }
@@ -97,6 +107,7 @@ export class Game {
 
   // --- Economy, one call per sim tick ---
   tick() {
+    if (++this._immTimer >= 3) { this._immTimer = 0; this._sendImmigrant(); } // settlers move in
     for (const b of this.buildings) {
       if (b.alert) b.alert.visible = !entryRoadTile(this.map, b); // flag buildings with no road
       this._tickBuilding(b);
@@ -107,12 +118,13 @@ export class Game {
   _tickBuilding(b) {
     switch (b.def.role) {
       case 'farm': {
-        if (++b.timer >= b.def.rate) { b.timer = 0; this._sendGrain(b); }
+        // No workers until people live here — dwellings before workers.
+        if (this.folk > 0 && ++b.timer >= b.def.rate) { b.timer = 0; this._sendGrain(b); }
         break;
       }
       case 'market': {
         this._restock(b);
-        if (b.stock > 0 && ++b.timer >= 3) { b.timer = 0; this._sendTrader(b); }
+        if (this.folk > 0 && b.stock > 0 && ++b.timer >= 3) { b.timer = 0; this._sendTrader(b); }
         break;
       }
       case 'dwelling': {
@@ -120,6 +132,25 @@ export class Game {
         break;
       }
     }
+  }
+
+  // A settler walks in from the entrance and moves into a dwelling with room.
+  _sendImmigrant() {
+    const home = this.buildings.find(
+      (b) => b.def.role === 'dwelling' && b.pop + b.incoming < b.cap
+    );
+    if (!home) return;
+    home.incoming += 1;
+    const person = { name: randomName(), ...personFor('villager') };
+    const tr = new Traveler(this.map, this.entrance, { x: home.x, z: home.z }, {
+      type: 'villager', speed: 2.4, person,
+      onArrive: () => {
+        home.incoming = Math.max(0, home.incoming - 1);
+        if (home.pop < home.cap) { home.pop += 1; this.folk += 1; }
+      },
+    });
+    this.walkers.push(tr);
+    this.walkerGroup.add(tr.sprite);
   }
 
   // Farm → grain_carrier wanders roads, deposits its load in the first granary it passes.

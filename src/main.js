@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=5';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=5';
-import { WorldView } from './render/world_view.js?v=5';
-import { BUILDINGS } from './data/buildings.js?v=5';
-import { Game } from './sim/game.js?v=5';
-import { UI } from './ui.js?v=5';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=5';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=6';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=6';
+import { WorldView } from './render/world_view.js?v=6';
+import { BUILDINGS } from './data/buildings.js?v=6';
+import { Game } from './sim/game.js?v=6';
+import { UI } from './ui.js?v=6';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=6';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -28,6 +28,16 @@ scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xdfffcf, 1.8);
 sun.position.set(40, 70, 20);
 scene.add(sun);
+// Seasonal accent: a coloured light from a different corner each season.
+const accent = new THREE.DirectionalLight(0x8fe06a, 0.75);
+scene.add(accent);
+scene.add(accent.target);
+const SEASON_ACCENT = {
+  earrach:    { color: 0x8fe06a, pos: [-45, 42, -45] },
+  samhradh:   { color: 0xffd166, pos: [45, 42, -45] },
+  fomhar:     { color: 0xff8a4a, pos: [45, 42, 45] },
+  geimhreadh: { color: 0x8fbfff, pos: [-45, 42, 45] },
+};
 
 const map = new Tilemap(32, 1, 7);
 const view = new WorldView(scene, map);
@@ -64,6 +74,9 @@ function applySeason(key) {
   hemi.groundColor.setHex(L.ground);
   sun.color.setHex(L.sun);
   sun.intensity = L.intensity;
+  const a = SEASON_ACCENT[key];
+  accent.color.setHex(a.color);
+  accent.position.set(a.pos[0], a.pos[1], a.pos[2]);
   ui.setSeasonIcon(SEASONS[key].icon);
 }
 function pushStats() {
@@ -150,7 +163,7 @@ function buildingHtml(inst) {
   const d = inst.def;
   let extra = '';
   if (d.role === 'granary' || d.role === 'market') extra = `<p>Grain in store: ${inst.stock}</p>`;
-  if (d.role === 'dwelling') extra = `<p>Food: ${inst.food}/10</p>`;
+  if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10</p>`;
   return `<h3>${d.label}</h3><div class="role">Building</div><p>${d.desc}</p>${extra}`;
 }
 function terrainHtml(tile) {

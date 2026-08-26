@@ -189,16 +189,17 @@ html, body {
 .build-btn.active { background: var(--gold); color: #1c130a; border-color: var(--gold); }
 .build-btn.active .b-cost { color: #1c130a; }
 
-/* Build toggle FAB (mobile) */
-#build-toggle {
+/* Mobile FABs: build + inspect */
+#build-toggle, #inspect-fab {
   position: absolute;
-  right: 14px; bottom: 70px;
+  right: 14px;
   width: 52px; height: 52px;
-  background: var(--gold); color: #1c130a;
   border: none; border-radius: 50%;
   font-size: 22px;
   display: none;
 }
+#build-toggle { bottom: 70px; background: var(--gold); color: #1c130a; }
+#inspect-fab { bottom: 132px; background: rgba(15,28,34,0.95); color: var(--ink); border: 1px solid var(--border); }
 
 /* Inspect popup */
 #inspect-popup {
@@ -344,6 +345,7 @@ html, body {
 @media (max-width: 900px) {
   #build-panel { transform: translateX(100%); box-shadow: -8px 0 24px rgba(0,0,0,0.4); }
   #build-panel.open { transform: translateX(0); }
-  #build-toggle { display: block; }
-  #build-panel.open ~ #build-toggle { display: none; }
+  #build-toggle, #inspect-fab { display: block; }
+  #build-panel.open ~ #build-toggle,
+  #build-panel.open ~ #inspect-fab { display: none; }
 }

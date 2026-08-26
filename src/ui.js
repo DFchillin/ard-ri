@@ -1,4 +1,4 @@
-import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=5';
+import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=6';
 
 // DOM overlay. Owns the HTML controls; the world never reads the DOM directly.
 export class UI {
@@ -51,6 +51,8 @@ export class UI {
     // Drawer + tools
     this.fab = document.getElementById('build-toggle');
     this.fab.addEventListener('click', () => this._setDrawer(true));
+    this.inspectFab = document.getElementById('inspect-fab');
+    this.inspectFab.addEventListener('click', () => this.selectTool('inspect'));
     this.inspectTool.addEventListener('click', () => this.selectTool('inspect'));
     this.demolishTool.addEventListener('click', () => this.selectTool('demolish'));
     this.roamTool.addEventListener('click', () => this.roam());
@@ -83,6 +85,7 @@ export class UI {
   _setDrawer(open) {
     this.panel.classList.toggle('open', open);
     this.fab.style.display = open ? 'none' : '';
+    if (this.inspectFab) this.inspectFab.style.display = open ? 'none' : '';
   }
 
   _buildTabs() {
@@ -122,6 +125,8 @@ export class UI {
     this.activeTool = this.activeTool === key ? null : key;
     if (this.activeTool !== 'inspect') this.hideInspect();
     this._applyToolHighlight();
+    // Inspect/demolish want the full map — close the build drawer on mobile.
+    if (this.activeTool === 'inspect' || this.activeTool === 'demolish') this._setDrawer(false);
     this.onTool(this.activeTool);
   }
 
