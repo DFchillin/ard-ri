@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=7';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=7';
-import { WorldView } from './render/world_view.js?v=7';
-import { BUILDINGS } from './data/buildings.js?v=7';
-import { Game } from './sim/game.js?v=7';
-import { UI } from './ui.js?v=7';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=7';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=8';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=8';
+import { WorldView } from './render/world_view.js?v=8';
+import { BUILDINGS } from './data/buildings.js?v=8';
+import { Game } from './sim/game.js?v=8';
+import { UI } from './ui.js?v=8';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=8';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -133,6 +133,43 @@ ghostBox.visible = false;
 scene.add(ghostBox);
 const GHOST_H = 1.4;
 
+// Road path ghost — flat tiles traced out while dragging, before you commit.
+const roadGhost = new THREE.Group();
+scene.add(roadGhost);
+function clearRoadGhost() {
+  roadGhost.children.forEach((m) => { m.geometry.dispose(); m.material.dispose(); });
+  roadGhost.clear();
+}
+function showRoadGhost() {
+  clearRoadGhost();
+  for (const p of pendingRoad) {
+    const c = map.tileToWorld(p.x, p.z);
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(map.tile * 0.9, map.tile * 0.9),
+      new THREE.MeshBasicMaterial({
+        color: map.isRoadable(p.x, p.z) ? 0x66ff66 : 0xff5555,
+        transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false,
+      })
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(c.x, 0.07, c.z);
+    roadGhost.add(m);
+  }
+}
+function pushTile(list, x, z) { if (!list.some((p) => p.x === x && p.z === z)) list.push({ x, z }); }
+function extendRoadPath(to) {
+  if (!pendingRoad.length) { pushTile(pendingRoad, to.x, to.z); return; }
+  let { x, z } = pendingRoad[pendingRoad.length - 1];
+  while (x !== to.x) { x += Math.sign(to.x - x); pushTile(pendingRoad, x, z); } // trace an L
+  while (z !== to.z) { z += Math.sign(to.z - z); pushTile(pendingRoad, x, z); }
+}
+function commitRoad() {
+  let changed = false;
+  for (const p of pendingRoad) if (map.setRoad(p.x, p.z, true)) changed = true;
+  if (changed) view.rebuildRoads();
+  cancelPending();
+}
+
 const raycaster = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 
@@ -213,6 +250,7 @@ function demolishAt(e) {
 const pointers = new Map();
 let painting = false, demolishing = false, panLast = null, pinchDist = 0;
 let pendingBuild = null, movingBuild = false;
+let pendingRoad = null, drawingRoad = false;
 const _fwd = new THREE.Vector3(), _right = new THREE.Vector3();
 
 // Ghost placement: drop a building, drag to relocate, then "Build here".
@@ -232,6 +270,7 @@ function showGhostAt(t) {
   ui.showPlaceConfirm();
 }
 function confirmBuild() {
+  if (pendingRoad) { commitRoad(); return; }
   if (!pendingBuild || !BUILDINGS[tool]) return;
   const f = footprint(tool, pendingBuild);
   if (game.place(tool, f)) { pushStats(); cancelPending(); }
@@ -239,8 +278,11 @@ function confirmBuild() {
 function cancelPending() {
   pendingBuild = null;
   movingBuild = false;
+  pendingRoad = null;
+  drawingRoad = false;
   preview.visible = false;
   ghostBox.visible = false;
+  clearRoadGhost();
   if (ui.hidePlaceConfirm) ui.hidePlaceConfirm();
 }
 
@@ -265,7 +307,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.button !== 2) {
     if (tool === 'inspect') { inspectAt(e); return; }
     if (tool === 'demolish') { demolishing = true; demolishAt(e); return; }
-    if (tool === 'road') { const t = tileUnderPointer(e); if (t) { painting = true; if (map.setRoad(t.x, t.z, true)) view.rebuildRoads(); } return; }
+    if (tool === 'road') { const t = tileUnderPointer(e); if (t) { pendingRoad = [{ x: t.x, z: t.z }]; drawingRoad = true; showRoadGhost(); } return; }
     if (BUILDINGS[tool]) { movingBuild = true; showGhostAt(tileUnderPointer(e)); return; }
   }
   panLast = { x: e.clientX, y: e.clientY }; // no build tool, or right-drag → pan
@@ -275,10 +317,10 @@ canvas.addEventListener('pointermove', (e) => {
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2) { const d = pointerDist(); if (pinchDist && d > 0) zoomIsoCamera(camera, pinchDist / d, aspect); pinchDist = d; return; }
   if (panLast) { panByScreen(e.clientX - panLast.x, e.clientY - panLast.y); panLast = { x: e.clientX, y: e.clientY }; return; }
+  if (drawingRoad && tool === 'road') { const t = tileUnderPointer(e); if (t) { extendRoadPath(t); showRoadGhost(); } return; }
   if (movingBuild && BUILDINGS[tool]) { const t = tileUnderPointer(e); if (t) showGhostAt(t); return; }
-  if (pendingBuild) return; // ghost locked awaiting "Build here"
+  if (pendingBuild || pendingRoad) return; // ghost locked awaiting "Build here"
   updatePreview(e);
-  if (painting && tool === 'road') { const t = tileUnderPointer(e); if (t && map.setRoad(t.x, t.z, true)) view.rebuildRoads(); }
   if (demolishing && tool === 'demolish') demolishAt(e);
 });
 
@@ -286,7 +328,13 @@ function endPointer(e) {
   pointers.delete(e.pointerId);
   canvas.releasePointerCapture?.(e.pointerId);
   if (pointers.size < 2) pinchDist = 0;
-  if (pointers.size === 0) { painting = false; demolishing = false; panLast = null; movingBuild = false; }
+  if (pointers.size === 0) {
+    painting = false; demolishing = false; panLast = null; movingBuild = false;
+    if (drawingRoad) {
+      drawingRoad = false;
+      if (pendingRoad && pendingRoad.length) ui.showPlaceConfirm(); else cancelPending();
+    }
+  }
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
