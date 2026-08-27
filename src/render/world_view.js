@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { T, TERRAIN_COLOR } from '../sim/tilemap.js?v=9';
+import { T, TERRAIN_COLOR } from '../sim/tilemap.js?v=10';
 
 function sceneryTexture(kind) {
   const c = document.createElement('canvas');
@@ -111,16 +111,26 @@ export class WorldView {
     const { map, ts, half } = this;
     this.roadGroup.clear();
     const pos = [], idx = [];
+    const border = []; // Deaglán's path — a framing edge on tiles laid by his route
     let vi = 0;
     const inset = ts * 0.06;
+    const bi = ts * 0.03;
     for (let z = 0; z < map.size; z++) {
       for (let x = 0; x < map.size; x++) {
-        if (!map.get(x, z).road) continue;
+        const t = map.get(x, z);
+        if (!t.road) continue;
         const wx = x * ts - half + inset, wz = z * ts - half + inset;
         const s = ts - inset * 2;
         pos.push(wx, 0.04, wz, wx + s, 0.04, wz, wx + s, 0.04, wz + s, wx, 0.04, wz + s);
         idx.push(vi, vi + 2, vi + 1, vi, vi + 3, vi + 2);
         vi += 4;
+        if (t.deaglan) {
+          const bx0 = x * ts - half + bi, bz0 = z * ts - half + bi;
+          const bx1 = (x + 1) * ts - half - bi, bz1 = (z + 1) * ts - half - bi;
+          const y = 0.05;
+          border.push(bx0, y, bz0, bx1, y, bz0,  bx1, y, bz0, bx1, y, bz1,
+                      bx1, y, bz1, bx0, y, bz1,  bx0, y, bz1, bx0, y, bz0);
+        }
       }
     }
     if (!pos.length) return;
@@ -130,5 +140,12 @@ export class WorldView {
     this.roadGroup.add(
       new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x8a7350, side: THREE.DoubleSide }))
     );
+    if (border.length) {
+      const bgeo = new THREE.BufferGeometry();
+      bgeo.setAttribute('position', new THREE.Float32BufferAttribute(border, 3));
+      this.roadGroup.add(
+        new THREE.LineSegments(bgeo, new THREE.LineBasicMaterial({ color: 0xe8c96b, transparent: true, opacity: 0.7 }))
+      );
+    }
   }
 }

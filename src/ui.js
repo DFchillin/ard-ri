@@ -1,4 +1,4 @@
-import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=9';
+import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=10';
 
 // DOM overlay. Owns the HTML controls; the world never reads the DOM directly.
 export class UI {
@@ -142,6 +142,7 @@ export class UI {
       const b = document.createElement('button');
       b.className = 'build-btn';
       b.dataset.key = key;
+      b.title = def.desc || '';
       b.innerHTML = `<span class="b-icon">${def.icon}</span>` +
         `<span class="b-name">${def.label}</span>` +
         (def.cost ? `<span class="b-cost">🪙${def.cost}</span>` : '');

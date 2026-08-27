@@ -24,4 +24,4 @@ export const CATEGORIES = [
 ];
 
 export const ROAD_ITEM = { key: 'road', label: 'Road', icon: '🛣️', cost: 0,
-  desc: 'A trackway. Walkers can only travel on roads — lay them to reach every building.' };
+  desc: 'A tóchar worthy of Midir. Walkers travel only on roads — drag to lay Deaglán’s path between two points.' };

@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=9';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=9';
-import { WorldView } from './render/world_view.js?v=9';
-import { BUILDINGS } from './data/buildings.js?v=9';
-import { Game } from './sim/game.js?v=9';
-import { UI } from './ui.js?v=9';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=9';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=10';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=10';
+import { WorldView } from './render/world_view.js?v=10';
+import { BUILDINGS } from './data/buildings.js?v=10';
+import { Game } from './sim/game.js?v=10';
+import { UI } from './ui.js?v=10';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=10';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -214,7 +214,9 @@ function suggestRoute(start, end, variant) {
 
 function commitRoad() {
   let changed = false;
-  for (const p of pendingRoad) if (map.setRoad(p.x, p.z, true)) changed = true;
+  for (const p of pendingRoad) {
+    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.deaglan = true; changed = true; }
+  }
   if (changed) view.rebuildRoads();
   cancelPending();
 }
@@ -396,7 +398,7 @@ function endPointer(e) {
     painting = false; demolishing = false; panLast = null; movingBuild = false;
     if (drawingRoad) {
       drawingRoad = false;
-      if (pendingRoad && pendingRoad.length) ui.showPlaceConfirm({ road: true, label: 'Deaglán’s route' }); else cancelPending();
+      if (pendingRoad && pendingRoad.length) ui.showPlaceConfirm({ road: true, label: 'Deaglán’s path' }); else cancelPending();
     }
   }
 }

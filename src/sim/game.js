@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../data/buildings.js?v=9';
-import { makeBuildingChip, makeAlertMarker } from '../render/chips.js?v=9';
-import { Walker, Traveler } from './walkers.js?v=9';
-import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=9';
-import { randomName } from '../data/names.js?v=9';
-import { personFor } from '../data/phrases.js?v=9';
+import { BUILDINGS } from '../data/buildings.js?v=10';
+import { makeBuildingChip, makeAlertMarker } from '../render/chips.js?v=10';
+import { Walker, Traveler } from './walkers.js?v=10';
+import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=10';
+import { randomName } from '../data/names.js?v=10';
+import { personFor } from '../data/phrases.js?v=10';
 
 const MARKET_CAP = 12;
 const HOUSE_CAP = 10;
@@ -98,7 +98,7 @@ export class Game {
       this.silver += Math.floor(inst.def.cost / 2);
       return 'building';
     }
-    if (t && t.road) { this.map.setRoad(x, z, false); return 'road'; }
+    if (t && t.road) { this.map.setRoad(x, z, false); t.deaglan = false; return 'road'; }
     return null;
   }
 
