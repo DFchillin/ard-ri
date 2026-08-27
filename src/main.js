@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=10';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=10';
-import { WorldView } from './render/world_view.js?v=10';
-import { BUILDINGS } from './data/buildings.js?v=10';
-import { Game } from './sim/game.js?v=10';
-import { UI } from './ui.js?v=10';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=10';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=11';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=11';
+import { WorldView } from './render/world_view.js?v=11';
+import { BUILDINGS } from './data/buildings.js?v=11';
+import { Game } from './sim/game.js?v=11';
+import { UI } from './ui.js?v=11';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=11';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -141,21 +141,26 @@ function clearRoadGhost() {
   roadGhost.children.forEach((m) => { m.geometry.dispose(); m.material.dispose(); });
   roadGhost.clear();
 }
-function showRoadGhost() {
-  clearRoadGhost();
-  for (const p of pendingRoad) {
+function addGhostTiles(tiles, { color, opacity, y, roadable }) {
+  for (const p of tiles) {
     const c = map.tileToWorld(p.x, p.z);
+    const col = roadable ? (map.isRoadable(p.x, p.z) ? 0x66ff66 : 0xff5555) : color;
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry(map.tile * 0.9, map.tile * 0.9),
-      new THREE.MeshBasicMaterial({
-        color: map.isRoadable(p.x, p.z) ? 0x66ff66 : 0xff5555,
-        transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false,
-      })
+      new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false })
     );
     m.rotation.x = -Math.PI / 2;
-    m.position.set(c.x, 0.07, c.z);
+    m.position.set(c.x, y, c.z);
     roadGhost.add(m);
   }
+}
+function showRoadGhost() {
+  clearRoadGhost();
+  if (!pendingRoad) return;
+  // Underlay: the route you drew, in a cool "your path" teal, for comparison.
+  addGhostTiles(drawnPath, { color: 0x54c8d8, opacity: 0.35, y: 0.065 });
+  // Overlay: the currently-selected option, bright green (red where blocked).
+  addGhostTiles(pendingRoad, { opacity: 0.6, y: 0.085, roadable: true });
 }
 function pushTile(list, x, z) { if (!list.some((p) => p.x === x && p.z === z)) list.push({ x, z }); }
 
@@ -212,10 +217,33 @@ function suggestRoute(start, end, variant) {
   return astar(start, end) || l;
 }
 
+// Trace the tiles the finger actually passes through — "your path".
+function extendDrawn(to) {
+  if (!drawnPath.length) { pushTile(drawnPath, to.x, to.z); return; }
+  let { x, z } = drawnPath[drawnPath.length - 1];
+  while (x !== to.x) { x += Math.sign(to.x - x); pushTile(drawnPath, x, z); }
+  while (z !== to.z) { z += Math.sign(to.z - z); pushTile(drawnPath, x, z); }
+}
+// On release, assemble the choices: Deaglán's clean suggestions + your own drawn path.
+function buildRoadOptions() {
+  const keyOf = (tiles) => tiles.map((p) => p.x + ',' + p.z).sort().join(';');
+  const opts = [], seen = new Set();
+  for (const v of [0, 1]) {
+    const s = suggestRoute(roadStart, roadEnd, v);
+    const k = keyOf(s);
+    if (!seen.has(k)) { seen.add(k); opts.push({ name: 'Deaglán’s path', tiles: s, mine: false }); }
+  }
+  const dk = keyOf(drawnPath);
+  if (!seen.has(dk)) { seen.add(dk); opts.push({ name: 'Your path', tiles: drawnPath.slice(), mine: true }); }
+  roadOptions = opts;
+  roadOptIdx = 0;
+  pendingRoad = opts[0].tiles;
+}
 function commitRoad() {
+  const opt = roadOptions[roadOptIdx] || { mine: false };
   let changed = false;
   for (const p of pendingRoad) {
-    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.deaglan = true; changed = true; }
+    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = opt.mine ? 'mine' : 'deaglan'; changed = true; }
   }
   if (changed) view.rebuildRoads();
   cancelPending();
@@ -302,7 +330,8 @@ const pointers = new Map();
 let painting = false, demolishing = false, panLast = null, pinchDist = 0;
 let pendingBuild = null, movingBuild = false;
 let pendingRoad = null, drawingRoad = false;
-let roadStart = null, roadEnd = null, roadVariant = 0;
+let roadStart = null, roadEnd = null, drawnPath = [];
+let roadOptions = [], roadOptIdx = 0;
 const _fwd = new THREE.Vector3(), _right = new THREE.Vector3();
 
 // Ghost placement: drop a building, drag to relocate, then "Build here".
@@ -334,18 +363,23 @@ function cancelPending() {
   drawingRoad = false;
   roadStart = null;
   roadEnd = null;
+  drawnPath = [];
+  roadOptions = [];
+  roadOptIdx = 0;
   preview.visible = false;
   ghostBox.visible = false;
   clearRoadGhost();
   if (ui.hidePlaceConfirm) ui.hidePlaceConfirm();
 }
 
-// "Try the other route" — flip Deaglán's suggestion between the two clean L runs.
+// "Other" — cycle through Deaglán's suggestions and your own drawn path.
 function altRoute() {
-  if (!pendingRoad || !roadStart || !roadEnd) return;
-  roadVariant = (roadVariant + 1) % 2;
-  pendingRoad = suggestRoute(roadStart, roadEnd, roadVariant);
+  if (roadOptions.length < 2) return;
+  roadOptIdx = (roadOptIdx + 1) % roadOptions.length;
+  const opt = roadOptions[roadOptIdx];
+  pendingRoad = opt.tiles;
   showRoadGhost();
+  ui.showPlaceConfirm({ road: true, label: opt.name, alt: true });
 }
 
 function pointerDist() {
@@ -369,7 +403,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.button !== 2) {
     if (tool === 'inspect') { inspectAt(e); return; }
     if (tool === 'demolish') { demolishing = true; demolishAt(e); return; }
-    if (tool === 'road') { const t = tileUnderPointer(e); if (t) { roadStart = t; roadEnd = t; roadVariant = 0; drawingRoad = true; pendingRoad = suggestRoute(roadStart, roadEnd, roadVariant); showRoadGhost(); } return; }
+    if (tool === 'road') { const t = tileUnderPointer(e); if (t) { roadStart = t; roadEnd = t; drawnPath = [{ x: t.x, z: t.z }]; drawingRoad = true; pendingRoad = drawnPath; showRoadGhost(); } return; }
     if (BUILDINGS[tool]) { movingBuild = true; showGhostAt(tileUnderPointer(e)); return; }
   }
   panLast = { x: e.clientX, y: e.clientY }; // no build tool, or right-drag → pan
@@ -381,7 +415,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (panLast) { panByScreen(e.clientX - panLast.x, e.clientY - panLast.y); panLast = { x: e.clientX, y: e.clientY }; return; }
   if (drawingRoad && tool === 'road') {
     const t = tileUnderPointer(e);
-    if (t && (t.x !== roadEnd.x || t.z !== roadEnd.z)) { roadEnd = t; pendingRoad = suggestRoute(roadStart, roadEnd, roadVariant); showRoadGhost(); }
+    if (t && (t.x !== roadEnd.x || t.z !== roadEnd.z)) { roadEnd = t; extendDrawn(t); pendingRoad = drawnPath; showRoadGhost(); }
     return;
   }
   if (movingBuild && BUILDINGS[tool]) { const t = tileUnderPointer(e); if (t) showGhostAt(t); return; }
@@ -398,7 +432,11 @@ function endPointer(e) {
     painting = false; demolishing = false; panLast = null; movingBuild = false;
     if (drawingRoad) {
       drawingRoad = false;
-      if (pendingRoad && pendingRoad.length) ui.showPlaceConfirm({ road: true, label: 'Deaglán’s path' }); else cancelPending();
+      if (drawnPath.length) {
+        buildRoadOptions();
+        showRoadGhost();
+        ui.showPlaceConfirm({ road: true, label: roadOptions[0].name, alt: roadOptions.length > 1 });
+      } else cancelPending();
     }
   }
 }

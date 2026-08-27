@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { T, TERRAIN_COLOR } from '../sim/tilemap.js?v=10';
+import { T, TERRAIN_COLOR } from '../sim/tilemap.js?v=11';
 
 function sceneryTexture(kind) {
   const c = document.createElement('canvas');
@@ -111,7 +111,7 @@ export class WorldView {
     const { map, ts, half } = this;
     this.roadGroup.clear();
     const pos = [], idx = [];
-    const border = []; // Deaglán's path — a framing edge on tiles laid by his route
+    const bDeaglan = [], bMine = []; // framing edges: Deaglán's path (gold) vs your own (teal)
     let vi = 0;
     const inset = ts * 0.06;
     const bi = ts * 0.03;
@@ -124,12 +124,13 @@ export class WorldView {
         pos.push(wx, 0.04, wz, wx + s, 0.04, wz, wx + s, 0.04, wz + s, wx, 0.04, wz + s);
         idx.push(vi, vi + 2, vi + 1, vi, vi + 3, vi + 2);
         vi += 4;
-        if (t.deaglan) {
+        if (t.roadKind) {
           const bx0 = x * ts - half + bi, bz0 = z * ts - half + bi;
           const bx1 = (x + 1) * ts - half - bi, bz1 = (z + 1) * ts - half - bi;
           const y = 0.05;
-          border.push(bx0, y, bz0, bx1, y, bz0,  bx1, y, bz0, bx1, y, bz1,
-                      bx1, y, bz1, bx0, y, bz1,  bx0, y, bz1, bx0, y, bz0);
+          const edges = [bx0, y, bz0, bx1, y, bz0,  bx1, y, bz0, bx1, y, bz1,
+                         bx1, y, bz1, bx0, y, bz1,  bx0, y, bz1, bx0, y, bz0];
+          (t.roadKind === 'mine' ? bMine : bDeaglan).push(...edges);
         }
       }
     }
@@ -140,12 +141,16 @@ export class WorldView {
     this.roadGroup.add(
       new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x8a7350, side: THREE.DoubleSide }))
     );
-    if (border.length) {
-      const bgeo = new THREE.BufferGeometry();
-      bgeo.setAttribute('position', new THREE.Float32BufferAttribute(border, 3));
-      this.roadGroup.add(
-        new THREE.LineSegments(bgeo, new THREE.LineBasicMaterial({ color: 0xe8c96b, transparent: true, opacity: 0.7 }))
-      );
-    }
+    this._addBorder(bDeaglan, 0xe8c96b);
+    this._addBorder(bMine, 0x54c8d8);
+  }
+
+  _addBorder(verts, color) {
+    if (!verts.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    this.roadGroup.add(
+      new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 }))
+    );
   }
 }

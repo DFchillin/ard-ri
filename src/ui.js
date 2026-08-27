@@ -1,4 +1,4 @@
-import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=10';
+import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=11';
 
 // DOM overlay. Owns the HTML controls; the world never reads the DOM directly.
 export class UI {
@@ -102,12 +102,12 @@ export class UI {
 
   showTitle() { if (this.titleScreen) this.titleScreen.classList.remove('hidden'); }
   hideTitle() { if (this.titleScreen) this.titleScreen.classList.add('hidden'); }
-  showPlaceConfirm({ road = false, label = '' } = {}) {
+  showPlaceConfirm({ road = false, label = '', alt = true } = {}) {
     if (this.placeLabel) {
       this.placeLabel.textContent = label;
       this.placeLabel.classList.toggle('hidden', !road);
     }
-    if (this.placeAlt) this.placeAlt.classList.toggle('hidden', !road);
+    if (this.placeAlt) this.placeAlt.classList.toggle('hidden', !road || !alt);
     if (this.placeConfirm) this.placeConfirm.classList.remove('hidden');
   }
   hidePlaceConfirm() { if (this.placeConfirm) this.placeConfirm.classList.add('hidden'); }
