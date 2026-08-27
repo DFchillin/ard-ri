@@ -37,7 +37,20 @@ export function makeBuildingChip(role, w, h, ts) {
   body.position.y = 0.14 + spec.h / 2;
   g.add(body);
 
+  g.userData.body = body;
+  g.userData.fullH = spec.h;
+  setChipActive(g, false); // starts half-height until occupied / operational
   return g;
+}
+
+// Empty/unoccupied buildings sit at half height; they rise when folk move in
+// or the building becomes operational. (Placeholder until pixel sprites arrive.)
+export function setChipActive(chip, active) {
+  const { body, fullH } = chip.userData;
+  if (!body) return;
+  const s = active ? 1 : 0.5;
+  body.scale.y = s;
+  body.position.y = 0.14 + (fullH * s) / 2;
 }
 
 export function makeWalkerChip(type) {

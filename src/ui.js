@@ -1,4 +1,4 @@
-import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=12';
+import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=13';
 
 // DOM overlay. Owns the HTML controls; the world never reads the DOM directly.
 export class UI {

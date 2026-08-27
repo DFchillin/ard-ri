@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=12';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=12';
-import { WorldView } from './render/world_view.js?v=12';
-import { BUILDINGS } from './data/buildings.js?v=12';
-import { Game } from './sim/game.js?v=12';
-import { UI } from './ui.js?v=12';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=12';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=13';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=13';
+import { WorldView } from './render/world_view.js?v=13';
+import { BUILDINGS } from './data/buildings.js?v=13';
+import { Game } from './sim/game.js?v=13';
+import { UI } from './ui.js?v=13';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=13';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -79,7 +79,7 @@ function showLedger() {
     `<tr><td>Rents in</td><td class="pos">+${rent}</td></tr>` +
     `<tr><td>Wages out</td><td class="neg">−${wages}</td></tr>` +
     `<tr class="net"><td>Net / day</td><td class="${net >= 0 ? 'pos' : 'neg'}">${sign(net)}</td></tr>` +
-    `<tr><td>Folk fed</td><td>${content} / ${game.folk}</td></tr>` +
+    `<tr><td>Folk content</td><td>${content} / ${game.folk}</td></tr>` +
     `</table>` +
     (festivalToday ? `<p class="fest-note">Festival today — content folk pay a generous bonus.</p>` : '') +
     (game.broke ? `<p class="fest-note broke">The cauldron runs dry — public folk go unpaid.</p>` : '');
@@ -336,7 +336,7 @@ function buildingHtml(inst) {
   const d = inst.def;
   let extra = '';
   if (d.role === 'granary' || d.role === 'market') extra = `<p>Grain in store: ${inst.stock}</p>`;
-  if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10</p>`;
+  if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10 · Water: ${inst.water}/10</p>`;
   return `<h3>${d.label}</h3><div class="role">Building</div><p>${d.desc}</p>${extra}`;
 }
 function terrainHtml(tile) {
