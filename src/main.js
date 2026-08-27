@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=11';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=11';
-import { WorldView } from './render/world_view.js?v=11';
-import { BUILDINGS } from './data/buildings.js?v=11';
-import { Game } from './sim/game.js?v=11';
-import { UI } from './ui.js?v=11';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=11';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=12';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=12';
+import { WorldView } from './render/world_view.js?v=12';
+import { BUILDINGS } from './data/buildings.js?v=12';
+import { Game } from './sim/game.js?v=12';
+import { UI } from './ui.js?v=12';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=12';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -62,7 +62,29 @@ const ui = new UI({
   onPlaceConfirm: () => confirmBuild(),
   onPlaceCancel: () => cancelPending(),
   onPlaceAlt: () => altRoute(),
+  onLedger: () => showLedger(),
 });
+
+function showLedger() {
+  const festivalToday = cal.day === 1 && !!FESTIVALS[cal.month];
+  const rent = game.dailyRent(festivalToday);
+  const wages = game.dailyWages();
+  const net = rent - wages;
+  const content = game.folkContent();
+  const sign = (n) => (n >= 0 ? `+${n}` : `${n}`);
+  const html =
+    `<h3>The Ledger</h3><div class="role">Rents &amp; wages, each day</div>` +
+    `<table class="ledger">` +
+    `<tr><td>Treasury</td><td>🪙 ${game.silver}</td></tr>` +
+    `<tr><td>Rents in</td><td class="pos">+${rent}</td></tr>` +
+    `<tr><td>Wages out</td><td class="neg">−${wages}</td></tr>` +
+    `<tr class="net"><td>Net / day</td><td class="${net >= 0 ? 'pos' : 'neg'}">${sign(net)}</td></tr>` +
+    `<tr><td>Folk fed</td><td>${content} / ${game.folk}</td></tr>` +
+    `</table>` +
+    (festivalToday ? `<p class="fest-note">Festival today — content folk pay a generous bonus.</p>` : '') +
+    (game.broke ? `<p class="fest-note broke">The cauldron runs dry — public folk go unpaid.</p>` : '');
+  ui.showInspect(html, false);
+}
 
 function startMission() { started = true; triggerFestival(FESTIVALS[1]); }
 
@@ -93,15 +115,29 @@ function triggerFestival(f) { pauseGame(); ui.showFestival({ name: f.name, emoji
 
 function advanceDay() {
   cal.day += 1;
+  let festivalToday = false;
   if (cal.day > DAYS_PER_MONTH) {
     cal.day = 1;
     cal.month = (cal.month + 1) % 12;
     const s = seasonOfMonth(cal.month);
     if (s !== curSeason) { curSeason = s; applySeason(s); }
     const fest = FESTIVALS[cal.month];
-    if (fest) triggerFestival(fest);
+    if (fest) { festivalToday = true; triggerFestival(fest); }
   }
+  const wasBroke = game.broke;
+  game.settleDay({ festival: festivalToday }); // rents in, public wages out
+  if (game.broke && !wasBroke) triggerAdvisor();
+  pushStats();
   updateDate();
+}
+
+function triggerAdvisor() {
+  pauseGame();
+  ui.showFestival({
+    name: 'The Dagda',
+    emoji: '⚠️',
+    sub: 'The cauldron runs dry — your treasury is empty. The folk you keep go unpaid, and the hungry will drift back through the gate. Raise silver before the settlement falters.',
+  });
 }
 
 applySeason(curSeason);
@@ -227,23 +263,28 @@ function extendDrawn(to) {
 // On release, assemble the choices: Deaglán's clean suggestions + your own drawn path.
 function buildRoadOptions() {
   const keyOf = (tiles) => tiles.map((p) => p.x + ',' + p.z).sort().join(';');
+  const suggested = [
+    { name: 'Deaglán’s path', kind: 'deaglan' },
+    { name: 'Midir’s path', kind: 'midir' },
+  ];
   const opts = [], seen = new Set();
+  let si = 0;
   for (const v of [0, 1]) {
     const s = suggestRoute(roadStart, roadEnd, v);
     const k = keyOf(s);
-    if (!seen.has(k)) { seen.add(k); opts.push({ name: 'Deaglán’s path', tiles: s, mine: false }); }
+    if (!seen.has(k)) { seen.add(k); opts.push({ ...suggested[si], tiles: s }); si++; }
   }
   const dk = keyOf(drawnPath);
-  if (!seen.has(dk)) { seen.add(dk); opts.push({ name: 'Your path', tiles: drawnPath.slice(), mine: true }); }
+  if (!seen.has(dk)) { seen.add(dk); opts.push({ name: 'Your path', kind: 'mine', tiles: drawnPath.slice() }); }
   roadOptions = opts;
   roadOptIdx = 0;
   pendingRoad = opts[0].tiles;
 }
 function commitRoad() {
-  const opt = roadOptions[roadOptIdx] || { mine: false };
+  const opt = roadOptions[roadOptIdx] || { kind: 'deaglan' };
   let changed = false;
   for (const p of pendingRoad) {
-    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = opt.mine ? 'mine' : 'deaglan'; changed = true; }
+    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = opt.kind; changed = true; }
   }
   if (changed) view.rebuildRoads();
   cancelPending();

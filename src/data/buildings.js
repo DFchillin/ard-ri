@@ -9,10 +9,10 @@ export const BUILDINGS = {
     desc: 'Holds the harvest. Markets draw grain from here along the roads.' },
   market: { label: 'Market', sprite: 'market', icon: '🏪', footprint: [2, 2], cost: 16, role: 'market',
     desc: 'Restocks from road-connected stores and feeds the dwellings on its route.' },
-  well: { label: 'Well', sprite: 'well', icon: '💧', footprint: [1, 1], cost: 8, role: 'well',
-    desc: 'Clean water for the settlement. Sends a water-carrier along the roads.' },
-  altar: { label: 'Altar', sprite: 'altar', icon: '🗿', footprint: [1, 1], cost: 12, role: 'altar',
-    desc: 'A standing-stone shrine. A druid walks out to spread the gods’ favour.' },
+  well: { label: 'Well', sprite: 'well', icon: '💧', footprint: [1, 1], cost: 8, role: 'well', upkeep: 2,
+    desc: 'Clean water for the settlement. Its water-carrier is paid from your treasury.' },
+  altar: { label: 'Altar', sprite: 'altar', icon: '🗿', footprint: [1, 1], cost: 12, role: 'altar', upkeep: 3,
+    desc: 'A standing-stone shrine. Its druid is kept by your treasury.' },
 };
 
 // Build-menu categories (Zeus-style tabs). 'road' is a special item.

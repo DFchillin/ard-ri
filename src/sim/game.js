@@ -1,13 +1,16 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../data/buildings.js?v=11';
-import { makeBuildingChip, makeAlertMarker } from '../render/chips.js?v=11';
-import { Walker, Traveler } from './walkers.js?v=11';
-import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=11';
-import { randomName } from '../data/names.js?v=11';
-import { personFor } from '../data/phrases.js?v=11';
+import { BUILDINGS } from '../data/buildings.js?v=12';
+import { makeBuildingChip, makeAlertMarker } from '../render/chips.js?v=12';
+import { Walker, Traveler } from './walkers.js?v=12';
+import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=12';
+import { randomName } from '../data/names.js?v=12';
+import { personFor } from '../data/phrases.js?v=12';
 
 const MARKET_CAP = 12;
 const HOUSE_CAP = 10;
+const RENT_PER_HEAD = 1;   // silver per content head per day
+const HUNGER_LEAVE = 6;    // econ ticks unfed before a resident leaves
+const FESTIVAL_BONUS = 1.5;
 
 // Owns the buildings, the economy tick, the walkers, and mission objectives.
 export class Game {
@@ -22,6 +25,7 @@ export class Game {
     this.silver = 200;
     this.folk = 0;
     this.cattle = 40;
+    this.broke = false;
     this._immTimer = 0;
     this.entrance = { x: 0, z: Math.floor(map.size / 2) }; // settlers arrive here
 
@@ -48,6 +52,29 @@ export class Game {
   // Half the folk are able workers — the rest are children and elders.
   workforce() { return Math.floor(this.folk * 0.5); }
   _activeWorkers() { return this.walkers.reduce((n, w) => n + (w instanceof Walker && !w.done ? 1 : 0), 0); }
+
+  // --- Economy: private rents in, public wages out, settled once per day ---
+  dwellings() { return this.buildings.filter((b) => b.def.role === 'dwelling' && b.pop > 0); }
+  folkContent() { return this.dwellings().reduce((n, b) => n + (b.food > 0 ? b.pop : 0), 0); }
+  dailyRent(festival = false) {
+    let sum = 0;
+    for (const b of this.dwellings()) {
+      const fed = b.food > 0;
+      let r = b.pop * RENT_PER_HEAD * (fed ? 1 : 0.5);
+      if (festival && fed) r *= FESTIVAL_BONUS; // happy folk are generous at the feast
+      sum += r;
+    }
+    return Math.round(sum);
+  }
+  dailyWages() { return this.buildings.reduce((n, b) => n + (b.def.upkeep || 0), 0); }
+  settleDay({ festival = false } = {}) {
+    const rent = this.dailyRent(festival);
+    const wages = this.dailyWages();
+    this.silver += rent;
+    if (this.silver >= wages) { this.silver -= wages; this.broke = false; }
+    else { this.silver = 0; this.broke = wages > 0; } // payroll unmet — public folk go unpaid
+    return { rent, wages, net: rent - wages, festival, broke: this.broke };
+  }
 
   _center(f) {
     return {
@@ -133,7 +160,8 @@ export class Game {
         break;
       }
       case 'dwelling': {
-        if (b.food > 0) b.food -= 1;
+        if (b.food > 0) { b.food -= 1; b.hunger = 0; }
+        else { b.hunger = (b.hunger || 0) + 1; if (b.hunger >= HUNGER_LEAVE && b.pop > 0) { b.hunger = 0; this._emigrate(b); } }
         break;
       }
     }
@@ -154,6 +182,16 @@ export class Game {
         if (home.pop < home.cap) { home.pop += 1; this.folk += 1; }
       },
     });
+    this.walkers.push(tr);
+    this.walkerGroup.add(tr.sprite);
+  }
+
+  // A hungry resident gives up and walks back out to the gate.
+  _emigrate(home) {
+    home.pop = Math.max(0, home.pop - 1);
+    this.folk = Math.max(0, this.folk - 1);
+    const person = { name: randomName(), ...personFor('villager') };
+    const tr = new Traveler(this.map, { x: home.x, z: home.z }, this.entrance, { type: 'villager', speed: 2.4, person });
     this.walkers.push(tr);
     this.walkerGroup.add(tr.sprite);
   }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { T, TERRAIN_COLOR } from '../sim/tilemap.js?v=11';
+import { T, TERRAIN_COLOR } from '../sim/tilemap.js?v=12';
 
 function sceneryTexture(kind) {
   const c = document.createElement('canvas');
@@ -111,7 +111,8 @@ export class WorldView {
     const { map, ts, half } = this;
     this.roadGroup.clear();
     const pos = [], idx = [];
-    const bDeaglan = [], bMine = []; // framing edges: Deaglán's path (gold) vs your own (teal)
+    // framing edges by whose route laid the tile: Deaglán (gold), Midir (violet), yours (teal)
+    const buckets = { deaglan: [], midir: [], mine: [] };
     let vi = 0;
     const inset = ts * 0.06;
     const bi = ts * 0.03;
@@ -130,7 +131,7 @@ export class WorldView {
           const y = 0.05;
           const edges = [bx0, y, bz0, bx1, y, bz0,  bx1, y, bz0, bx1, y, bz1,
                          bx1, y, bz1, bx0, y, bz1,  bx0, y, bz1, bx0, y, bz0];
-          (t.roadKind === 'mine' ? bMine : bDeaglan).push(...edges);
+          if (buckets[t.roadKind]) buckets[t.roadKind].push(...edges);
         }
       }
     }
@@ -141,8 +142,9 @@ export class WorldView {
     this.roadGroup.add(
       new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x8a7350, side: THREE.DoubleSide }))
     );
-    this._addBorder(bDeaglan, 0xe8c96b);
-    this._addBorder(bMine, 0x54c8d8);
+    this._addBorder(buckets.deaglan, 0xe8c96b);
+    this._addBorder(buckets.midir, 0xb98cff);
+    this._addBorder(buckets.mine, 0x54c8d8);
   }
 
   _addBorder(verts, color) {

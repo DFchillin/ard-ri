@@ -23,7 +23,7 @@ export function seasonOfMonth(m) {
 
 // month index -> festival that opens it (day 1)
 export const FESTIVALS = {
-  1: { name: 'Imbolc', emoji: '🕯️', sub: 'Brigid’s feast — the first stirrings of spring.' },
+  1: { name: 'Imbolc', emoji: '🕯️', sub: 'The goddess Brigid, daughter of the Dagda, wakes the land — the first stirrings of spring.' },
   4: { name: 'Bealtaine', emoji: '🔥', sub: 'Fires of summer — cattle driven to the high pastures.' },
   7: { name: 'Lughnasadh', emoji: '🌾', sub: 'Lugh’s feast — the first harvest is gathered.' },
   10: { name: 'Samhain', emoji: '🎃', sub: 'The veil thins — winter comes, and the dead walk.' },

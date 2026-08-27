@@ -1,8 +1,8 @@
-import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=11';
+import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=12';
 
 // DOM overlay. Owns the HTML controls; the world never reads the DOM directly.
 export class UI {
-  constructor({ onTool, onSpeed, onRotate, onZoom, onInspectClose, onFestivalContinue, onStartMission, onPlaceConfirm, onPlaceCancel, onPlaceAlt }) {
+  constructor({ onTool, onSpeed, onRotate, onZoom, onInspectClose, onFestivalContinue, onStartMission, onPlaceConfirm, onPlaceCancel, onPlaceAlt, onLedger }) {
     this.onTool = onTool;
     this.onSpeed = onSpeed;
     this.onInspectClose = onInspectClose || (() => {});
@@ -86,6 +86,13 @@ export class UI {
       };
       document.addEventListener('fullscreenchange', sync);
       document.addEventListener('webkitfullscreenchange', sync);
+    }
+
+    // Tap the silver in the topbar to open the ledger.
+    const silverStat = this.el.silver && this.el.silver.closest('.stat');
+    if (silverStat) {
+      silverStat.style.cursor = 'pointer';
+      silverStat.addEventListener('click', () => (onLedger || (() => {}))());
     }
 
     this._buildTabs();
