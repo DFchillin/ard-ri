@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../data/buildings.js?v=8';
-import { makeBuildingChip, makeAlertMarker } from '../render/chips.js?v=8';
-import { Walker, Traveler } from './walkers.js?v=8';
-import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=8';
-import { randomName } from '../data/names.js?v=8';
-import { personFor } from '../data/phrases.js?v=8';
+import { BUILDINGS } from '../data/buildings.js?v=9';
+import { makeBuildingChip, makeAlertMarker } from '../render/chips.js?v=9';
+import { Walker, Traveler } from './walkers.js?v=9';
+import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=9';
+import { randomName } from '../data/names.js?v=9';
+import { personFor } from '../data/phrases.js?v=9';
 
 const MARKET_CAP = 12;
 const HOUSE_CAP = 10;

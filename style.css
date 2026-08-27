@@ -305,11 +305,25 @@ html, body {
   pointer-events: auto;
 }
 #place-confirm.hidden { display: none; }
+#place-confirm { align-items: center; }
+#place-label {
+  font-family: var(--font-display); color: var(--gold);
+  font-size: 14px; padding: 8px 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  white-space: nowrap;
+}
+#place-label.hidden { display: none; }
 #place-do {
   background: var(--gold); color: #1c130a; border: none;
   border-radius: 10px; padding: 12px 22px; font-size: 16px; font-weight: 600;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
+#place-alt {
+  background: rgba(15,28,34,0.95); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; font-size: 14px;
+}
+#place-alt.hidden { display: none; }
 #place-cancel {
   background: rgba(15,28,34,0.95); color: var(--ink);
   border: 1px solid var(--border); border-radius: 10px;

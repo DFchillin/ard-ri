@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { T, TERRAIN_COLOR } from '../sim/tilemap.js?v=8';
+import { T, TERRAIN_COLOR } from '../sim/tilemap.js?v=9';
 
 function sceneryTexture(kind) {
   const c = document.createElement('canvas');

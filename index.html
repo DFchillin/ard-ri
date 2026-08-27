@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Uncial+Antiqua&family=Spectral:wght@400;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css?v=8" />
+<link rel="stylesheet" href="style.css?v=9" />
 <script type="importmap" data-cfasync="false">
 {
   "imports": {
@@ -68,7 +68,9 @@
   </aside>
 
   <div id="place-confirm" class="hidden">
-    <button id="place-do">Build here ✓</button>
+    <span id="place-label" class="hidden"></span>
+    <button id="place-alt" class="hidden" title="Try Deaglán’s other route">↻ Other</button>
+    <button id="place-do">Build ✓</button>
     <button id="place-cancel">✕</button>
   </div>
 
@@ -100,6 +102,6 @@
   </div>
 </div>
 
-<script type="module" src="src/main.js?v=8" data-cfasync="false"></script>
+<script type="module" src="src/main.js?v=9" data-cfasync="false"></script>
 </body>
 </html>

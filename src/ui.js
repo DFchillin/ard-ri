@@ -1,8 +1,8 @@
-import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=8';
+import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=9';
 
 // DOM overlay. Owns the HTML controls; the world never reads the DOM directly.
 export class UI {
-  constructor({ onTool, onSpeed, onRotate, onZoom, onInspectClose, onFestivalContinue, onStartMission, onPlaceConfirm, onPlaceCancel }) {
+  constructor({ onTool, onSpeed, onRotate, onZoom, onInspectClose, onFestivalContinue, onStartMission, onPlaceConfirm, onPlaceCancel, onPlaceAlt }) {
     this.onTool = onTool;
     this.onSpeed = onSpeed;
     this.onInspectClose = onInspectClose || (() => {});
@@ -59,8 +59,11 @@ export class UI {
     document.getElementById('inspect-close').addEventListener('click', () => this.hideInspect());
     this.inspectContinue.addEventListener('click', () => this.hideInspect());
     document.getElementById('fest-continue').addEventListener('click', () => this.hideFestival());
+    this.placeLabel = document.getElementById('place-label');
+    this.placeAlt = document.getElementById('place-alt');
     document.getElementById('place-do').addEventListener('click', () => (onPlaceConfirm || (() => {}))());
     document.getElementById('place-cancel').addEventListener('click', () => (onPlaceCancel || (() => {}))());
+    if (this.placeAlt) this.placeAlt.addEventListener('click', () => (onPlaceAlt || (() => {}))());
     [...document.querySelectorAll('.mission-btn:not(.locked)')].forEach((b) =>
       b.addEventListener('click', () => { this.hideTitle(); (onStartMission || (() => {}))(); })
     );
@@ -99,7 +102,14 @@ export class UI {
 
   showTitle() { if (this.titleScreen) this.titleScreen.classList.remove('hidden'); }
   hideTitle() { if (this.titleScreen) this.titleScreen.classList.add('hidden'); }
-  showPlaceConfirm() { if (this.placeConfirm) this.placeConfirm.classList.remove('hidden'); }
+  showPlaceConfirm({ road = false, label = '' } = {}) {
+    if (this.placeLabel) {
+      this.placeLabel.textContent = label;
+      this.placeLabel.classList.toggle('hidden', !road);
+    }
+    if (this.placeAlt) this.placeAlt.classList.toggle('hidden', !road);
+    if (this.placeConfirm) this.placeConfirm.classList.remove('hidden');
+  }
   hidePlaceConfirm() { if (this.placeConfirm) this.placeConfirm.classList.add('hidden'); }
 
   _setDrawer(open) {
