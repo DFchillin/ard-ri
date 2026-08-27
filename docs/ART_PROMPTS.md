@@ -1,180 +1,153 @@
-# Ard Rí — Sprite Prompt Pack
+# Ard Rí — Asset Brief
 
-Prompts for generating the settlement sprites (ChatGPT image gen, Pixellab, or
-any diffusion tool). Built to match the **Celtic / Brehon Settlement Sprite
-Sheet** reference so every new asset stays consistent with it.
+Copy-ready pixel-art prompts for **every sprite the current build needs**, for
+any image generator (ChatGPT image gen, Pixellab, diffusion tools). Scoped to
+what's actually in the game today, not the wishlist.
+
+A designed, shareable version of this brief is published as an Artifact.
+
+**Counts:** 6 buildings × 2 states · 5 walkers × 8 directions · 5 ground tiles ·
+2 scatter props + gate.
 
 ## How to use
-
-1. **Always prepend the STYLE BLOCK** below to every prompt. It's what keeps
-   separate generations looking like one set.
-2. When you can, **attach the reference sheet as an image** and add
-   *"match the style, palette, scale and perspective of the attached sheet"* —
-   that locks consistency harder than words alone.
-3. Generate on a **transparent background**. If a tool bakes a background,
-   generate on flat neutral grey/green and we key it out later.
-4. Keep a **fixed seed** per set where the tool allows, so re-rolls stay on model.
+1. **Prepend the STYLE BLOCK to every prompt** — it's what keeps separate
+   generations looking like one set.
+2. Where possible, attach an already-approved sprite and add *"match the style,
+   palette, scale and perspective of the attached image."*
+3. Hold a fixed seed per set. Generate on transparent background (or flat
+   neutral grey-green to key out).
 
 ## STYLE BLOCK (prepend to everything)
+> Isometric pixel-art game asset, 2:1 dimetric ¾ top-down city-builder view at
+> ~30° elevation. Hand-crafted HD pixel art: soft painterly shading, a single
+> thin dark outline, one soft light from the upper-left, a small soft contact
+> shadow. Mythic Iron-Age / early-medieval Gaelic Ireland. Muted earthy palette
+> — olive and moss green, thatch straw-gold, weathered oak brown, grey
+> fieldstone, cream, with occasional Celtic gold and woad-blue accents. Clean
+> readable silhouette, centred, consistent scale. Fully transparent background
+> (PNG alpha). No ground tile, no text, no frame, no UI.
 
-> Isometric pixel-art game asset, 2:1 dimetric / classic city-builder ¾ top-down
-> view, ~30° elevation. Detailed HD pixel art with soft painterly shading and a
-> thin dark outline. Single soft light source from the upper-left, small soft
-> contact shadow only. Muted earthy Celtic Iron-Age / early-medieval Gaelic
-> palette: olive green, thatch straw-gold, weathered timber brown, grey
-> fieldstone, cream, moss. Clean readable silhouette. Centred, consistent scale,
-> fully transparent background (PNG alpha). No ground tile, no text, no frame,
-> no UI.
-
-## Output → asset mapping
-
-- Single building: `assets/buildings/<name>.png`
-- Upgrade stages: `assets/buildings/<name>_1.png` … `_5.png` (1 = humblest,
-  5 = grandest). The loader will read these once building upgrades are wired.
-- Walker: `assets/walkers/<name>/<name>_<DIR>.png` for the 8 compass dirs.
-
----
-
-## DWELLINGS  (5 upgrade stages each)
-
-Add to each: *"Show 5 progressive upgrade stages in one row, left to right,
-evenly spaced on a shared baseline at identical scale: (1) small and rough,
-(2) modest and lived-in, (3) established, (4) prosperous and decorated,
-(5) grand. Transparent gaps between each."*
-
-- **roundhouse** — A Celtic roundhouse: circular wattle-and-daub wall, conical
-  thatched roof with a smoke hole, low timber doorway. Stage 5 adds a surrounding
-  low earthen bank and carved doorposts.
-- **longhouse** — A Gaelic timber longhouse: rectangular plan, long pitched
-  thatched roof, timber-framed walls, a stone chimney end. Stage 5 adds a porch
-  and painted door.
-- **stone_house** — A drystone-walled house with a heavy thatched roof and a
-  stone chimney, small shuttered windows. Later stages gain a second gable and
-  neater masonry.
-- **hill_fort_house** — A chieftain's house: stout timber and stone, defensive
-  posts, banner poles, a raised stone footing. Later stages gain palisade posts
-  and a carved lintel.
-- **druids_hut** — A druid's dwelling ringed by small standing stones, a low
-  thatched hut with a glowing doorway and hanging charms. Later stages add more
-  standing stones and a carved ogham stele.
-
-## FARMING  (5 stages = the seasonal / growth cycle)
-
-Add to each: *"Show 5 stages left to right on a shared baseline at identical
-scale, transparent gaps between."*
-
-- **fields** — An isometric tilled crop field bordered by a low timber fence.
-  Stages: (1) bare ploughed furrows, (2) green sprouts, (3) growing green crop,
-  (4) tall ripe golden barley, (5) harvested with stooked sheaves.
-- **vegetable_patch** — A fenced kitchen garden. Stages: (1) bare beds,
-  (2) seedlings, (3) leafy rows, (4) full cabbages and greens, (5) ripe with
-  roots and gourds.
-- **orchard** — Fenced fruit trees. Stages: (1) bare saplings, (2) leafing,
-  (3) full green canopy, (4) blossom, (5) heavy with red apples. (One tree unit;
-  we tile several.)
-- **animal_pen** — A timber-fenced enclosure. Stages: (1) empty pen, (2) a few
-  sheep, (3) a small flock, (4) sheep and cattle, (5) a full herd of cattle.
-- **grain_store** — Grain storage. Stages: (1) small thatched basket store,
-  (2) larger, (3) a raised granary hut, (4) a granary on stone staddle stilts,
-  (5) a tall well-built raised granary. (Souterrain/raised-store feel.)
-
-## AMENITIES  (single sprite each, no stages unless noted)
-
-- **well** — A round drystone well with a timber winch and a small pitched roof.
-- **market** — An open market stall: timber posts, striped awning, baskets of
-  produce and pots.
-- **smithy** — A blacksmith's forge: stone hearth with glowing coals, anvil,
-  timber lean-to roof, smoke.
-- **herbalist** — A herbalist's hut hung with drying herbs, shelves of pots, a
-  small garden of plants.
-- **bard_circle** — A ceremonial circle of standing stones around a low central
-  fire pit, a banner on a pole. (The gathering place for the filí.)
-- **rain_shrine** — A carved standing-stone shrine with a small water basin and
-  votive offerings, moss and Celtic knotwork.
-- **sacred_oak** — A great ancient oak with a low stone ring at its base and
-  cloth offerings tied to the branches.
-- **training_ground** — A warriors' training yard: timber weapon racks, practice
-  posts, hide targets, banner poles.
-- **community_fire** — A communal stone fire pit with a crackling fire, log
-  seats and a cooking tripod.
-- **altar** — A pagan standing-stone altar carved with ogham and knotwork, a
-  small offering bowl. (Spawns the druid walker.)
+## Technical rules
+- **Projection** — one fixed iso view per building. The camera rotates in 90°
+  steps but buildings are billboards, so a single view reads at every rotation.
+- **Background** — transparent PNG alpha.
+- **Anchor** — base-centre. Footprint ground-centre on the horizontal middle;
+  front ground edge on the bottom margin (~8% pad); head-room above for roof/smoke.
+- **Scale** — author at **128 px per map tile**; hold it across the whole set.
+- **Canvas** — `1×1 → 256×256`, `2×2 → 512×448`, `3×2 field → 640×384`.
+- **Two states** — each building drawn twice on one sheet, identical scale &
+  anchor: **left = empty/unoccupied**, **right = occupied/operational**. The
+  engine shows a half-height placeholder until occupied, then swaps to full.
 
 ---
 
-## WALKERS  (4 directional frames each: down / left / up / right)
+## BUILDINGS — two states each
+Files: `assets/buildings/<name>_empty.png` and `<name>_full.png`.
 
-Per the concept sheet, every walker has **4 frames** — down, left, up, right —
-saved as `_S _W _N _E`. Add to each prompt: *"A single small character sprite,
-full body, mid-stride walking pose, in isometric ¾ view. Generate 4 directional
-frames — facing down, left, up, and right — as a consistent character at
-identical scale."* (Or draw one and mirror left↔right for two of the four.)
+### roundhouse — Dwelling (2×2)
+Empty: freshly built, plain, dark doorway, no smoke. Occupied: smoke, warm glow,
+pots, a worn path.
+> A Celtic roundhouse home: circular wattle-and-daub wall, tall conical thatched
+> roof with a central smoke-hole, a low timber doorway. Draw TWO frames at
+> identical scale on one transparent sheet, evenly spaced. LEFT (empty): freshly
+> built, plain, dark empty doorway, no smoke, muted and still. RIGHT (occupied):
+> lived-in and warm — thin smoke rising from the smoke-hole, a warm glow in the
+> doorway, a drying rack and a few pots, a worn path at the door.
 
-Each walker is spawned by a building and carries a service along the roads
-(a few are ambient folk). Files go in `assets/walkers/<name>/<name>_<DIR>.png`.
+### field — Barley Field (3×2)
+> An isometric tilled barley field bordered by a low woven-timber fence. Draw TWO
+> frames at identical scale on one transparent sheet, evenly spaced. LEFT
+> (fallow): bare brown ploughed furrows, empty soil. RIGHT (in crop): tall ripe
+> golden barley filling the plot, lush and heavy, ready to harvest. Wider than it
+> is deep (3×2 footprint).
 
-**Vendors / Merchants** — market & trade
-- **trader**, **food_merchant**, **herbalist**, **fishmonger**, **weaponsmith**,
-  **jeweler** — market/craft vendors; spread *goods/appeal* from their stalls.
+### granary — Grain Store (2×2)
+> A raised Gaelic granary: a thatched timber grain-store lifted on flat
+> staddle-stones to keep out vermin, with a small ladder. Draw TWO frames at
+> identical scale on one transparent sheet, evenly spaced. LEFT (empty): bare,
+> doors open, nothing stored. RIGHT (stocked): full — grain sacks and woven
+> baskets stacked around and beneath it, doors shut, tidy and well-kept.
 
-**Resource carriers & laborers** — the core service walkers
-- **water_carrier** — pails on a yoke → spreads **water** (from the well).
-- **wood_cutter**, **stone_carrier**, **grain_carrier** → carry raw goods to store.
-- **pack_mule_handler** — leads a laden mule; long-haul goods.
-- **laborer** — general worker (construction, ambient).
+### market (2×2)
+> An open Celtic market stall: timber posts under a striped woollen awning with
+> trestle boards. Draw TWO frames at identical scale on one transparent sheet,
+> evenly spaced. LEFT (idle): bare empty boards, no goods, quiet. RIGHT
+> (trading): boards laden with baskets of grain, loaves, clay pots and folded
+> cloth — colourful, abundant and busy.
 
-**Maintenance & builders** — keep buildings from decaying
-- **builder**, **carpenter**, **stone_mason**, **thatcher**, **repairer** →
-  spread **upkeep** (prevent devolution).
+### well (1×1)
+> A round drystone well with a timber winch, rope and wooden bucket, under a small
+> pitched shingle roof. Draw TWO frames at identical scale on one transparent
+> sheet, evenly spaced. LEFT (still): plain, the bucket resting on the rim, no
+> activity. RIGHT (in use): rope lowered into the shaft, water glistening at the
+> brim, a filled bucket, wet stones and a small puddle. Small footprint (1×1).
 
-**Service & civic roles**
-- **bard_storyteller**, **bard_musician** → spread **culture** (from the bard circle).
-- **herald**, **messenger** → carry orders/announcements.
-- **seneschal** — the steward with a tally stick → collects **tribute/tax**.
+### altar (1×1)
+> A pagan standing-stone altar carved with ogham strokes and Celtic knotwork, a
+> small offering bowl at its foot. Draw TWO frames at identical scale on one
+> transparent sheet, evenly spaced. LEFT (dormant): bare weathered grey stone,
+> empty bowl, quiet. RIGHT (venerated): greenery and offerings laid around it, a
+> lit votive flame in the bowl, cloth tied on, a faint warm golden glow. Small
+> footprint (1×1).
 
-**Animal handlers**
-- **cow_herder** (cattle = wealth), **sheep_herder**, **pig_keeper**,
-  **goose_herder**, **horse_handler** → tend the animal pens.
+---
 
-**Utility & support** — the food/craft chain
-- **cook**, **brewer**, **baker** → spread **food/hospitality** (feasting hall,
-  granary). **tanner**, **fire_keeper** → hides/leather and the community fire.
+## WALKERS — 8 directions, single frame
+Files: `assets/walkers/<name>/<name>_<DIR>.png`, DIR ∈ `S SE E NE N NW W SW`.
+The engine adds the hop and shadow. E/W, NE/NW, SE/SW are mirror pairs — five
+drawings, three flipped.
 
-**Special**
-- **druid** — hooded robe and staff → spreads **religious favour** (from the
-  altar / druid's hut).
-- **warrior** — war-band spearman with a round shield → defence (training ground).
+**Shared instruction (add to each):** A single small full-body character in
+isometric ¾ view, mid-stride walking pose, clean readable silhouette, base-centre
+anchored. Generate EIGHT directional frames on one transparent sheet, evenly
+spaced at identical scale, facing the compass in this order: S (toward camera),
+SE, E, NE, N (away), NW, W, SW. Keep the character identical across all eight —
+only the facing changes. No baked shadow.
 
-## GODS & HEROES
+- **villager** — a common Gaelic villager: belted léine (linen tunic) in undyed
+  cream or muted earth-brown, bare-headed or a simple hood, plain leather shoes.
+- **grain_carrier** — a farm labourer carrying a woven basket/sack of golden
+  barley on the shoulder, léine with a rough apron, sleeves rolled.
+- **market_trader** — a trader in a finer dyed tunic (woad-blue or madder-red
+  trim), woollen cloak pinned by a bronze penannular brooch, a laden basket.
+- **water_carrier** — balances a wooden yoke with two pails, splashed and wet,
+  plain léine, barefoot or simple shoes.
+- **druid** — a long hooded robe of natural wool or soft green, a carved staff,
+  bearded, a sprig of oak or a small bronze sickle at the belt; dignified,
+  otherworldly.
 
-Two forms per figure:
-1. **Walker** — 4 directional frames like any villager, saved to
-   `assets/walkers/<id>/<id>_<DIR>.png`. Used when a god or hero walks the
-   settlement.
-2. **Manifestation** — one larger "visiting your settlement" scene (the bottom
-   row of the sheet), saved to `assets/manifestations/<id>.png`. Shown when the
-   god appears at their site.
+---
 
-Prompt add for walkers: *"…mid-stride walking pose, isometric ¾ view, 4
-directional frames (down/left/up/right), consistent design."* For manifestations:
-*"…standing at a sacred site (stones / well / grove / shrine), a moment of divine
-presence, richer detail, isometric ¾ view, transparent background."*
+## GROUND & TILES
+Two kinds: seamless **ground textures** that tile across the grid, and **scatter
+props** (tree, boulder) that sit on top as billboards. Texture pasture first,
+then bog/water; rock and woodland already read through their props.
 
-**Gods of Éire** (ids match `src/data/gods.js`): dagda, brigid, lugh, morrigan,
-manannan, tailtiu, cernunnos, nuada, aengus — with their domains and boons.
+**Shared tile instruction:** A seamless, tileable top-down ground texture,
+square, that repeats edge-to-edge with no visible seam. Flat even lighting (no
+baked directional shadow/highlight) so copies tile cleanly. Subtle, muted,
+low-contrast so buildings/units read on top. Pixel-art. Ground only — no props.
 
-**Heroes** (ids match `src/data/heroes.js`): cu_chulainn, scathach, caech,
-ferdiad, fionn, grainne, diarmuid, deirdre, conchobar.
+Files: `assets/terrain/tiles/<name>.png`
+- **pasture** — lush Irish grazing grass, olive & moss green, faint tufts and
+  clover, a few tiny daisies, evenly grazed. *(build ground; do this first)*
+- **bog** — dark waterlogged peat, sphagnum moss, bog-cotton tufts, small black
+  pools, sedge.
+- **water** — shallow lough, deep teal-blue, gentle ripples and faint reflections.
+- **shore** — pale gold sand and small pebbles, faint ripple lines.
+- **rock** — bare grey fieldstone, cracked stone, lichen, scattered pebbles.
+  *(optional; rock also carries a boulder prop)*
 
-Keep gods/heroes slightly larger and more richly coloured than common folk so
-they read as special in-world.
+Scatter props & gate (each transparent, base-centre anchored):
+- `assets/terrain/tree.png` — a single Irish oak/hazel tree, full leafy canopy.
+- `assets/terrain/rock.png` — a cluster of grey moss-covered fieldstone boulders.
+- `assets/props/gate.png` — a carved oak threshold gateway (two posts + a
+  knotwork lintel, a worn path through) marking the settlement entrance; replaces
+  the placeholder gold post.
 
-## Consistency tips
+---
 
-- Generate a **whole row of 5 stages in one image** (as the reference sheet did)
-  so stages share lighting and scale, then slice. This beats generating stages
-  separately.
-- Lock the **palette** first (generate one hero building, approve the colours,
-  then reference it for everything else).
-- Keep the **light from the upper-left** on every asset or shadows will fight
-  in-world.
+## Palette anchors (already in the build)
+If the tool takes hex, match the *mood* not the flat colour — these are the
+placeholder chip colours: dwelling `#c98a3a`, field `#8ea63a`, granary `#b0894a`,
+market `#a8663a`, well `#5a8aa0`, altar `#7a6a9a` · gold `#e8c96b` · woad `#2c6b76`.
