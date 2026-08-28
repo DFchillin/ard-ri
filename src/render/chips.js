@@ -5,7 +5,11 @@ const DIRS = ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'];
 const WALK_CYCLE = [0, 2, 1, 2]; // step1, stand, step2, stand
 const STEP_TIME = 0.42; // seconds per walk frame (slower, calmer gait)
 
-const FILL = 1.2; // building sprite width as a multiple of its footprint width
+// A screen-facing billboard's width maps to the footprint's diagonal screen
+// span, which grows with w+h (not w alone). 0.6 keeps square/1x1 buildings the
+// same size they were at the old w*1.2, while insetting wide footprints (the
+// 3x2 field) so their art no longer overhangs onto adjacent roads.
+const DIAG_FILL = 0.6;
 
 // Pixel-art sprites for buildings and walkers, with the old solid-shape chips
 // kept as a fallback if a role has no art yet.
@@ -33,7 +37,7 @@ export function makeBuildingChip(role, w, h, ts) {
   if (base) {
     const emptyT = tex('assets/buildings/' + base + '_empty.png');
     const fullT = tex('assets/buildings/' + base + '_full.png');
-    const worldW = w * ts * FILL; // fill the footprint regardless of art pixel size
+    const worldW = (w + h) * ts * DIAG_FILL; // size to the iso footprint's diagonal span
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emptyT, transparent: true, alphaTest: 0.12 }));
     spr.center.set(0.5, 0);
     fitWidth(spr, emptyT, worldW);
