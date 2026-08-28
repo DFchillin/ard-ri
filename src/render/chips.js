@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { tex, spriteFrom, fitWidth } from './assets.js?v=16';
+import { tex, spriteFrom, fitWidth } from './assets.js?v=17';
 
-const FILL = 1.35; // building sprite width as a multiple of its footprint width
+const FILL = 1.2; // building sprite width as a multiple of its footprint width
 
 // Pixel-art sprites for buildings and walkers, with the old solid-shape chips
 // kept as a fallback if a role has no art yet.
