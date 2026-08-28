@@ -8,11 +8,11 @@ SETUP = """(ripe) => {
   const {game, map, view, sim} = window.ardri;
   game.silver = 99999;
   for (let z=10;z<=22;z++) for (let x=10;x<=22;x++){ const t=map.get(x,z); if(t){ t.terrain=0; t.road=false; t.occupant=null; } }
-  // roads boxing a 3x2 field at 14,14..16,15
-  for (let x=13;x<=17;x++){ map.setRoad(x,13,true); map.setRoad(x,16,true); }
-  for (let z=13;z<=16;z++){ map.setRoad(13,z,true); map.setRoad(17,z,true); }
+  // roads boxing a 2x2 field at 14,14..15,15
+  for (let x=13;x<=16;x++){ map.setRoad(x,13,true); map.setRoad(x,16,true); }
+  for (let z=13;z<=16;z++){ map.setRoad(13,z,true); map.setRoad(16,z,true); }
   view.rebuildRoads();
-  game.place('field',{x:14,z:14,w:3,h:2});
+  game.place('field',{x:14,z:14,w:2,h:2});
   const f = game.buildings.find(b=>b.def.role==='farm');
   if (ripe){ f.ripe=true; f.grown=24; }
   game.tick();

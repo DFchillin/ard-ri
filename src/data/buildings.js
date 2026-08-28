@@ -3,7 +3,7 @@
 export const BUILDINGS = {
   roundhouse: { label: 'Dwelling', sprite: 'roundhouse', icon: '🛖', footprint: [2, 2], cost: 20, role: 'dwelling', folk: 4,
     desc: 'A ráth — a round wattle-and-daub home. Draws folk when fed and watered.' },
-  field: { label: 'Field', sprite: 'fields', icon: '🌾', footprint: [3, 2], cost: 15, role: 'farm', produce: 'barley', rate: 5, load: 4,
+  field: { label: 'Field', sprite: 'fields', icon: '🌾', footprint: [2, 2], cost: 15, role: 'farm', produce: 'barley', rate: 5, load: 4,
     desc: 'Barley for bread and ale. Sends a grain-carrier to a nearby store.' },
   granary: { label: 'Grain Store', sprite: 'grain_store', icon: '🏚️', footprint: [2, 2], cost: 18, role: 'granary',
     desc: 'Holds the harvest. Markets draw grain from here along the roads.' },
