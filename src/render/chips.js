@@ -3,7 +3,7 @@ import { tex, spriteFrom, fitWidth, sizeSprite, screenDir } from './assets.js?v=
 
 const DIRS = ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'];
 const WALK_CYCLE = [0, 2, 1, 2]; // step1, stand, step2, stand
-const STEP_TIME = 0.14;
+const STEP_TIME = 0.42; // seconds per walk frame (slower, calmer gait)
 
 const FILL = 1.2; // building sprite width as a multiple of its footprint width
 

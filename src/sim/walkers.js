@@ -46,7 +46,6 @@ export class Walker {
     this.t += dt * this.speed;
     const k = Math.min(this.t, 1);
     this._moveSpriteTo(this.cur, this.next, k);
-    this.sprite.position.y = 0.05 + Math.abs(Math.sin(this.age * 7)) * 0.16; // bob
     if (this.sprite.animate) this.sprite.animate(dt, true);
     if (this.t >= 1) {
       this.t -= 1;
@@ -96,7 +95,7 @@ export class Traveler {
     const k = Math.min(this.t, 1);
     this.sprite.position.set(
       this.a.x + (this.b.x - this.a.x) * k,
-      0.05 + Math.abs(Math.sin(this.age * 7)) * 0.16,
+      0.05,
       this.a.z + (this.b.z - this.a.z) * k
     );
     if (this.sprite.animate) this.sprite.animate(dt, true);
