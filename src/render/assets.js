@@ -2,24 +2,27 @@ import * as THREE from 'three';
 
 // Loads the sliced pixel-art PNGs and turns them into billboard sprites.
 // Textures load async; sizing callbacks run once each image arrives.
-const V = '18';
+const V = '19';
 const PPT = 128; // pixels per map tile the art was authored at
 const loader = new THREE.TextureLoader();
 const cache = new Map();
 
-export function tex(path) {
-  if (cache.has(path)) return cache.get(path);
-  const t = loader.load(path + '?v=' + V, () => {
-    t.needsUpdate = true;
-    for (const fn of t._cbs || []) fn();
-    t._cbs = [];
-  });
-  t._cbs = [];
-  t.magFilter = THREE.NearestFilter;
-  t.minFilter = THREE.NearestFilter;
-  t.generateMipmaps = false;
-  t.colorSpace = THREE.SRGBColorSpace;
-  cache.set(path, t);
+export function tex(path, onError) {
+  let t = cache.get(path);
+  if (!t) {
+    t = loader.load(path + '?v=' + V, () => {
+      t.needsUpdate = true;
+      for (const fn of t._cbs || []) fn();
+      t._cbs = [];
+    }, undefined, () => { t._failed = true; for (const fn of t._errCbs || []) fn(t); t._errCbs = []; });
+    t._cbs = []; t._errCbs = [];
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
+    t.colorSpace = THREE.SRGBColorSpace;
+    cache.set(path, t);
+  }
+  if (onError) { if (t._failed) onError(t); else t._errCbs.push(onError); }
   return t;
 }
 

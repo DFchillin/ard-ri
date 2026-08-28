@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=18';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=18';
-import { WorldView } from './render/world_view.js?v=18';
-import { BUILDINGS } from './data/buildings.js?v=18';
-import { Game } from './sim/game.js?v=18';
-import { UI } from './ui.js?v=18';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=18';
-import { setCamera } from './render/assets.js?v=18';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=19';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=19';
+import { WorldView } from './render/world_view.js?v=19';
+import { BUILDINGS } from './data/buildings.js?v=19';
+import { Game } from './sim/game.js?v=19';
+import { UI } from './ui.js?v=19';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=19';
+import { setCamera } from './render/assets.js?v=19';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×

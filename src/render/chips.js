@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { tex, spriteFrom, fitWidth, sizeSprite, screenDir } from './assets.js?v=18';
+import { tex, spriteFrom, fitWidth, sizeSprite, screenDir } from './assets.js?v=19';
 
 const DIRS = ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'];
 const WALK_CYCLE = [0, 2, 1, 2]; // step1, stand, step2, stand
@@ -64,17 +64,32 @@ function fallbackBody(spec, w, h, ts) {
   return body;
 }
 
+const WALKER_COLOR = {
+  villager: 0xf0e0c0, grain_carrier: 0xe8c96b, market_trader: 0xe0883a,
+  water_carrier: 0x6fb0e0, druid: 0xb07ad0,
+};
+
 export function makeWalkerChip(type) {
   const base = WALK_FILE[type] || 'villager';
   const T = {};
   for (const d of DIRS) T[d] = ['step1', 'step2', 'stand'].map((f) => tex(`assets/walkers/${base}/${d}_${f}.png`));
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.s[2], transparent: true, alphaTest: 0.12 }));
   s.center.set(0.5, 0);
+  s.scale.set(0.55, 0.95, 1); // sensible default before the art loads
   sizeSprite(s, T.s[2], 1.5);
+  // Safety net: if the art can't load, show a plain coloured figure, never nothing.
+  tex(`assets/walkers/${base}/s_stand.png`, () => {
+    s._failed = true;
+    s.material.map = null;
+    s.material.color.set(WALKER_COLOR[type] || 0xffffff);
+    s.material.needsUpdate = true;
+    s.scale.set(0.5, 0.9, 1);
+  });
   // animation state on dedicated props — walkers overwrite userData for inspect
   s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0;
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
   s.animate = (dt, moving) => {
+    if (s._failed) return; // fallback colour figure — nothing to swap
     const frames = T[screenDir(s._dx, s._dz)] || T.s;
     if (moving) {
       s._t += dt;
