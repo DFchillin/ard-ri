@@ -1,33 +1,11 @@
 import * as THREE from 'three';
-import { T, TERRAIN_COLOR } from '../sim/tilemap.js?v=13';
+import { T } from '../sim/tilemap.js?v=14';
+import { tex, spriteFrom } from './assets.js?v=14';
 
-function sceneryTexture(kind) {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d');
-  if (kind === 'tree') {
-    g.fillStyle = '#3a2a18';
-    g.fillRect(29, 40, 6, 18);
-    g.fillStyle = '#2f5a2a';
-    g.beginPath();
-    g.arc(32, 30, 18, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#3c6e33';
-    g.beginPath();
-    g.arc(26, 26, 10, 0, Math.PI * 2);
-    g.fill();
-  } else {
-    g.fillStyle = '#8a857b';
-    g.beginPath();
-    g.moveTo(16, 52); g.lineTo(24, 30); g.lineTo(40, 34); g.lineTo(50, 52);
-    g.closePath(); g.fill();
-    g.fillStyle = '#6f6a61';
-    g.beginPath(); g.moveTo(24, 30); g.lineTo(40, 34); g.lineTo(30, 40); g.closePath(); g.fill();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.magFilter = THREE.NearestFilter;
-  return tex;
-}
+const TERR_FILE = {
+  [T.GRASS]: 'pasture', [T.WATER]: 'water', [T.BOG]: 'bog',
+  [T.ROCK]: 'rock', [T.WOODS]: 'pasture', [T.SAND]: 'shore',
+};
 
 export class WorldView {
   constructor(scene, map) {
@@ -60,47 +38,47 @@ export class WorldView {
 
   _buildTerrain() {
     const { map, ts, half } = this;
-    const pos = [], col = [], idx = [];
-    let vi = 0;
-    const c = new THREE.Color();
+    // One textured mesh per terrain type; each tile samples the full texture.
+    const buckets = {};
     for (let z = 0; z < map.size; z++) {
       for (let x = 0; x < map.size; x++) {
-        const t = map.get(x, z);
-        const y = t.terrain === T.WATER ? -0.18 : 0;
-        c.set(TERRAIN_COLOR[t.terrain]);
+        const t = map.get(x, z).terrain;
+        const b = (buckets[t] = buckets[t] || { pos: [], uv: [], idx: [], vi: 0 });
+        const y = t === T.WATER ? -0.18 : 0;
         const wx = x * ts - half, wz = z * ts - half;
-        pos.push(wx, y, wz, wx + ts, y, wz, wx + ts, y, wz + ts, wx, y, wz + ts);
-        for (let k = 0; k < 4; k++) col.push(c.r, c.g, c.b);
-        idx.push(vi, vi + 2, vi + 1, vi, vi + 3, vi + 2);
-        vi += 4;
+        b.pos.push(wx, y, wz, wx + ts, y, wz, wx + ts, y, wz + ts, wx, y, wz + ts);
+        b.uv.push(0, 0, 1, 0, 1, 1, 0, 1);
+        b.idx.push(b.vi, b.vi + 2, b.vi + 1, b.vi, b.vi + 3, b.vi + 2);
+        b.vi += 4;
       }
     }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    geo.setIndex(idx);
-    geo.computeVertexNormals();
-    return new THREE.Mesh(
-      geo,
-      new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })
-    );
+    const group = new THREE.Group();
+    for (const t in buckets) {
+      const b = buckets[t];
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+      geo.setIndex(b.idx);
+      geo.computeVertexNormals();
+      const file = TERR_FILE[t] || 'pasture';
+      group.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+        map: tex('assets/terrain/tiles/' + file + '.png'), side: THREE.DoubleSide,
+      })));
+    }
+    return group;
   }
 
   _buildScenery() {
     const { map } = this;
     const group = new THREE.Group();
-    const treeTex = sceneryTexture('tree');
-    const rockTex = sceneryTexture('rock');
     for (let z = 0; z < map.size; z++) {
       for (let x = 0; x < map.size; x++) {
-        const t = map.get(x, z);
-        const tex = t.terrain === T.WOODS ? treeTex : t.terrain === T.ROCK ? rockTex : null;
-        if (!tex) continue;
-        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
-        s.center.set(0.5, 0);
+        const t = map.get(x, z).terrain;
+        const file = t === T.WOODS ? 'tree' : t === T.ROCK ? 'rock' : null;
+        if (!file) continue;
+        const s = spriteFrom(tex('assets/terrain/' + file + '.png'));
         const w = map.tileToWorld(x, z);
         s.position.set(w.x, 0, w.z);
-        s.scale.set(1.1, 1.1, 1.1);
         group.add(s);
       }
     }

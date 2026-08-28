@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../data/buildings.js?v=13';
-import { makeBuildingChip, makeAlertMarker, setChipActive } from '../render/chips.js?v=13';
-import { Walker, Traveler } from './walkers.js?v=13';
-import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=13';
-import { randomName } from '../data/names.js?v=13';
-import { personFor } from '../data/phrases.js?v=13';
+import { BUILDINGS } from '../data/buildings.js?v=14';
+import { makeBuildingChip, makeAlertMarker, setChipActive } from '../render/chips.js?v=14';
+import { tex, spriteFrom } from '../render/assets.js?v=14';
+import { Walker, Traveler } from './walkers.js?v=14';
+import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=14';
+import { randomName } from '../data/names.js?v=14';
+import { personFor } from '../data/phrases.js?v=14';
 
 const MARKET_CAP = 12;
 const HOUSE_CAP = 10;
@@ -30,11 +31,8 @@ export class Game {
     this.entrance = { x: 0, z: Math.floor(map.size / 2) }; // settlers arrive here
 
     const ew = map.tileToWorld(this.entrance.x, this.entrance.z);
-    const gate = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.18, 0.22, 1.6, 6),
-      new THREE.MeshBasicMaterial({ color: 0xe8c96b })
-    );
-    gate.position.set(ew.x, 0.8, ew.z);
+    const gate = spriteFrom(tex('assets/props/gate.png'), 1.2);
+    gate.position.set(ew.x, 0, ew.z);
     scene.add(gate);
 
     this.objectives = [

@@ -1,72 +1,63 @@
 import * as THREE from 'three';
+import { tex, spriteFrom, sizeSprite } from './assets.js?v=14';
 
-// Programmer-art: solid coloured shapes so the game is fully readable before
-// the pixel sprites are wired in. Swap back to sprites.js per building later.
+// Pixel-art sprites for buildings and walkers, with the old solid-shape chips
+// kept as a fallback if a role has no art yet.
 
-const BUILDING = {
-  dwelling: { color: 0xc98a3a, h: 1.2 },
-  farm:     { color: 0x8ea63a, h: 0.35 },
-  granary:  { color: 0xb0894a, h: 1.7 },
-  market:   { color: 0xa8663a, h: 1.0 },
-  well:     { color: 0x5a8aa0, h: 0.8 },
-  altar:    { color: 0x7a6a9a, h: 1.1 },
+const ROLE_FILE = {
+  dwelling: 'roundhouse', farm: 'field', granary: 'granary',
+  market: 'market', well: 'well', altar: 'altar',
+};
+const WALK_FILE = {
+  villager: 'villager', grain_carrier: 'grain_carrier',
+  market_trader: 'market_trader', water_carrier: 'water_carrier', druid: 'druid',
 };
 
-const WALKER = {
-  grain_carrier: 0xe8c96b,
-  market_trader: 0xe0883a,
-  water_carrier: 0x6fb0e0,
-  druid: 0xb07ad0,
+const FALLBACK = {
+  dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },
+  granary: { color: 0xb0894a, h: 1.7 }, market: { color: 0xa8663a, h: 1.0 },
+  well: { color: 0x5a8aa0, h: 0.8 }, altar: { color: 0x7a6a9a, h: 1.1 },
 };
 
+// A building is a Group holding one billboard sprite (so the alert marker can be
+// a child without being scaled by the sprite). Two textures — empty / full.
 export function makeBuildingChip(role, w, h, ts) {
-  const spec = BUILDING[role] || { color: 0x999999, h: 1 };
+  const base = ROLE_FILE[role];
   const g = new THREE.Group();
+  if (base) {
+    const emptyT = tex('assets/buildings/' + base + '_empty.png');
+    const fullT = tex('assets/buildings/' + base + '_full.png');
+    const spr = spriteFrom(emptyT);
+    g.add(spr);
+    g.userData = { spr, emptyT, fullT, active: false };
+  } else {
+    g.add(fallbackBody(FALLBACK[role] || { color: 0x999999, h: 1 }, w, h, ts));
+  }
+  return g;
+}
 
-  const plinth = new THREE.Mesh(
-    new THREE.BoxGeometry(w * ts * 0.92, 0.14, h * ts * 0.92),
-    new THREE.MeshLambertMaterial({ color: 0x1b2416 })
-  );
-  plinth.position.y = 0.07;
-  g.add(plinth);
+export function setChipActive(chip, active) {
+  const u = chip.userData;
+  if (!u || !u.spr) return; // fallback chips just stay put
+  const t = active ? u.fullT : u.emptyT;
+  if (u.spr.material.map === t) return;
+  u.spr.material.map = t;
+  u.spr.material.needsUpdate = true;
+  sizeSprite(u.spr, t);
+}
 
+function fallbackBody(spec, w, h, ts) {
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(w * ts * 0.8, spec.h, h * ts * 0.8),
     new THREE.MeshLambertMaterial({ color: spec.color })
   );
   body.position.y = 0.14 + spec.h / 2;
-  g.add(body);
-
-  g.userData.body = body;
-  g.userData.fullH = spec.h;
-  setChipActive(g, false); // starts half-height until occupied / operational
-  return g;
-}
-
-// Empty/unoccupied buildings sit at half height; they rise when folk move in
-// or the building becomes operational. (Placeholder until pixel sprites arrive.)
-export function setChipActive(chip, active) {
-  const { body, fullH } = chip.userData;
-  if (!body) return;
-  const s = active ? 1 : 0.5;
-  body.scale.y = s;
-  body.position.y = 0.14 + (fullH * s) / 2;
+  return body;
 }
 
 export function makeWalkerChip(type) {
-  const g = new THREE.Group();
-  const geo = new THREE.ConeGeometry(0.32, 1.1, 7);
-  geo.translate(0, 0.55, 0); // base at origin
-  // MeshBasic so walkers stay vivid regardless of lighting.
-  const body = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: WALKER[type] || 0xffffff }));
-  g.add(body);
-  const cap = new THREE.Mesh(
-    new THREE.SphereGeometry(0.16, 8, 8),
-    new THREE.MeshBasicMaterial({ color: 0xfff4d8 })
-  );
-  cap.position.y = 1.2;
-  g.add(cap);
-  return g;
+  const base = WALK_FILE[type] || 'villager';
+  return spriteFrom(tex('assets/walkers/' + base + '.png'), 1.5);
 }
 
 export function makeAlertMarker() {
@@ -79,9 +70,9 @@ export function makeAlertMarker() {
   x.font = 'bold 42px sans-serif';
   x.textAlign = 'center'; x.textBaseline = 'middle';
   x.fillText('!', 32, 35);
-  const tex = new THREE.CanvasTexture(c);
-  tex.magFilter = THREE.NearestFilter;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+  const tx = new THREE.CanvasTexture(c);
+  tx.magFilter = THREE.NearestFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, depthTest: false }));
   s.scale.set(1.1, 1.1, 1.1);
   return s;
 }
