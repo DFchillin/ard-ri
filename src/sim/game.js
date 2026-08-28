@@ -1,11 +1,14 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../data/buildings.js?v=14';
-import { makeBuildingChip, makeAlertMarker, setChipActive } from '../render/chips.js?v=14';
-import { tex, spriteFrom } from '../render/assets.js?v=14';
-import { Walker, Traveler } from './walkers.js?v=14';
-import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=14';
-import { randomName } from '../data/names.js?v=14';
-import { personFor } from '../data/phrases.js?v=14';
+import { BUILDINGS } from '../data/buildings.js?v=15';
+import { makeBuildingChip, makeAlertMarker, setChipActive } from '../render/chips.js?v=15';
+import { tex, spriteFrom } from '../render/assets.js?v=15';
+import { emitterFor } from '../render/effects.js?v=15';
+
+const FX_TOP = { dwelling: 2.4, farm: 0.9, market: 1.8 }; // effect ceiling per role
+import { Walker, Traveler } from './walkers.js?v=15';
+import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=15';
+import { randomName } from '../data/names.js?v=15';
+import { personFor } from '../data/phrases.js?v=15';
 
 const MARKET_CAP = 12;
 const HOUSE_CAP = 10;
@@ -104,6 +107,8 @@ export class Game {
     alert.visible = false;
     chip.add(alert);
     inst.alert = alert;
+    const fx = emitterFor(def.role, { w: f.w, h: f.h, tile: this.map.tile, topY: FX_TOP[def.role] || 2 });
+    if (fx) { fx.setActive(false); chip.add(fx.group); inst.fx = fx; }
     this.buildingGroup.add(chip);
     inst.sprite = chip;
 
@@ -123,6 +128,7 @@ export class Game {
           if (tt) tt.occupant = null;
         }
       this.buildingGroup.remove(inst.sprite);
+      if (inst.fx) inst.fx.dispose();
       this.buildings = this.buildings.filter((b) => b !== inst);
       if (inst.pop) this.folk = Math.max(0, this.folk - inst.pop);
       this.silver += Math.floor(inst.def.cost / 2);
@@ -147,7 +153,7 @@ export class Game {
       const connected = !!entryRoadTile(this.map, b);
       if (b.alert) b.alert.visible = !connected; // flag buildings with no road
       const active = b.def.role === 'dwelling' ? b.pop > 0 : connected;
-      if (active !== b.active) { b.active = active; setChipActive(b.sprite, active); } // rise when occupied/operational
+      if (active !== b.active) { b.active = active; setChipActive(b.sprite, active); if (b.fx) b.fx.setActive(active); } // rise + effects when occupied/operational
       this._tickBuilding(b);
     }
     for (const o of this.objectives) if (!o.done && o.check(this)) o.done = true;
@@ -273,6 +279,11 @@ export class Game {
         }
       },
     });
+  }
+
+  // Ambient particle effects — real time, so they drift even while paused.
+  updateFx(dt) {
+    for (const b of this.buildings) if (b.fx) b.fx.update(dt);
   }
 
   // --- Animation, one call per frame (dt already scaled by game speed) ---

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { tex, spriteFrom, sizeSprite } from './assets.js?v=14';
+import { tex, spriteFrom, fitWidth } from './assets.js?v=15';
+
+const FILL = 1.35; // building sprite width as a multiple of its footprint width
 
 // Pixel-art sprites for buildings and walkers, with the old solid-shape chips
 // kept as a fallback if a role has no art yet.
@@ -27,9 +29,12 @@ export function makeBuildingChip(role, w, h, ts) {
   if (base) {
     const emptyT = tex('assets/buildings/' + base + '_empty.png');
     const fullT = tex('assets/buildings/' + base + '_full.png');
-    const spr = spriteFrom(emptyT);
+    const worldW = w * ts * FILL; // fill the footprint regardless of art pixel size
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emptyT, transparent: true, alphaTest: 0.12 }));
+    spr.center.set(0.5, 0);
+    fitWidth(spr, emptyT, worldW);
     g.add(spr);
-    g.userData = { spr, emptyT, fullT, active: false };
+    g.userData = { spr, emptyT, fullT, worldW, active: false };
   } else {
     g.add(fallbackBody(FALLBACK[role] || { color: 0x999999, h: 1 }, w, h, ts));
   }
@@ -43,7 +48,7 @@ export function setChipActive(chip, active) {
   if (u.spr.material.map === t) return;
   u.spr.material.map = t;
   u.spr.material.needsUpdate = true;
-  sizeSprite(u.spr, t);
+  fitWidth(u.spr, t, u.worldW);
 }
 
 function fallbackBody(spec, w, h, ts) {

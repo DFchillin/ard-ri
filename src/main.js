@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=14';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=14';
-import { WorldView } from './render/world_view.js?v=14';
-import { BUILDINGS } from './data/buildings.js?v=14';
-import { Game } from './sim/game.js?v=14';
-import { UI } from './ui.js?v=14';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=14';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=15';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=15';
+import { WorldView } from './render/world_view.js?v=15';
+import { BUILDINGS } from './data/buildings.js?v=15';
+import { Game } from './sim/game.js?v=15';
+import { UI } from './ui.js?v=15';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=15';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -519,6 +519,7 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.1);
   const scaled = started ? dt * sim.speed : 0;
   game.update(scaled);
+  game.updateFx(dt); // ambient effects run in real time
   econAcc += scaled;
   while (econAcc >= ECON_TICK) { econAcc -= ECON_TICK; game.tick(); pushStats(); checkMission(); }
   dayAcc += scaled;
