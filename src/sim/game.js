@@ -1,14 +1,14 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../data/buildings.js?v=15';
-import { makeBuildingChip, makeAlertMarker, setChipActive } from '../render/chips.js?v=15';
-import { tex, spriteFrom } from '../render/assets.js?v=15';
-import { emitterFor } from '../render/effects.js?v=15';
+import { BUILDINGS } from '../data/buildings.js?v=16';
+import { makeBuildingChip, makeAlertMarker, setChipActive } from '../render/chips.js?v=16';
+import { tex, spriteFrom } from '../render/assets.js?v=16';
+import { emitterFor } from '../render/effects.js?v=16';
 
 const FX_TOP = { dwelling: 2.4, farm: 0.9, market: 1.8 }; // effect ceiling per role
-import { Walker, Traveler } from './walkers.js?v=15';
-import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=15';
-import { randomName } from '../data/names.js?v=15';
-import { personFor } from '../data/phrases.js?v=15';
+import { Walker, Traveler } from './walkers.js?v=16';
+import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=16';
+import { randomName } from '../data/names.js?v=16';
+import { personFor } from '../data/phrases.js?v=16';
 
 const MARKET_CAP = 12;
 const HOUSE_CAP = 10;

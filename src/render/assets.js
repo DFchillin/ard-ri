@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // Loads the sliced pixel-art PNGs and turns them into billboard sprites.
 // Textures load async; sizing callbacks run once each image arrives.
-const V = '15';
+const V = '16';
 const PPT = 128; // pixels per map tile the art was authored at
 const loader = new THREE.TextureLoader();
 const cache = new Map();

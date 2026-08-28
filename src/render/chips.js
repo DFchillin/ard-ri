@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { tex, spriteFrom, fitWidth } from './assets.js?v=15';
+import { tex, spriteFrom, fitWidth } from './assets.js?v=16';
 
 const FILL = 1.35; // building sprite width as a multiple of its footprint width
 

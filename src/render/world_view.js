@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { T } from '../sim/tilemap.js?v=15';
-import { tex, spriteFrom } from './assets.js?v=15';
+import { T } from '../sim/tilemap.js?v=16';
+import { tex, spriteFrom } from './assets.js?v=16';
 
 const TERR_FILE = {
   [T.GRASS]: 'pasture', [T.WATER]: 'water', [T.BOG]: 'bog',
