@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { tex, spriteFrom, fitWidth } from './assets.js?v=17';
+import { tex, spriteFrom, fitWidth, sizeSprite, screenDir } from './assets.js?v=18';
+
+const DIRS = ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'];
+const WALK_CYCLE = [0, 2, 1, 2]; // step1, stand, step2, stand
+const STEP_TIME = 0.14;
 
 const FILL = 1.2; // building sprite width as a multiple of its footprint width
 
@@ -62,7 +66,25 @@ function fallbackBody(spec, w, h, ts) {
 
 export function makeWalkerChip(type) {
   const base = WALK_FILE[type] || 'villager';
-  return spriteFrom(tex('assets/walkers/' + base + '.png'), 1.5);
+  const T = {};
+  for (const d of DIRS) T[d] = ['step1', 'step2', 'stand'].map((f) => tex(`assets/walkers/${base}/${d}_${f}.png`));
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.s[2], transparent: true, alphaTest: 0.12 }));
+  s.center.set(0.5, 0);
+  sizeSprite(s, T.s[2], 1.5);
+  // animation state on dedicated props — walkers overwrite userData for inspect
+  s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0;
+  s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
+  s.animate = (dt, moving) => {
+    const frames = T[screenDir(s._dx, s._dz)] || T.s;
+    if (moving) {
+      s._t += dt;
+      if (s._t >= STEP_TIME) { s._t -= STEP_TIME; s._phase = (s._phase + 1) % 4; }
+      s.material.map = frames[WALK_CYCLE[s._phase]];
+    } else {
+      s.material.map = frames[2];
+    }
+  };
+  return s;
 }
 
 export function makeAlertMarker() {

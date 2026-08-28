@@ -1,5 +1,5 @@
-import { makeWalkerChip } from '../render/chips.js?v=17';
-import { roadNeighbors } from './roads.js?v=17';
+import { makeWalkerChip } from '../render/chips.js?v=18';
+import { roadNeighbors } from './roads.js?v=18';
 
 // A walker random-walks the road network for a fixed number of steps, running
 // its onTile callback as it enters each tile, then finishes. This one mechanic
@@ -36,11 +36,7 @@ export class Walker {
     const pool = forward.length ? forward : opts;
     if (!pool.length) { this.next = null; return; }
     this.next = pool[(Math.random() * pool.length) | 0];
-    if (this.sprite.setHeading) {
-      const wa = this.map.tileToWorld(this.cur.x, this.cur.z);
-      const wb = this.map.tileToWorld(this.next.x, this.next.z);
-      this.sprite.setHeading(Math.atan2(-(wb.z - wa.z), wb.x - wa.x));
-    }
+    if (this.sprite.faceWorld) this.sprite.faceWorld(this.next.x - this.cur.x, this.next.z - this.cur.z);
   }
 
   update(dt) {
@@ -51,6 +47,7 @@ export class Walker {
     const k = Math.min(this.t, 1);
     this._moveSpriteTo(this.cur, this.next, k);
     this.sprite.position.y = 0.05 + Math.abs(Math.sin(this.age * 7)) * 0.16; // bob
+    if (this.sprite.animate) this.sprite.animate(dt, true);
     if (this.t >= 1) {
       this.t -= 1;
       const prev = this.cur;
@@ -89,6 +86,7 @@ export class Traveler {
     this.sprite = makeWalkerChip(type);
     this.sprite.userData = { kind: 'walker', person: this.person, type };
     this.sprite.position.set(this.a.x, 0.05, this.a.z);
+    if (this.sprite.faceWorld) this.sprite.faceWorld(targetTile.x - startTile.x, targetTile.z - startTile.z);
   }
 
   update(dt) {
@@ -101,6 +99,7 @@ export class Traveler {
       0.05 + Math.abs(Math.sin(this.age * 7)) * 0.16,
       this.a.z + (this.b.z - this.a.z) * k
     );
+    if (this.sprite.animate) this.sprite.animate(dt, true);
     if (this.t >= 1) { this.done = true; if (this.onArrive) this.onArrive(); }
   }
 

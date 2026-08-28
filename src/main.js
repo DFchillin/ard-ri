@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=17';
-import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=17';
-import { WorldView } from './render/world_view.js?v=17';
-import { BUILDINGS } from './data/buildings.js?v=17';
-import { Game } from './sim/game.js?v=17';
-import { UI } from './ui.js?v=17';
-import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=17';
+import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera, cameraDirLabel } from './iso_camera.js?v=18';
+import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=18';
+import { WorldView } from './render/world_view.js?v=18';
+import { BUILDINGS } from './data/buildings.js?v=18';
+import { Game } from './sim/game.js?v=18';
+import { UI } from './ui.js?v=18';
+import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=18';
+import { setCamera } from './render/assets.js?v=18';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -22,6 +23,7 @@ scene.fog = new THREE.Fog(0x0b1418, 70, 175);
 
 let aspect = window.innerWidth / window.innerHeight;
 const camera = createIsoCamera(15, aspect);
+setCamera(camera); // walkers face by screen direction
 
 const hemi = new THREE.HemisphereLight(0xd6f0cf, 0x40602f, 1.6);
 scene.add(hemi);
