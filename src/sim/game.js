@@ -15,6 +15,11 @@ const HOUSE_CAP = 10;
 const RENT_PER_HEAD = 1;   // silver per content head per day
 const DISTRESS_LEAVE = 18; // econ ticks with NO food AND NO water before a family leaves
 const FESTIVAL_BONUS = 1.5;
+const GRANARY_CAP = 48;    // grain a store holds before it's full
+const FARM_GROW = 24;      // econ ticks for a field to ripen
+const FARM_HARVESTS = 2;   // grain-carriers a ripe field sends before regrowing
+const FARM_MIN_FOLK = 4;   // hands the settlement needs to bring a harvest in
+const MAX_PER_BLD = 2;     // most walkers any one building keeps on the roads
 
 // Owns the buildings, the economy tick, the walkers, and mission objectives.
 export class Game {
@@ -96,7 +101,8 @@ export class Game {
     if (this.silver < def.cost || !this.map.canPlace(f.x, f.z, f.w, f.h)) return false;
 
     const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, water: 0, timer: 0,
-      pop: 0, cap: def.folk || 0, incoming: 0, distress: 0, active: false };
+      pop: 0, cap: def.folk || 0, incoming: 0, distress: 0, active: false,
+      grown: 0, ripe: false, harvestsLeft: 0, connected: false };
     this.map.place(f.x, f.z, f.w, f.h, inst);
 
     const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile);
@@ -141,8 +147,13 @@ export class Game {
   _spawn(entry, opts) {
     const person = { name: randomName(), ...personFor(opts.type) };
     const w = new Walker(this.map, entry, { ...opts, person });
+    w.source = opts.source || null;
     this.walkers.push(w);
     this.walkerGroup.add(w.sprite);
+  }
+
+  _walkersFrom(b) {
+    return this.walkers.reduce((n, w) => n + (w.source === b && !w.done ? 1 : 0), 0);
   }
 
   // --- Economy, one call per sim tick ---
@@ -151,9 +162,13 @@ export class Game {
     this._labour = Math.max(0, this.workforce() - this._activeWorkers()); // spare hands this tick
     for (const b of this.buildings) {
       const connected = !!entryRoadTile(this.map, b);
+      b.connected = connected;
       if (b.alert) b.alert.visible = !connected; // flag buildings with no road
-      const active = b.def.role === 'dwelling' ? b.pop > 0 : connected;
-      if (active !== b.active) { b.active = active; setChipActive(b.sprite, active); if (b.fx) b.fx.setActive(active); } // rise + effects when occupied/operational
+      // dwellings rise when occupied; a field only shows its golden crop when ripe; else road-connected
+      const active = b.def.role === 'dwelling' ? b.pop > 0
+        : b.def.role === 'farm' ? b.ripe
+        : connected;
+      if (active !== b.active) { b.active = active; setChipActive(b.sprite, active); if (b.fx) b.fx.setActive(active); }
       this._tickBuilding(b);
     }
     for (const o of this.objectives) if (!o.done && o.check(this)) o.done = true;
@@ -162,18 +177,32 @@ export class Game {
   _tickBuilding(b) {
     switch (b.def.role) {
       case 'farm': {
-        // No workers until people live here, and never more workers than spare hands.
-        if (this._labour > 0 && ++b.timer >= b.def.rate) { b.timer = 0; this._labour--; this._sendGrain(b); }
+        // The field ripens on a growth cycle; only a ripe field is golden & harvested.
+        if (!b.ripe) {
+          if (++b.grown >= FARM_GROW) { b.ripe = true; b.harvestsLeft = FARM_HARVESTS; b.timer = 0; }
+          break;
+        }
+        // Ripe: bring the harvest in — needs a road, 4 hands in the settlement,
+        // spare labour, and at most 2 carriers on the roads at once.
+        if (b.connected && this.folk >= FARM_MIN_FOLK && this._labour > 0 &&
+            this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 2) {
+          b.timer = 0; this._labour--; this._sendGrain(b);
+          if (--b.harvestsLeft <= 0) { b.ripe = false; b.grown = 0; } // back to growing
+        }
         break;
       }
       case 'market': {
         this._restock(b);
-        if (this._labour > 0 && b.stock > 0 && ++b.timer >= 3) { b.timer = 0; this._labour--; this._sendTrader(b); }
+        if (this._labour > 0 && b.stock > 0 && this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 3) {
+          b.timer = 0; this._labour--; this._sendTrader(b);
+        }
         break;
       }
       case 'well': {
         // Public water-carrier: runs while the treasury can pay (not broke).
-        if (!this.broke && this.folk > 0 && ++b.timer >= 3) { b.timer = 0; this._sendWater(b); }
+        if (!this.broke && this.folk > 0 && this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 3) {
+          b.timer = 0; this._sendWater(b);
+        }
         break;
       }
       case 'dwelling': {
@@ -223,11 +252,15 @@ export class Game {
     if (!entry) return;
     let load = farm.def.load;
     this._spawn(entry, {
-      type: 'grain_carrier', label: 'G', steps: 26, speed: 2.4,
+      type: 'grain_carrier', label: 'G', steps: 26, speed: 2.4, source: farm,
       onTile: (x, z) => {
         if (load <= 0) return;
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'granary') { inst.stock += load; load = 0; break; }
+          if (inst.def.role === 'granary' && inst.stock < GRANARY_CAP) { // stores fill to a cap
+            const add = Math.min(load, GRANARY_CAP - inst.stock);
+            inst.stock += add; load -= add;
+            if (load <= 0) break;
+          }
         }
       },
     });
@@ -238,7 +271,7 @@ export class Game {
     const entry = entryRoadTile(this.map, well);
     if (!entry) return;
     this._spawn(entry, {
-      type: 'water_carrier', label: 'W', steps: 24, speed: 2.6,
+      type: 'water_carrier', label: 'W', steps: 24, speed: 2.6, source: well,
       onTile: (x, z) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
           if (inst.def.role === 'dwelling' && inst.water < HOUSE_CAP) inst.water = Math.min(HOUSE_CAP, inst.water + 5);
@@ -269,7 +302,7 @@ export class Game {
     const entry = entryRoadTile(this.map, market);
     if (!entry) return;
     this._spawn(entry, {
-      type: 'market_trader', label: 'M', steps: 24, speed: 2.6,
+      type: 'market_trader', label: 'M', steps: 24, speed: 2.6, source: market,
       onTile: (x, z) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
           if (inst.def.role === 'dwelling' && market.stock > 0 && inst.food < HOUSE_CAP) {

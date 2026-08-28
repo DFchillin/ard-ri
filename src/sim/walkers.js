@@ -1,6 +1,8 @@
 import { makeWalkerChip } from '../render/chips.js?v=CBUST';
 import { roadNeighbors } from './roads.js?v=CBUST';
 
+const MOVE_SCALE = 0.5; // global walker pace (half the old speed)
+
 // A walker random-walks the road network for a fixed number of steps, running
 // its onTile callback as it enters each tile, then finishes. This one mechanic
 // carries every service in the game.
@@ -43,7 +45,7 @@ export class Walker {
     if (this.done) return;
     if (!this.next) { this.done = true; return; }
     this.age = (this.age || 0) + dt;
-    this.t += dt * this.speed;
+    this.t += dt * this.speed * MOVE_SCALE;
     const k = Math.min(this.t, 1);
     this._moveSpriteTo(this.cur, this.next, k);
     if (this.sprite.animate) this.sprite.animate(dt, true);
@@ -91,7 +93,7 @@ export class Traveler {
   update(dt) {
     if (this.done) return;
     this.age += dt;
-    this.t += (dt * this.speed) / this.dist;
+    this.t += (dt * this.speed * MOVE_SCALE) / this.dist;
     const k = Math.min(this.t, 1);
     this.sprite.position.set(
       this.a.x + (this.b.x - this.a.x) * k,
