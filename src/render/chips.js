@@ -74,7 +74,10 @@ const WALKER_COLOR = {
 };
 
 export function makeWalkerChip(type) {
-  const base = WALK_FILE[type] || 'villager';
+  const role = WALK_FILE[type] || 'villager';
+  // Half the folk are women — every role has a matching female sprite set in a
+  // <role>_f folder, so the streets read as families, not a town of one gender.
+  const base = Math.random() < 0.5 ? role + '_f' : role;
   const T = {};
   for (const d of DIRS) T[d] = ['step1', 'step2', 'stand'].map((f) => tex(`assets/walkers/${base}/${d}_${f}.png`));
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.s[2], transparent: true, alphaTest: 0.12 }));

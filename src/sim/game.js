@@ -19,7 +19,10 @@ const GRANARY_CAP = 48;    // grain a store holds before it's full
 const FARM_GROW = 24;      // econ ticks for a field to ripen
 const FARM_HARVESTS = 2;   // grain-carriers a ripe field sends before regrowing
 const FARM_MIN_FOLK = 4;   // hands the settlement needs to bring a harvest in
-const MAX_PER_BLD = 2;     // most walkers any one building keeps on the roads
+const MAX_PER_BLD = 2;     // most walkers any one building keeps on the roads (2 druids per shrine)
+const CULTURE_BONUS = 1.25; // rent multiplier for a fed, watered AND cultured house
+// Settlement rank ladder — culture is weighted double, so a cultured túath rises fastest.
+const RANKS = [[120, 'Ard Rí'], [80, 'Rí Tuaithe'], [45, 'Mór-Thúath'], [20, 'Túath'], [8, 'Baile'], [0, 'Ráth']];
 
 // Owns the buildings, the economy tick, the walkers, and mission objectives.
 export class Game {
@@ -66,16 +69,26 @@ export class Game {
   // --- Economy: private rents in, public wages out, settled once per day ---
   dwellings() { return this.buildings.filter((b) => b.def.role === 'dwelling' && b.pop > 0); }
   folkContent() { return this.dwellings().reduce((n, b) => n + (b.food > 0 && b.water > 0 ? b.pop : 0), 0); }
+  culturedFolk() { return this.dwellings().reduce((n, b) => n + (b.culture > 0 ? b.pop : 0), 0); }
   dailyRent(festival = false) {
     let sum = 0;
     for (const b of this.dwellings()) {
       const fed = b.food > 0, watered = b.water > 0;
       const factor = fed && watered ? 1 : (fed || watered ? 0.5 : 0.25); // both services = full rent
       let r = b.pop * RENT_PER_HEAD * factor;
+      if (fed && watered && b.culture > 0) r *= CULTURE_BONUS; // proud, cultured folk pay more
       if (festival && fed && watered) r *= FESTIVAL_BONUS; // content folk are generous at the feast
       sum += r;
     }
     return Math.round(sum);
+  }
+  // Settlement standing — folk, the content among them, and culture (double-weighted).
+  standing() {
+    const content = this.folkContent();
+    const cultured = this.culturedFolk();
+    const score = this.folk + content + cultured * 2;
+    const title = RANKS.find(([t]) => score >= t)[1];
+    return { score, title, content, cultured };
   }
   dailyWages() { return this.buildings.reduce((n, b) => n + (b.def.upkeep || 0), 0); }
   settleDay({ festival = false } = {}) {
@@ -100,7 +113,7 @@ export class Game {
     const def = BUILDINGS[key];
     if (this.silver < def.cost || !this.map.canPlace(f.x, f.z, f.w, f.h)) return false;
 
-    const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, water: 0, timer: 0,
+    const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, water: 0, culture: 0, timer: 0,
       pop: 0, cap: def.folk || 0, incoming: 0, distress: 0, active: false,
       grown: 0, ripe: false, harvestsLeft: 0, connected: false };
     this.map.place(f.x, f.z, f.w, f.h, inst);
@@ -205,9 +218,18 @@ export class Game {
         }
         break;
       }
+      case 'altar': {
+        // A shrine keeps druids on the roads (paid from the treasury, like a well),
+        // and every dwelling they pass gains culture. Two druids at a time.
+        if (!this.broke && this.folk > 0 && this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 3) {
+          b.timer = 0; this._sendDruid(b);
+        }
+        break;
+      }
       case 'dwelling': {
         if (b.food > 0) b.food -= 1;
         if (b.water > 0) b.water -= 1;
+        if (b.culture > 0) b.culture -= 1; // culture wanes without a druid's visits (a bonus, never a cause to leave)
         if (b.food <= 0 && b.water <= 0) { // no food AND no water — a family in distress
           b.distress += 1;
           if (b.distress >= DISTRESS_LEAVE && b.pop > 0) { b.distress = 0; this._emigrate(b); }
@@ -275,6 +297,20 @@ export class Game {
       onTile: (x, z) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
           if (inst.def.role === 'dwelling' && inst.water < HOUSE_CAP) inst.water = Math.min(HOUSE_CAP, inst.water + 5);
+        }
+      },
+    });
+  }
+
+  // Altar → druid wanders roads, raising the culture of the dwellings it passes.
+  _sendDruid(altar) {
+    const entry = entryRoadTile(this.map, altar);
+    if (!entry) return;
+    this._spawn(entry, {
+      type: 'druid', label: 'D', steps: 26, speed: 2.2, source: altar,
+      onTile: (x, z) => {
+        for (const inst of adjacentBuildings(this.map, x, z)) {
+          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) inst.culture = Math.min(HOUSE_CAP, inst.culture + 5);
         }
       },
     });

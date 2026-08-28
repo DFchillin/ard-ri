@@ -73,6 +73,7 @@ function showLedger() {
   const wages = game.dailyWages();
   const net = rent - wages;
   const content = game.folkContent();
+  const st = game.standing();
   const sign = (n) => (n >= 0 ? `+${n}` : `${n}`);
   const html =
     `<h3>The Ledger</h3><div class="role">Rents &amp; wages, each day</div>` +
@@ -82,6 +83,8 @@ function showLedger() {
     `<tr><td>Wages out</td><td class="neg">−${wages}</td></tr>` +
     `<tr class="net"><td>Net / day</td><td class="${net >= 0 ? 'pos' : 'neg'}">${sign(net)}</td></tr>` +
     `<tr><td>Folk content</td><td>${content} / ${game.folk}</td></tr>` +
+    `<tr><td>Folk cultured</td><td>${st.cultured} / ${game.folk}</td></tr>` +
+    `<tr class="net"><td>Standing</td><td>${st.title} · ${st.score}</td></tr>` +
     `</table>` +
     (festivalToday ? `<p class="fest-note">Festival today — content folk pay a generous bonus.</p>` : '') +
     (game.broke ? `<p class="fest-note broke">The cauldron runs dry — public folk go unpaid.</p>` : '');
@@ -338,7 +341,7 @@ function buildingHtml(inst) {
   const d = inst.def;
   let extra = '';
   if (d.role === 'granary' || d.role === 'market') extra = `<p>Grain in store: ${inst.stock}</p>`;
-  if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10 · Water: ${inst.water}/10</p>`;
+  if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10 · Water: ${inst.water}/10 · Culture: ${inst.culture}/10</p>`;
   return `<h3>${d.label}</h3><div class="role">Building</div><p>${d.desc}</p>${extra}`;
 }
 function terrainHtml(tile) {
