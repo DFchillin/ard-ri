@@ -15,6 +15,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Replace the CBUST token in every module import / asset URL with this
+      # commit's short SHA, so each deploy ships brand-new cache keys. No more
+      # hand-bumping ?v= or fighting the Cloudflare edge cache.
+      - name: Stamp cache-bust version
+        run: |
+          STAMP="${GITHUB_SHA::8}"
+          echo "Cache-bust stamp: $STAMP"
+          find index.html src -type f \( -name '*.js' -o -name '*.html' \) \
+            -exec sed -i "s/CBUST/${STAMP}/g" {} +
+          echo "index.html now references:"
+          grep -o '?v=[0-9a-f]\{8\}' index.html | sort -u || true
+
       - name: Upload site via lftp
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}

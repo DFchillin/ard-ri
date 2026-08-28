@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { tex, spriteFrom, fitWidth, sizeSprite, screenDir } from './assets.js?v=19';
+import { tex, spriteFrom, fitWidth, sizeSprite, screenDir } from './assets.js?v=CBUST';
 
 const DIRS = ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'];
 const WALK_CYCLE = [0, 2, 1, 2]; // step1, stand, step2, stand
