@@ -52,6 +52,7 @@ export class Game {
       { text: 'Store grain', done: false, check: (g) => g.anyStock('granary') },
       { text: 'Stock a market', done: false, check: (g) => g.anyStock('market') },
       { text: 'Feed a dwelling', done: false, check: (g) => g.buildings.some((b) => b.def.role === 'dwelling' && b.food > 0) },
+      { text: 'Raise a shrine', done: false, check: (g) => g.count('altar') >= 1 },
     ];
   }
 
