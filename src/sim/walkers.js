@@ -34,6 +34,10 @@ export class Walker {
   _pickNext(prev) {
     if (this.steps <= 0) { this.next = null; return; }
     let opts = roadNeighbors(this.map, this.cur.x, this.cur.z);
+    // Prefer to skirt a Cros; only step onto one when it's the sole way through, so
+    // an errand is never fully broken (a Cros shapes routes, it doesn't strand folk).
+    const open = opts.filter((n) => { const t = this.map.get(n.x, n.z); return t && !t.blocked; });
+    if (open.length) opts = open;
     const forward = prev ? opts.filter((n) => !(n.x === prev.x && n.z === prev.z)) : opts;
     const pool = forward.length ? forward : opts;
     if (!pool.length) { this.next = null; return; }

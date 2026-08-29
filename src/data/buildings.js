@@ -26,6 +26,6 @@ export const CATEGORIES = [
 export const ROAD_ITEM = { key: 'road', label: 'Road', icon: '🛣️', cost: 0,
   desc: 'A tóchar worthy of Midir. Walkers travel only on roads — drag to lay Deaglán’s path between two points.' };
 export const CROS_ITEM = { key: 'cros', label: 'Cros', icon: '✝️', cost: 0,
-  desc: 'A wayside cros. Folk turn back rather than cross it — tap a road to pen your walkers onto the routes you choose.' };
+  desc: 'A wayside cros. Folk skirt it rather than cross — tap a road to steer your walkers onto the routes you choose. It never strands an errand.' };
 // Special (non-building) placeables, looked up by key alongside BUILDINGS.
 export const SPECIAL_ITEMS = { road: ROAD_ITEM, cros: CROS_ITEM };
