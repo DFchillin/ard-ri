@@ -403,13 +403,32 @@ function inspectAt(e) {
   const tile = map.get(t.x, t.z);
   ui.showInspect(tile.occupant ? buildingHtml(tile.occupant) : terrainHtml(tile), false);
 }
-function demolishAt(e) {
-  const t = tileUnderPointer(e);
+// Demolish, like build, is confirmed: mark the target red, then "Raze ✓".
+function showDemolishGhost(t) {
   if (!t) return;
-  const r = game.demolish(t.x, t.z);
+  const tile = map.get(t.x, t.z);
+  if (!tile) return;
+  let f;
+  if (tile.occupant) { const o = tile.occupant; f = { x: o.x, z: o.z, w: o.w, h: o.h }; }
+  else if (tile.blocked || tile.road) f = { x: t.x, z: t.z, w: 1, h: 1 };
+  else return; // nothing to remove on bare ground
+  pendingDemolish = { x: t.x, z: t.z };
+  const cx = f.x * map.tile - map.half + (f.w * map.tile) / 2;
+  const cz = f.z * map.tile - map.half + (f.h * map.tile) / 2;
+  preview.material.color.set(0xff5555);
+  preview.position.set(cx, 0.07, cz);
+  preview.scale.set(f.w * map.tile, f.h * map.tile, 1);
+  preview.visible = true;
+  ghostBox.visible = false;
+  ui.showPlaceConfirm({ raze: true });
+}
+function commitDemolish() {
+  if (!pendingDemolish) return;
+  const r = game.demolish(pendingDemolish.x, pendingDemolish.z);
   if (r === 'road') { view.rebuildRoads(); view.rebuildCros(); }
   if (r === 'cros') view.rebuildCros();
   if (r) pushStats();
+  cancelPending();
 }
 
 // --- Input: build / road-paint / demolish / inspect + pan + pinch ---
@@ -417,6 +436,7 @@ const pointers = new Map();
 let painting = false, demolishing = false, panLast = null, pinchDist = 0;
 let pendingBuild = null, movingBuild = false;
 let pendingRoad = null, drawingRoad = false;
+let pendingDemolish = null;
 let roadStart = null, roadEnd = null, drawnPath = [];
 let roadOptions = [], roadOptIdx = 0;
 const _fwd = new THREE.Vector3(), _right = new THREE.Vector3();
@@ -439,6 +459,7 @@ function showGhostAt(t) {
 }
 function confirmBuild() {
   if (pendingRoad) { commitRoad(); return; }
+  if (pendingDemolish) { commitDemolish(); return; }
   if (!pendingBuild || !BUILDINGS[tool]) return;
   const f = footprint(tool, pendingBuild);
   if (game.place(tool, f)) { pushStats(); cancelPending(); }
@@ -447,6 +468,7 @@ function cancelPending() {
   pendingBuild = null;
   movingBuild = false;
   pendingRoad = null;
+  pendingDemolish = null;
   drawingRoad = false;
   roadStart = null;
   roadEnd = null;
@@ -489,7 +511,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (pointers.size >= 2) { panLast = null; painting = false; demolishing = false; pinchDist = pointerDist(); return; }
   if (e.button !== 2) {
     if (tool === 'inspect') { inspectAt(e); return; }
-    if (tool === 'demolish') { demolishing = true; demolishAt(e); return; }
+    if (tool === 'demolish') { showDemolishGhost(tileUnderPointer(e)); return; }
     if (tool === 'road') { const t = tileUnderPointer(e); if (t) { roadStart = t; roadEnd = t; drawnPath = [{ x: t.x, z: t.z }]; drawingRoad = true; pendingRoad = drawnPath; showRoadGhost(); } return; }
     if (tool === 'cros') { const t = tileUnderPointer(e); if (t && game.toggleCros(t.x, t.z)) view.rebuildCros(); return; }
     if (BUILDINGS[tool]) { movingBuild = true; showGhostAt(tileUnderPointer(e)); return; }
@@ -507,9 +529,8 @@ canvas.addEventListener('pointermove', (e) => {
     return;
   }
   if (movingBuild && BUILDINGS[tool]) { const t = tileUnderPointer(e); if (t) showGhostAt(t); return; }
-  if (pendingBuild || pendingRoad) return; // ghost locked awaiting "Build here"
+  if (pendingBuild || pendingRoad || pendingDemolish) return; // ghost locked awaiting confirm
   updatePreview(e);
-  if (demolishing && tool === 'demolish') demolishAt(e);
 });
 
 function endPointer(e) {
@@ -555,7 +576,12 @@ window.addEventListener('resize', () => {
   resizeIsoCamera(camera, aspect);
 });
 
-window.ardri = { game, map, view, sim, cal };
+window.ardri = { game, map, view, sim, cal, camera,
+  screenOf(tx, tz) { // tile → screen pixels, for headless probes
+    const w = map.tileToWorld(tx, tz);
+    const v = new THREE.Vector3(w.x, 0.1, w.z).project(camera);
+    return { x: (v.x * 0.5 + 0.5) * window.innerWidth, y: (-v.y * 0.5 + 0.5) * window.innerHeight };
+  } };
 
 // --- Loop: economy on ECON_TICK, calendar on SECONDS_PER_DAY ---
 let econAcc = 0, dayAcc = 0;

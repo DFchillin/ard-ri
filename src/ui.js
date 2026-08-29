@@ -61,7 +61,8 @@ export class UI {
     document.getElementById('fest-continue').addEventListener('click', () => this.hideFestival());
     this.placeLabel = document.getElementById('place-label');
     this.placeAlt = document.getElementById('place-alt');
-    document.getElementById('place-do').addEventListener('click', () => (onPlaceConfirm || (() => {}))());
+    this.placeDo = document.getElementById('place-do');
+    this.placeDo.addEventListener('click', () => (onPlaceConfirm || (() => {}))());
     document.getElementById('place-cancel').addEventListener('click', () => (onPlaceCancel || (() => {}))());
     if (this.placeAlt) this.placeAlt.addEventListener('click', () => (onPlaceAlt || (() => {}))());
     [...document.querySelectorAll('.mission-btn:not(.locked)')].forEach((b) =>
@@ -104,9 +105,13 @@ export class UI {
     this._renderList(CATEGORIES[0].id);
   }
 
-  // Brightness dial — a CSS filter on the world canvas, remembered per device.
+  // Brightness — a sun button opens a modal with a horizontal slider; the value
+  // is a CSS filter on the world canvas, remembered per device.
   _initBrightness() {
+    const btn = document.getElementById('brightness-btn');
+    const modal = document.getElementById('brightness-modal');
     const slider = document.getElementById('brightness');
+    const done = document.getElementById('brightness-done');
     const world = document.getElementById('world');
     if (!slider || !world) return;
     let v = 1;
@@ -118,6 +123,9 @@ export class UI {
       apply(n);
       try { localStorage.setItem('ardri_brightness', String(n)); } catch (e) {}
     });
+    if (btn && modal) btn.addEventListener('click', () => modal.classList.remove('hidden'));
+    if (done && modal) done.addEventListener('click', () => modal.classList.add('hidden'));
+    if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
   }
 
   roam() {
@@ -130,10 +138,11 @@ export class UI {
 
   showTitle() { if (this.titleScreen) this.titleScreen.classList.remove('hidden'); }
   hideTitle() { if (this.titleScreen) this.titleScreen.classList.add('hidden'); }
-  showPlaceConfirm({ road = false, label = '', alt = true } = {}) {
+  showPlaceConfirm({ road = false, label = '', alt = true, raze = false } = {}) {
+    if (this.placeDo) this.placeDo.textContent = raze ? 'Raze ✓' : 'Build ✓';
     if (this.placeLabel) {
-      this.placeLabel.textContent = label;
-      this.placeLabel.classList.toggle('hidden', !road);
+      this.placeLabel.textContent = raze ? 'Remove this?' : label;
+      this.placeLabel.classList.toggle('hidden', !(road || raze));
     }
     if (this.placeAlt) this.placeAlt.classList.toggle('hidden', !road || !alt);
     if (this.placeConfirm) this.placeConfirm.classList.remove('hidden');
@@ -156,6 +165,7 @@ export class UI {
       b.addEventListener('click', () => {
         [...this.tabsEl.children].forEach((c) => c.classList.toggle('active', c === b));
         this._renderList(cat.id);
+        if (cat.items.length && this.activeTool !== cat.items[0]) this.selectTool(cat.items[0]); // arm the first item on tab change
       });
       this.tabsEl.appendChild(b);
     }

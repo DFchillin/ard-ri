@@ -124,38 +124,40 @@ html, body {
 }
 #compass-label { font-family: var(--font-display); font-size: 12px; color: var(--gold); }
 
-/* Brightness dial, left edge */
-#brightness-dial {
+/* Brightness + advisors buttons, stacked above the map controls */
+#brightness-btn, #advisors-fab {
   position: absolute;
-  left: 16px; top: 50%; transform: translateY(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 6px;
-  z-index: 5;
-}
-#brightness-dial .bd-icon { font-size: 15px; color: var(--gold); }
-#brightness {
-  -webkit-appearance: slider-vertical;
-  appearance: slider-vertical;
-  writing-mode: vertical-lr;
-  direction: rtl; /* up = brighter */
-  width: 10px; height: 130px;
-  accent-color: var(--gold);
-  cursor: pointer;
-}
-
-/* Advisors button, above the map controls */
-#advisors-fab {
-  position: absolute;
-  left: 14px; bottom: 118px;
+  left: 14px;
   width: 44px; height: 44px;
   border: 1px solid var(--border); border-radius: 50%;
   background: var(--panel); color: var(--ink);
   font-size: 20px; line-height: 1; z-index: 5;
 }
+#advisors-fab { bottom: 118px; }
+#brightness-btn { bottom: 168px; }
 #advisors-fab.active { background: var(--gold); color: #1c130a; border-color: var(--gold); }
+
+/* Brightness modal */
+.modal {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(6,12,15,0.6);
+  pointer-events: auto; z-index: 20;
+}
+.modal.hidden { display: none; }
+.modal-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 22px;
+  width: min(320px, 86vw);
+  text-align: center;
+}
+.modal-card h3 { font-family: var(--font-display); color: var(--gold); font-size: 18px; font-weight: normal; }
+.modal-sub { font-size: 13px; opacity: 0.8; margin: 6px 0 14px; }
+.bright-row { display: flex; align-items: center; gap: 10px; }
+.bright-row span { font-size: 16px; }
+#brightness { flex: 1; accent-color: var(--gold); height: 22px; cursor: pointer; }
 
 /* Speed */
 #speedbar {
