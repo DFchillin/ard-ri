@@ -138,8 +138,17 @@ export class Game {
   }
 
   // Remove a building (refund half) or a road at a tile.
+  // A Cros pens walkers: toggle it on a road tile. Returns 'cros'/'uncros'/null.
+  toggleCros(x, z) {
+    const t = this.map.get(x, z);
+    if (!t || !t.road) return null;
+    t.blocked = !t.blocked;
+    return t.blocked ? 'cros' : 'uncros';
+  }
+
   demolish(x, z) {
     const t = this.map.get(x, z);
+    if (t && t.blocked) { t.blocked = false; return 'cros'; } // clear the Cros first, keep the road
     if (t && t.occupant) {
       const inst = t.occupant;
       for (let dz = 0; dz < inst.h; dz++)
@@ -154,7 +163,7 @@ export class Game {
       this.silver += Math.floor(inst.def.cost / 2);
       return 'building';
     }
-    if (t && t.road) { this.map.setRoad(x, z, false); t.roadKind = null; return 'road'; }
+    if (t && t.road) { this.map.setRoad(x, z, false); t.roadKind = null; t.blocked = false; return 'road'; }
     return null;
   }
 

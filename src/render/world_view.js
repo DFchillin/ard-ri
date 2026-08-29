@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { T } from '../sim/tilemap.js?v=CBUST';
 import { tex, spriteFrom } from './assets.js?v=CBUST';
+import { makeCrosMarker } from './chips.js?v=CBUST';
 
 const TERR_FILE = {
   [T.GRASS]: 'pasture', [T.WATER]: 'water', [T.BOG]: 'bog',
@@ -19,6 +20,9 @@ export class WorldView {
     this.roadGroup = new THREE.Group();
     scene.add(this.roadGroup);
     this.rebuildRoads();
+
+    this.crosGroup = new THREE.Group();
+    scene.add(this.crosGroup);
 
     const grid = new THREE.GridHelper(map.size * this.ts, map.size, 0x20301c, 0x33492a);
     grid.position.y = 0.03;
@@ -123,6 +127,20 @@ export class WorldView {
     this._addBorder(buckets.deaglan, 0xe8c96b);
     this._addBorder(buckets.midir, 0xb98cff);
     this._addBorder(buckets.mine, 0x54c8d8);
+  }
+
+  rebuildCros() {
+    const { map, ts, half } = this;
+    this.crosGroup.clear();
+    for (let z = 0; z < map.size; z++) {
+      for (let x = 0; x < map.size; x++) {
+        const t = map.get(x, z);
+        if (!t || !t.blocked) continue;
+        const s = makeCrosMarker();
+        s.position.set(x * ts - half + ts / 2, 0.06, z * ts - half + ts / 2);
+        this.crosGroup.add(s);
+      }
+    }
   }
 
   _addBorder(verts, color) {

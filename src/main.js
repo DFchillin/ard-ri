@@ -65,7 +65,47 @@ const ui = new UI({
   onPlaceCancel: () => cancelPending(),
   onPlaceAlt: () => altRoute(),
   onLedger: () => showLedger(),
+  onAdvisors: () => showAdvisors(),
 });
+
+function showAdvisors() {
+  const B = game.buildings;
+  const sum = (role, key) => B.reduce((n, b) => n + (b.def.role === role ? (b[key] || 0) : 0), 0);
+  const fields = game.count('farm');
+  const ripe = B.filter((b) => b.def.role === 'farm' && b.ripe).length;
+  const st = game.standing();
+  const spearmen = Math.floor(game.folk / 2);
+  const strength = spearmen + Math.floor(game.cattle / 4) + Math.floor(game.silver / 50);
+  const host = strength < 6 ? 'a lone champion'
+    : strength < 14 ? 'a cattle-raiding party'
+    : strength < 28 ? 'a túath war-band'
+    : strength < 48 ? 'a great host'
+    : 'an army fit for the High King';
+  const row = (a, b) => `<tr><td>${a}</td><td>${b}</td></tr>`;
+  const html =
+    `<h3>Trusted Advisors</h3><div class="role">Counsel at your ear</div>` +
+    `<div class="advisor"><h4>🌾 An Rechtaire · the Steward</h4><table class="ledger">` +
+      row('Fields sown', fields + (ripe ? ` · ${ripe} ripe` : '')) +
+      row('Grain in store', sum('granary', 'stock')) +
+      row('At market', sum('market', 'stock')) +
+      row('Wells', game.count('well')) +
+    `</table></div>` +
+    `<div class="advisor"><h4>📜 An tOllamh · the Poet</h4><table class="ledger">` +
+      row('Folk', game.folk) +
+      row('Content', `${game.folkContent()} / ${game.folk}`) +
+      row('Cultured', `${game.culturedFolk()} / ${game.folk}`) +
+      row('Shrines', game.count('altar')) +
+      `<tr class="net"><td>Standing</td><td>${st.title} · ${st.score}</td></tr>` +
+    `</table></div>` +
+    `<div class="advisor"><h4>⚔️ An Toísech · the War-Leader</h4><table class="ledger">` +
+      row('Cattle', game.cattle) +
+      row('Silver', `🪙 ${game.silver}`) +
+      row('Fighting folk', spearmen) +
+      `<tr class="net"><td>War-band</td><td>${host}</td></tr>` +
+    `</table></div>` +
+    `<p class="fest-note">The Toísech reckons your strength from folk, cattle and silver — the raid-wealth of a Gaelic king.</p>`;
+  ui.showInspect(html, false);
+}
 
 function showLedger() {
   const festivalToday = cal.day === 1 && !!FESTIVALS[cal.month];
@@ -367,7 +407,8 @@ function demolishAt(e) {
   const t = tileUnderPointer(e);
   if (!t) return;
   const r = game.demolish(t.x, t.z);
-  if (r === 'road') view.rebuildRoads();
+  if (r === 'road') { view.rebuildRoads(); view.rebuildCros(); }
+  if (r === 'cros') view.rebuildCros();
   if (r) pushStats();
 }
 
@@ -450,6 +491,7 @@ canvas.addEventListener('pointerdown', (e) => {
     if (tool === 'inspect') { inspectAt(e); return; }
     if (tool === 'demolish') { demolishing = true; demolishAt(e); return; }
     if (tool === 'road') { const t = tileUnderPointer(e); if (t) { roadStart = t; roadEnd = t; drawnPath = [{ x: t.x, z: t.z }]; drawingRoad = true; pendingRoad = drawnPath; showRoadGhost(); } return; }
+    if (tool === 'cros') { const t = tileUnderPointer(e); if (t && game.toggleCros(t.x, t.z)) view.rebuildCros(); return; }
     if (BUILDINGS[tool]) { movingBuild = true; showGhostAt(tileUnderPointer(e)); return; }
   }
   panLast = { x: e.clientX, y: e.clientY }; // no build tool, or right-drag → pan

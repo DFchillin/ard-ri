@@ -6,7 +6,7 @@ export function roadNeighbors(map, x, z) {
   const out = [];
   for (const [dx, dz] of N4) {
     const t = map.get(x + dx, z + dz);
-    if (t && t.road) out.push({ x: x + dx, z: z + dz });
+    if (t && t.road && !t.blocked) out.push({ x: x + dx, z: z + dz }); // a Cros walls the road off
   }
   return out;
 }
@@ -18,7 +18,7 @@ export function entryRoadTile(map, inst) {
       const bx = inst.x + dx, bz = inst.z + dz;
       for (const [ox, oz] of N4) {
         const t = map.get(bx + ox, bz + oz);
-        if (t && t.road) return { x: bx + ox, z: bz + oz };
+        if (t && t.road && !t.blocked) return { x: bx + ox, z: bz + oz };
       }
     }
   }

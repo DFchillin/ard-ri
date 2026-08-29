@@ -77,7 +77,7 @@ export class Tilemap {
         else if (e > 0.91) terrain = T.ROCK;
         else if (m > 0.89) terrain = T.BOG;
         else if (m < 0.15 && scatter() < 0.35) terrain = T.WOODS;
-        this.tiles[this.idx(x, z)] = { terrain, road: false, occupant: null };
+        this.tiles[this.idx(x, z)] = { terrain, road: false, occupant: null, blocked: false };
       }
     }
   }

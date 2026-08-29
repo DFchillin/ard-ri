@@ -1,8 +1,8 @@
-import { BUILDINGS, CATEGORIES, ROAD_ITEM } from './data/buildings.js?v=CBUST';
+import { BUILDINGS, CATEGORIES, SPECIAL_ITEMS } from './data/buildings.js?v=CBUST';
 
 // DOM overlay. Owns the HTML controls; the world never reads the DOM directly.
 export class UI {
-  constructor({ onTool, onSpeed, onRotate, onZoom, onInspectClose, onFestivalContinue, onStartMission, onPlaceConfirm, onPlaceCancel, onPlaceAlt, onLedger }) {
+  constructor({ onTool, onSpeed, onRotate, onZoom, onInspectClose, onFestivalContinue, onStartMission, onPlaceConfirm, onPlaceCancel, onPlaceAlt, onLedger, onAdvisors }) {
     this.onTool = onTool;
     this.onSpeed = onSpeed;
     this.onInspectClose = onInspectClose || (() => {});
@@ -95,8 +95,29 @@ export class UI {
       silverStat.addEventListener('click', () => (onLedger || (() => {}))());
     }
 
+    // Trusted advisors
+    const advBtn = document.getElementById('advisors-fab');
+    if (advBtn) advBtn.addEventListener('click', () => (onAdvisors || (() => {}))());
+
+    this._initBrightness();
     this._buildTabs();
     this._renderList(CATEGORIES[0].id);
+  }
+
+  // Brightness dial — a CSS filter on the world canvas, remembered per device.
+  _initBrightness() {
+    const slider = document.getElementById('brightness');
+    const world = document.getElementById('world');
+    if (!slider || !world) return;
+    let v = 1;
+    try { const s = localStorage.getItem('ardri_brightness'); if (s) v = parseFloat(s) || 1; } catch (e) {}
+    const apply = (n) => { world.style.filter = n === 1 ? '' : `brightness(${n})`; };
+    slider.value = v; apply(v);
+    slider.addEventListener('input', () => {
+      const n = parseFloat(slider.value) || 1;
+      apply(n);
+      try { localStorage.setItem('ardri_brightness', String(n)); } catch (e) {}
+    });
   }
 
   roam() {
@@ -145,7 +166,7 @@ export class UI {
     const cat = CATEGORIES.find((c) => c.id === catId);
     this.listEl.innerHTML = '';
     for (const key of cat.items) {
-      const def = key === 'road' ? ROAD_ITEM : BUILDINGS[key];
+      const def = SPECIAL_ITEMS[key] || BUILDINGS[key];
       const b = document.createElement('button');
       b.className = 'build-btn';
       b.dataset.key = key;

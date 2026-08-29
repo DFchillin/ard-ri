@@ -109,6 +109,29 @@ export function makeWalkerChip(type) {
   return s;
 }
 
+// A wayside high-cross that pens walkers to a route. Drawn on a canvas so it
+// needs no sprite-sheet art — a ringed Celtic cross in weathered stone.
+export function makeCrosMarker() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 96;
+  const x = c.getContext('2d');
+  x.strokeStyle = '#2a2418'; x.lineWidth = 3;
+  x.fillStyle = '#b9b2a0'; // pale standing-stone grey
+  const cx = 32;
+  const shaft = (yTop, yBot, halfW) => { x.beginPath(); x.rect(cx - halfW, yTop, halfW * 2, yBot - yTop); x.fill(); x.stroke(); };
+  shaft(10, 92, 7);            // upright
+  shaft(30, 46, 22);          // arms (drawn as a bar)
+  x.beginPath(); x.arc(cx, 38, 17, 0, Math.PI * 2); x.lineWidth = 5; x.stroke(); // the ring
+  x.fillStyle = 'rgba(120,110,90,0.35)';
+  x.beginPath(); x.ellipse(cx, 92, 16, 5, 0, 0, Math.PI * 2); x.fill(); // ground shadow
+  const tx = new THREE.CanvasTexture(c);
+  tx.magFilter = THREE.NearestFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true }));
+  s.center.set(0.5, 0);
+  s.scale.set(0.85, 1.28, 1);
+  return s;
+}
+
 export function makeAlertMarker() {
   const c = document.createElement('canvas');
   c.width = c.height = 64;

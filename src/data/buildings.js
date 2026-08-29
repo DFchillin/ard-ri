@@ -15,9 +15,9 @@ export const BUILDINGS = {
     desc: 'A standing-stone shrine. Its druid is kept by your treasury.' },
 };
 
-// Build-menu categories (Zeus-style tabs). 'road' is a special item.
+// Build-menu categories (Zeus-style tabs). 'road' and 'cros' are special items.
 export const CATEGORIES = [
-  { id: 'infra', icon: '🛣️', label: 'Roads', items: ['road'] },
+  { id: 'infra', icon: '🛣️', label: 'Roads', items: ['road', 'cros'] },
   { id: 'homes', icon: '🏠', label: 'Homes', items: ['roundhouse'] },
   { id: 'farming', icon: '🌾', label: 'Farming', items: ['field', 'granary'] },
   { id: 'services', icon: '🏛️', label: 'Services', items: ['market', 'well', 'altar'] },
@@ -25,3 +25,7 @@ export const CATEGORIES = [
 
 export const ROAD_ITEM = { key: 'road', label: 'Road', icon: '🛣️', cost: 0,
   desc: 'A tóchar worthy of Midir. Walkers travel only on roads — drag to lay Deaglán’s path between two points.' };
+export const CROS_ITEM = { key: 'cros', label: 'Cros', icon: '✝️', cost: 0,
+  desc: 'A wayside cros. Folk turn back rather than cross it — tap a road to pen your walkers onto the routes you choose.' };
+// Special (non-building) placeables, looked up by key alongside BUILDINGS.
+export const SPECIAL_ITEMS = { road: ROAD_ITEM, cros: CROS_ITEM };
