@@ -7,6 +7,7 @@ import { Game } from './sim/game.js?v=CBUST';
 import { UI } from './ui.js?v=CBUST';
 import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=CBUST';
 import { setCamera } from './render/assets.js?v=CBUST';
+import { Battle } from './battle/battle.js?v=CBUST';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -59,8 +60,8 @@ const ui = new UI({
   onRotate: (d) => ui.setCompass(rotateIsoCamera(camera, d)),
   onZoom: (f) => zoomIsoCamera(camera, f, aspect),
   onInspectClose: () => resumeGame(),
-  onFestivalContinue: () => resumeGame(),
-  onStartMission: () => startMission(),
+  onFestivalContinue: () => { if (battleWon) { battleWon = false; battle.exit(); } else resumeGame(); },
+  onStartMission: (n) => startMission(n),
   onPlaceConfirm: () => confirmBuild(),
   onPlaceCancel: () => cancelPending(),
   onPlaceAlt: () => altRoute(),
@@ -131,7 +132,16 @@ function showLedger() {
   ui.showInspect(html, false);
 }
 
-function startMission() { started = true; triggerFestival(FESTIVALS[1]); }
+let battleWon = false;
+const battle = new Battle({
+  onVictory: () => { battleWon = true; ui.showFestival({ name: 'Victory!', emoji: '🏆', sub: 'The enemy slua is broken and flees the field. Ériu will remember this cath.' }); },
+  onExit: () => ui.showTitle(),
+});
+
+function startMission(n) {
+  if (String(n) === '2') { battle.enter(); return; }
+  started = true; triggerFestival(FESTIVALS[1]);
+}
 
 function pauseGame() { if (savedSpeed === null) savedSpeed = sim.speed; sim.speed = 0; ui.reflectSpeed(0); }
 function resumeGame() { if (savedSpeed !== null) { sim.speed = savedSpeed; ui.reflectSpeed(sim.speed); savedSpeed = null; } }
@@ -507,6 +517,7 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture?.(e.pointerId);
+  if (battle.active) { battle.pointerDown(e); return; }
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2) { panLast = null; painting = false; demolishing = false; pinchDist = pointerDist(); return; }
   if (e.button !== 2) {
@@ -520,6 +531,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  if (battle.active) { battle.pointerMove(e); return; }
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2) { const d = pointerDist(); if (pinchDist && d > 0) zoomIsoCamera(camera, pinchDist / d, aspect); pinchDist = d; return; }
   if (panLast) { panByScreen(e.clientX - panLast.x, e.clientY - panLast.y); panLast = { x: e.clientX, y: e.clientY }; return; }
@@ -534,8 +546,9 @@ canvas.addEventListener('pointermove', (e) => {
 });
 
 function endPointer(e) {
-  pointers.delete(e.pointerId);
   canvas.releasePointerCapture?.(e.pointerId);
+  if (battle.active) { battle.pointerUp(e); return; }
+  pointers.delete(e.pointerId);
   if (pointers.size < 2) pinchDist = 0;
   if (pointers.size === 0) {
     painting = false; demolishing = false; panLast = null; movingBuild = false;
@@ -555,10 +568,12 @@ canvas.addEventListener('pointerleave', () => { if (!pendingBuild) preview.visib
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  if (battle.active) return;
   zoomIsoCamera(camera, e.deltaY > 0 ? 1.1 : 0.9, aspect);
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
+  if (battle.active) return;
   if (e.key === 'Escape') { cancelPending(); tool = null; ui.setTool(null); preview.visible = false; ui.hideInspect(); }
 });
 
@@ -574,9 +589,10 @@ window.addEventListener('resize', () => {
   aspect = window.innerWidth / window.innerHeight;
   renderer.setSize(window.innerWidth, window.innerHeight);
   resizeIsoCamera(camera, aspect);
+  battle.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera,
+window.ardri = { game, map, view, sim, cal, camera, battle,
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
     const v = new THREE.Vector3(w.x, 0.1, w.z).project(camera);
@@ -590,6 +606,7 @@ const clock = new THREE.Clock();
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
+  if (battle.active) { battle.update(dt); battle.render(renderer); return; }
   const scaled = started ? dt * sim.speed : 0;
   game.update(scaled);
   game.updateFx(dt); // ambient effects run in real time

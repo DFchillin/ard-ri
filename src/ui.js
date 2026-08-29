@@ -66,7 +66,7 @@ export class UI {
     document.getElementById('place-cancel').addEventListener('click', () => (onPlaceCancel || (() => {}))());
     if (this.placeAlt) this.placeAlt.addEventListener('click', () => (onPlaceAlt || (() => {}))());
     [...document.querySelectorAll('.mission-btn:not(.locked)')].forEach((b) =>
-      b.addEventListener('click', () => { this.hideTitle(); (onStartMission || (() => {}))(); })
+      b.addEventListener('click', () => { this.hideTitle(); (onStartMission || (() => {}))(b.dataset.mission); })
     );
 
     // Full-screen toggle (top corner)

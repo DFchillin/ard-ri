@@ -104,13 +104,36 @@
     </div>
   </div>
 
+  <div id="battle-ui" class="hidden">
+    <div id="battle-banner"></div>
+    <button id="battle-exit" title="Leave the field">⮐ Leave</button>
+    <div id="battle-select-box" class="hidden"></div>
+    <div id="battle-hud" class="hidden">
+      <div id="battle-sel-info"><span class="dim">Draw a box to choose a buíon</span></div>
+      <div id="battle-actions">
+        <button data-form="wall" title="Shield-wall — holds Misneach">Claí Sciath</button>
+        <button data-form="wedge" title="Spear-point — hits hard, holds poorly">Rinn</button>
+        <button data-form="loose" title="Skirmish — fast, weak in the clash">Scaoilte</button>
+        <button id="battle-cry" title="A battle-cry — surge Misneach">Gáir Chatha</button>
+      </div>
+    </div>
+    <div id="muster-overlay" class="hidden">
+      <div class="muster-card">
+        <h2>Muster the Slua</h2>
+        <p class="muster-sub">Name each buíon and hang a relic on it — a bold name and a good ortha raise Misneach. Then take the field.</p>
+        <div id="muster-list"></div>
+        <button id="muster-go" class="continue-btn">Cath! ▸</button>
+      </div>
+    </div>
+  </div>
+
   <div id="title-screen">
     <div class="title-card">
       <h1 class="game-title">Ard Rí</h1>
       <p class="title-sub">Rise from a lone ráth to High King of Ériu</p>
       <div class="mission-menu">
         <button class="mission-btn" data-mission="1">Mission One · First Steps</button>
-        <button class="mission-btn locked" disabled>Mission Two · locked 🔒</button>
+        <button class="mission-btn" data-mission="2">Mission Two · The Pitched Battle ⚔</button>
         <button class="mission-btn locked" disabled>Mission Three · locked 🔒</button>
       </div>
     </div>
