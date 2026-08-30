@@ -1,42 +1,62 @@
-// Battle data: buíon (warband) types, formations, relic talismans, and the
-// matchup table that makes mismatches decisive. Balance lives here, not in code.
+// The battle roster. Regulars are your own village folk taking up arms — they
+// render with the walker sprites from the settlement. Seasoned/special warriors,
+// summoned heroes and gods are rarer and stronger. `cat` drives the matchup
+// table; `rank` decides a company's leader (highest rank leads).
+export const CAT = { regular: 1, seasoned: 2, special: 3, hero: 4, god: 5 };
 
-// Each unit is one chess-piece on the map. hp is how much it can take; atk is the
-// blow it lands; build is how hard it hits infrastructure; speed is march pace;
-// morale is starting Misneach; aura lifts the Misneach of nearby friendly units.
+// sprite = a walker-sheet base (billboarded); else piece:{color,tall} draws a chess-piece.
 export const UNIT_TYPES = {
-  ceithern:    { label: 'Ceithern',   ga: 'kern (levy)',    glyph: '⚔', atk: 1.4, hp: 3,  build: 0.4, speed: 3.6, morale: 55, aura: 0,  color: 0x6f9bd0, tall: 0.8 },
-  galloglaigh: { label: 'Gallóglaigh', ga: 'gallowglass',    glyph: '🛡', atk: 2.4, hp: 7,  build: 0.9, speed: 2.8, morale: 78, aura: 0,  color: 0x4a6fae, tall: 1.0 },
-  curadh:      { label: 'Curadh',     ga: 'champion',        glyph: '★', atk: 4.5, hp: 15, build: 1.3, speed: 3.2, morale: 90, aura: 12, color: 0xe0c060, tall: 1.2 },
-  dia:         { label: 'Túatha Dé',  ga: 'a god',           glyph: '☀', atk: 9.0, hp: 34, build: 3.2, speed: 3.0, morale: 100, aura: 20, color: 0xf0f0ff, tall: 1.7 },
+  // --- regulars: the folk of the túath ---
+  villager:     { label: 'Villager',       ga: 'aos na túaithe',    cat: 'regular', rank: 1, atk: 1.3, hp: 3, build: 0.4, speed: 3.6, morale: 50, aura: 0, sprite: 'villager' },
+  water:        { label: 'Water-carrier',  ga: 'iompróir uisce',    cat: 'regular', rank: 1, atk: 1.1, hp: 3, build: 0.3, speed: 3.9, morale: 48, aura: 0, sprite: 'water_carrier' },
+  grain:        { label: 'Grain-carrier',  ga: 'iompróir arbhair',  cat: 'regular', rank: 1, atk: 1.2, hp: 3, build: 0.3, speed: 3.5, morale: 50, aura: 0, sprite: 'grain_carrier' },
+  deaglan:      { label: 'Deaglán',        ga: 'the path-maker',    cat: 'regular', rank: 1, atk: 1.5, hp: 4, build: 0.4, speed: 4.4, morale: 62, aura: 0, sprite: 'market_trader' },
+  druid:        { label: 'Druid',          ga: 'draoi',             cat: 'regular', rank: 2, atk: 1.8, hp: 4, build: 0.3, speed: 3.2, morale: 72, aura: 8, sprite: 'druid' },
+  // --- seasoned & special ---
+  seasoned:     { label: 'Seasoned Warrior', ga: 'óglach',          cat: 'seasoned', rank: 2, atk: 2.4, hp: 8, build: 0.9, speed: 2.8, morale: 78, aura: 0, piece: { color: 0x4a6fae, tall: 1.0 } },
+  curadh:       { label: 'Curadh',         ga: 'champion',          cat: 'special', rank: 3, atk: 4.4, hp: 16, build: 1.3, speed: 3.2, morale: 90, aura: 12, piece: { color: 0xe0c060, tall: 1.2 } },
+  // --- summoned heroes of the Fianna & the Red Branch ---
+  cuchulainn:   { label: 'Cú Chulainn',    ga: 'the Hound of Ulster', cat: 'hero', rank: 4, atk: 6.5, hp: 24, build: 1.8, speed: 3.4, morale: 96, aura: 14, piece: { color: 0xe8a030, tall: 1.35 } },
+  fionn:        { label: 'Fionn mac Cumhaill', ga: 'lord of the Fianna', cat: 'hero', rank: 4, atk: 5.2, hp: 22, build: 1.6, speed: 3.2, morale: 95, aura: 22, piece: { color: 0xe8c86b, tall: 1.35 } },
+  // --- summoned gods of the Túatha Dé ---
+  dagda:        { label: 'An Dagda',       ga: 'the Good God',      cat: 'god', rank: 5, atk: 9.0, hp: 40, build: 3.4, speed: 2.8, morale: 100, aura: 24, piece: { color: 0xf2ead6, tall: 1.7 } },
+  morrigan:     { label: 'An Mhórríon',    ga: 'phantom queen of war', cat: 'god', rank: 5, atk: 8.0, hp: 32, build: 2.4, speed: 3.4, morale: 100, aura: 24, piece: { color: 0xc86a8a, tall: 1.6 } },
 };
 
-// Formation (córú) modifiers.
 export const FORMATIONS = {
-  wall:  { label: 'Claí Sciath', ga: 'shield-wall', atk: 0.9, tough: 1.5, speed: 0.7, hold: 1.6 }, // holds Misneach
-  wedge: { label: 'Rinn',        ga: 'spear-point', atk: 1.4, tough: 0.85, speed: 1.15, hold: 0.9 },
-  loose: { label: 'Scaoilte',    ga: 'skirmish',    atk: 0.85, tough: 0.9, speed: 1.4, hold: 1.0 },
+  wall:  { label: 'Claí Sciath', ga: 'shield-wall', atk: 0.9, tough: 1.5, speed: 0.75, hold: 1.6, cols: 4 },
+  wedge: { label: 'Rinn',        ga: 'spear-point', atk: 1.35, tough: 0.85, speed: 1.1, hold: 0.95, cols: 3 },
+  loose: { label: 'Scaoilte',    ga: 'skirmish',    atk: 0.9, tough: 0.9, speed: 1.35, hold: 1.0, cols: 6 },
 };
+export const FORMATION_KEYS = ['wall', 'wedge', 'loose'];
 
-// Relic talismans (ortha) — one per buíon, chosen at the muster.
-export const TALISMANS = {
-  none:      { label: 'No relic',        morale: 0,  atk: 1.0,  tough: 1.0,  regen: 0 },
-  dord:      { label: 'Dord Fiann',      ga: 'war-horn of the Fianna', morale: 15, atk: 1.0, tough: 1.0, regen: 2 },
-  gaebulg:   { label: 'Gáe Bulg',        ga: "Cú Chulainn's spear",    morale: 5,  atk: 1.25, tough: 1.0, regen: 0 },
-  bratachsi: { label: 'Bratach na Sí',   ga: 'banner of the sí',       morale: 10, atk: 1.0, tough: 1.2, regen: 1 },
-};
-export const TALISMAN_KEYS = ['none', 'dord', 'gaebulg', 'bratachsi'];
-
-// Matchup multiplier: attacker type vs defender type. Default 1. Gods crush
-// mortals and shrug off their blows; only a god (or, dearly, champions) answers one.
-const M = {
-  dia: { ceithern: 3.0, galloglaigh: 3.0, curadh: 2.2, dia: 1.0 },
-  curadh: { ceithern: 1.6, galloglaigh: 1.2, curadh: 1.0, dia: 0.8 },
-  galloglaigh: { ceithern: 1.3, galloglaigh: 1.0, curadh: 0.8, dia: 0.3 },
-  ceithern: { ceithern: 1.0, galloglaigh: 0.8, curadh: 0.5, dia: 0.4 },
+// Matchup by category: gods crush mortals and shrug off their blows; heroes
+// bridge; a company of levy is dust before a god unless it is a great many.
+const CM = {
+  god:      { regular: 3.0, seasoned: 3.0, special: 2.4, hero: 2.0, god: 1.0 },
+  hero:     { regular: 2.2, seasoned: 1.6, special: 1.2, hero: 1.0, god: 0.6 },
+  special:  { regular: 1.6, seasoned: 1.2, special: 1.0, hero: 0.7, god: 0.4 },
+  seasoned: { regular: 1.3, seasoned: 1.0, special: 0.8, hero: 0.6, god: 0.3 },
+  regular:  { regular: 1.0, seasoned: 0.8, special: 0.55, hero: 0.35, god: 0.2 },
 };
 export function matchup(attType, defType) {
-  return (M[attType] && M[attType][defType]) || 1.0;
+  const a = UNIT_TYPES[attType], d = UNIT_TYPES[defType];
+  if (!a || !d) return 1.0;
+  return (CM[a.cat] && CM[a.cat][d.cat]) || 1.0;
 }
 
-export const ROUT_MISNEACH = 20; // below this, a buíon breaks and flees
+export const ROUT_MISNEACH = 20;
+
+// Company names for the muster — a Gaelic bank with an English gloss.
+export const NICKNAMES = [
+  ['Na Toirnigh', 'the Thunderers'], ['An Chraobh Rua', 'the Red Branch'],
+  ['Clann na Fola', 'kin of blood'], ['Faolchúnna an Átha', 'wolves of the ford'],
+  ['Mic na Tuaithe', 'sons of the túath'], ['Na Tuirc', 'the Boars'],
+  ['Sciath Iarainn', 'iron shields'], ['Lucht na Tine', 'folk of the fire'],
+  ['Gáir Bhán', 'the white war-cry'], ['An Dord', 'the war-horn'],
+  ['Cú na Life', 'hounds of the Liffey'], ['Béir an tSléibhe', 'bears of the mountain'],
+  ['Claímhte Solais', 'swords of light'], ['Fir na gCloch', 'men of the stones'],
+  ['Ruaig na Toinne', 'the tide-rout'],
+];
+let _nn = Math.floor(Math.random() * NICKNAMES.length);
+export function nextNickname() { _nn = (_nn + 1 + Math.floor(Math.random() * 3)) % NICKNAMES.length; return NICKNAMES[_nn]; }

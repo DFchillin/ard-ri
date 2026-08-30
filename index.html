@@ -105,15 +105,32 @@
   </div>
 
   <div id="battle-ui" class="hidden">
-    <div id="battle-banner"></div>
     <button id="battle-exit" title="Leave the field">⮐ Leave</button>
     <div id="battle-select-box" class="hidden"></div>
-    <div id="battle-hud" class="hidden">
-      <div id="battle-sel-info"><span class="dim">Tap a unit, or drag a box to raise a band</span></div>
-      <div id="battle-actions">
-        <button id="battle-cry" title="A battle-cry — surge the Misneach of the units in hand">Gáir Chatha</button>
+    <aside id="battle-sidebar" class="hidden">
+      <div id="bs-phase">An Cruinniú · Muster</div>
+      <div id="bs-flash" class="hidden"></div>
+      <div id="bs-formations">
+        <button data-form="wall" title="Shield-wall — holds Misneach">Claí Sciath</button>
+        <button data-form="wedge" title="Spear-point — hits hard">Rinn</button>
+        <button data-form="loose" title="Skirmish — fast, loose">Scaoilte</button>
       </div>
-    </div>
+      <div id="bs-muster">
+        <div class="bs-sec">Muster the folk</div>
+        <div id="bs-roster"></div>
+        <div class="bs-sec">Forming company</div>
+        <div id="bs-name"></div>
+        <div id="bs-forming"></div>
+        <div class="bs-row"><button id="bs-reroll">↻ name</button><button id="bs-clear">clear</button><button id="bs-place">Set down ▸</button></div>
+        <div class="bs-sec">Companies mustered</div>
+        <div id="bs-companies"></div>
+        <button id="bs-give-battle" class="continue-btn">Give battle ▸</button>
+      </div>
+      <div id="bs-command" class="hidden">
+        <div id="bs-sel-info" class="dim">Tap a company, or drag a box.</div>
+        <button id="bs-cry" class="continue-btn">Gáir Chatha — war-cry</button>
+      </div>
+    </aside>
   </div>
 
   <div id="title-screen">

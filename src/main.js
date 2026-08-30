@@ -57,8 +57,8 @@ let missionDone = false;
 const ui = new UI({
   onTool: (kind) => { cancelPending(); tool = kind; if (!(tool === 'road' || BUILDINGS[tool])) preview.visible = false; },
   onSpeed: (s) => { sim.speed = s; savedSpeed = null; },
-  onRotate: (d) => ui.setCompass(rotateIsoCamera(camera, d)),
-  onZoom: (f) => zoomIsoCamera(camera, f, aspect),
+  onRotate: (d) => { if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
+  onZoom: (f) => { if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
   onInspectClose: () => resumeGame(),
   onFestivalContinue: () => { if (battleWon) { battleWon = false; battle.exit(); } else resumeGame(); },
   onStartMission: (n) => startMission(n),
@@ -569,7 +569,7 @@ canvas.addEventListener('pointerleave', () => { if (!pendingBuild) preview.visib
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  if (battle.active) return;
+  if (battle.active) { battle.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   zoomIsoCamera(camera, e.deltaY > 0 ? 1.1 : 0.9, aspect);
 }, { passive: false });
 
