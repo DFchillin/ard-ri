@@ -6,11 +6,12 @@ import { makeBuildingChip } from '../render/chips.js?v=CBUST';
 import { UNIT_TYPES, matchup, ROUT_MISNEACH } from './units.js?v=CBUST';
 
 const MAP = 20;
-const CLASH_DT = 0.35;
+const CLASH_DT = 0.5;      // seconds between casualty exchanges (slower, weightier)
+const MOVE = 0.7;          // march-pace scale
 const ATTACK_RANGE = 1.7;   // reach for a blow (world units)
 const AGGRO = 6;            // auto-acquire an idle unit's nearest foe within this
-const KU = 0.38;           // unit-damage knob (lower = longer, less swingy fights)
-const KB = 0.5;           // building-damage knob
+const KU = 0.2;            // unit-damage knob (lower = longer, less swingy fights)
+const KB = 0.4;           // building-damage knob
 const TEAM = { player: 0x4a86ff, enemy: 0xe0563a };
 
 // Two scenarios share one engine. In 'attack' you storm the enemy ráth in the
@@ -159,7 +160,7 @@ export class Battle {
   }
 
   _move(u, dt) {
-    const spd = UNIT_TYPES[u.type].speed;
+    const spd = UNIT_TYPES[u.type].speed * MOVE;
     let dest = null, isFoe = false;
     if (u.routing) {
       dest = { x: u.pos.x, z: u.team === 'player' ? this.map.half + 3 : -this.map.half - 3 };
