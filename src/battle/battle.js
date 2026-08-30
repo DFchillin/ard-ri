@@ -9,24 +9,41 @@ const MAP = 20;
 const CLASH_DT = 0.35;
 const ATTACK_RANGE = 1.7;   // reach for a blow (world units)
 const AGGRO = 6;            // auto-acquire an idle unit's nearest foe within this
-const KU = 1.0;            // unit-damage knob
-const KB = 0.6;           // building-damage knob
+const KU = 0.38;           // unit-damage knob (lower = longer, less swingy fights)
+const KB = 0.5;           // building-damage knob
 const TEAM = { player: 0x4a86ff, enemy: 0xe0563a };
 
-// The enemy ráth in the north — infrastructure you can raze — and its garrison.
-const RATH = [
-  { role: 'dwelling', x: 7, z: 4, w: 2, h: 2, hp: 24 },
-  { role: 'dwelling', x: 11, z: 4, w: 2, h: 2, hp: 24 },
-  { role: 'granary', x: 9, z: 6, w: 2, h: 2, hp: 34 },
-];
-const PLAYER_HOST = [ // type, tileX, tileZ  (deploy south)
-  ['ceithern', 5, 15], ['ceithern', 7, 15], ['ceithern', 13, 15], ['ceithern', 15, 15],
-  ['galloglaigh', 8, 16], ['galloglaigh', 12, 16], ['curadh', 10, 16],
-];
-const ENEMY_HOST = [ // guard the ráth
-  ['ceithern', 6, 8], ['ceithern', 9, 8], ['ceithern', 12, 8], ['ceithern', 14, 8],
-  ['galloglaigh', 8, 7], ['galloglaigh', 11, 7], ['curadh', 10, 9],
-];
+// Two scenarios share one engine. In 'attack' you storm the enemy ráth in the
+// north; in 'defend' the ráth is yours (centre) and a raiding slua pours in from
+// the north to burn it — hold them off.
+const SCENARIOS = {
+  attack: {
+    title: 'Cath — rout the enemy slua',
+    buildings: [
+      { role: 'dwelling', x: 7, z: 4, w: 2, h: 2, hp: 24, team: 'enemy' },
+      { role: 'dwelling', x: 11, z: 4, w: 2, h: 2, hp: 24, team: 'enemy' },
+      { role: 'granary', x: 9, z: 6, w: 2, h: 2, hp: 34, team: 'enemy' },
+    ],
+    player: [['ceithern', 5, 15], ['ceithern', 7, 15], ['ceithern', 13, 15], ['ceithern', 15, 15],
+      ['galloglaigh', 8, 16], ['galloglaigh', 12, 16], ['curadh', 10, 16]],
+    enemy: [['ceithern', 6, 8], ['ceithern', 9, 8], ['ceithern', 12, 8], ['ceithern', 14, 8],
+      ['galloglaigh', 8, 7], ['galloglaigh', 11, 7], ['curadh', 10, 9]],
+  },
+  defend: {
+    title: 'Cosaint — hold your ráth',
+    defend: true,
+    buildings: [
+      { role: 'dwelling', x: 6, z: 9, w: 2, h: 2, hp: 24, team: 'player' },
+      { role: 'dwelling', x: 12, z: 9, w: 2, h: 2, hp: 24, team: 'player' },
+      { role: 'granary', x: 9, z: 11, w: 2, h: 2, hp: 34, team: 'player' },
+      { role: 'well', x: 10, z: 7, w: 1, h: 1, hp: 14, team: 'player' },
+    ],
+    player: [['ceithern', 5, 6], ['ceithern', 8, 6], ['ceithern', 12, 6], ['ceithern', 15, 6],
+      ['galloglaigh', 7, 7], ['galloglaigh', 13, 7], ['curadh', 10, 6]],
+    enemy: [['ceithern', 4, 2], ['ceithern', 7, 2], ['ceithern', 10, 2], ['ceithern', 13, 2], ['ceithern', 16, 2],
+      ['galloglaigh', 8, 1], ['galloglaigh', 12, 1], ['curadh', 10, 1]],
+  },
+};
 
 let _uid = 0;
 
@@ -60,14 +77,23 @@ export class Battle {
   _worldOf(tx, tz) { return { x: tx - this.map.half + 0.5, z: tz - this.map.half + 0.5 }; }
 
   // ---- entry ----
-  enter() {
+  enter(scenario = 'attack') {
+    this.scenario = scenario;
+    this.cfg = SCENARIOS[scenario] || SCENARIOS.attack;
     this.active = true; this.started = false;
     for (const u of this.units) this.unitGroup.remove(u.mesh);
-    for (const b of this.buildings) this.buildingGroup.remove(b.chip);
+    for (const b of this.buildings) { this.buildingGroup.remove(b.chip); this.buildingGroup.remove(b.bar); }
     this.units = []; this.buildings = []; this.selected.clear();
-    for (const d of RATH) this._spawnBuilding(d);
-    for (const [t, x, z] of PLAYER_HOST) this._spawnUnit('player', t, x, z);
-    for (const [t, x, z] of ENEMY_HOST) this._spawnUnit('enemy', t, x, z);
+    for (const d of this.cfg.buildings) this._spawnBuilding(d);
+    for (const [t, x, z] of this.cfg.player) this._spawnUnit('player', t, x, z);
+    for (const [t, x, z] of this.cfg.enemy) this._spawnUnit('enemy', t, x, z);
+    if (this.cfg.defend) {
+      // fighting for hearth and kin steadies the defenders; raiders march on the ráth
+      for (const u of this.units) {
+        if (u.team === 'player') u.misneach = Math.min(100, u.misneach + 6);
+        else { const b = pick(u, this.buildings.filter((x) => !x.dead)); if (b) u.target = { foe: b }; }
+      }
+    }
     document.getElementById('battle-ui').classList.remove('hidden');
     document.getElementById('battle-hud').classList.remove('hidden');
     document.body.classList.add('in-battle');
@@ -90,7 +116,7 @@ export class Battle {
     chip.position.set(cx, 0, cz);
     const bar = makeBar(1.4); bar.position.set(cx, 2.6, cz); this.buildingGroup.add(bar);
     this.buildingGroup.add(chip);
-    const b = { id: ++_uid, team: 'enemy', kind: 'building', chip, bar, pos: { x: cx, z: cz }, x: d.x, z: d.z, w: d.w, h: d.h, hp: d.hp, hp0: d.hp, dead: false };
+    const b = { id: ++_uid, team: d.team || 'enemy', kind: 'building', chip, bar, pos: { x: cx, z: cz }, x: d.x, z: d.z, w: d.w, h: d.h, hp: d.hp, hp0: d.hp, dead: false };
     drawBar(bar, 1, 0x6cc551); this.buildings.push(b); return b;
   }
 
@@ -139,6 +165,9 @@ export class Battle {
       dest = { x: u.pos.x, z: u.team === 'player' ? this.map.half + 3 : -this.map.half - 3 };
       if (Math.abs(u.pos.z) > this.map.half + 1) { u.dead = true; this.unitGroup.remove(u.mesh); return; }
     } else {
+      // hold and fight if an enemy unit is already in reach — don't walk past a foe
+      const enemies = u.team === 'player' ? this._live('enemy') : this._live('player');
+      for (const o of enemies) if (dist2(u.pos, o.pos) <= ATTACK_RANGE * ATTACK_RANGE) return;
       dest = this._targetPos(u); isFoe = !!(u.target && u.target.foe);
     }
     if (!dest) return;
@@ -160,10 +189,15 @@ export class Battle {
 
   _clash() {
     const F = this._live('player'), E = this._live('enemy');
-    // idle units acquire the nearest foe (units auto-guard; buildings only if ordered)
+    // re-acquire when a target is spent: raiders press on to the next building of
+    // the ráth; everyone else guards, taking the nearest foe within aggro range.
     for (const u of [...F, ...E]) {
-      const dead = u.target && ((u.target.foe && (u.target.foe.dead || u.target.foe.routing)));
-      if (!u.target || dead) { const n = nearest(u, u.team === 'player' ? E : F); u.target = n ? { foe: n } : null; }
+      const stale = !u.target || (u.target.foe && (u.target.foe.dead || u.target.foe.routing));
+      if (!stale) continue;
+      let n = null;
+      if (this.cfg.defend && u.team === 'enemy') n = pick(u, this.buildings.filter((b) => !b.dead && b.team !== 'enemy'));
+      if (!n) n = nearest(u, u.team === 'player' ? E : F);
+      u.target = n ? { foe: n } : null;
     }
     for (const u of this.units) { u.wasEngaged = u.engagedNow; u.engagedNow = false; }
     // gather attacks: every unit strikes whatever enemy is within reach — the
@@ -174,7 +208,7 @@ export class Battle {
       const foes = u.team === 'player' ? E : F;
       let tgt = null, td = ATTACK_RANGE * ATTACK_RANGE;
       for (const o of foes) { const d = dist2(u.pos, o.pos); if (d < td) { td = d; tgt = o; } }
-      if (!tgt) for (const b of this.buildings) if (!b.dead &&
+      if (!tgt) for (const b of this.buildings) if (!b.dead && b.team !== u.team &&
         Math.abs(u.pos.x - b.pos.x) <= b.w / 2 + ATTACK_RANGE - 0.4 && Math.abs(u.pos.z - b.pos.z) <= b.h / 2 + ATTACK_RANGE - 0.4) { tgt = b; break; }
       if (tgt) { u.engagedNow = true; if (tgt.kind === 'unit') tgt.engagedNow = true; add(tgt, this._dmgTo(u, tgt)); }
     }
@@ -197,7 +231,7 @@ export class Battle {
       if (u._took) {
         let foes = 0, friends = 0;
         for (const o of this.units) if (!o.dead && !o.routing && o.kind === 'unit' && dist2(o.pos, u.pos) < 9) (o.team === u.team ? friends++ : foes++);
-        u.misneach -= 6 + Math.max(0, foes - friends) * 4;
+        u.misneach -= 4 + Math.max(0, foes - friends) * 2.5;
         u._took = 0;
       } else if (!u.engagedNow) u.misneach += 5 * CLASH_DT; // rally out of the fray
       u.misneach = Math.max(0, Math.min(100, u.misneach));
@@ -211,8 +245,10 @@ export class Battle {
 
   _checkEnd() {
     if (!this.started) return;
+    const rathStanding = this.buildings.some((b) => !b.dead && b.team === 'player');
     if (this._live('enemy').length === 0) { this.started = false; this.onVictory(); }
     else if (this._live('player').length === 0) { this.started = false; this._showDefeat(); }
+    else if (this.cfg.defend && !rathStanding) { this.started = false; this._showDefeat('Your ráth is burned.'); }
   }
 
   // ---- input ----
@@ -281,13 +317,16 @@ export class Battle {
     } else { info.innerHTML = `<b>${arr.length} units</b> in hand — tap a foe or the ráth to strike, ground to march`; }
   }
   _updateBanner() {
-    const f = this._live('player').length, e = this._live('enemy').length, r = this.buildings.filter((b) => !b.dead).length;
-    document.getElementById('battle-banner').innerHTML = `Cath — rout the enemy slua &nbsp; <b>${f}</b> vs <b>${e}</b> &nbsp; · ráth <b>${r}</b>`;
+    const f = this._live('player').length, e = this._live('enemy').length;
+    const rathTeam = this.cfg.defend ? 'player' : 'enemy';
+    const r = this.buildings.filter((b) => !b.dead && b.team === rathTeam).length;
+    const rathLabel = this.cfg.defend ? 'your ráth' : 'ráth';
+    document.getElementById('battle-banner').innerHTML = `${this.cfg.title} &nbsp; <b>${f}</b> vs <b>${e}</b> &nbsp; · ${rathLabel} <b>${r}</b>`;
   }
-  _showDefeat() {
+  _showDefeat(msg) {
     const info = document.getElementById('battle-sel-info');
-    info.innerHTML = '<span class="rout">Your slua is broken.</span> <a id="battle-retry">Try again</a>';
-    document.getElementById('battle-retry').addEventListener('click', () => this.enter());
+    info.innerHTML = `<span class="rout">${msg || 'Your slua is broken.'}</span> <a id="battle-retry">Try again</a>`;
+    document.getElementById('battle-retry').addEventListener('click', () => this.enter(this.scenario));
   }
 
   render(renderer) { renderer.render(this.scene, this.camera); }
@@ -333,3 +372,4 @@ function drawBar(sprite, frac, color) {
 }
 function dist2(a, b) { const dx = a.x - b.x, dz = a.z - b.z; return dx * dx + dz * dz; }
 function nearest(u, list) { let best = null, bd = AGGRO * AGGRO; for (const o of list) { const d = dist2(u.pos, o.pos); if (d < bd) { bd = d; best = o; } } return best; }
+function pick(u, list) { let best = null, bd = Infinity; for (const o of list) { const d = dist2(u.pos, o.pos); if (d < bd) { bd = d; best = o; } } return best; } // uncapped: march targets

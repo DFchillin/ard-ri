@@ -139,7 +139,8 @@ const battle = new Battle({
 });
 
 function startMission(n) {
-  if (String(n) === '2') { battle.enter(); return; }
+  if (String(n) === '2') { battle.enter('attack'); return; }
+  if (String(n) === '3') { battle.enter('defend'); return; }
   started = true; triggerFestival(FESTIVALS[1]);
 }
 
