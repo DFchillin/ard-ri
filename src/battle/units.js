@@ -30,12 +30,15 @@ export const UPSKILL = { villager: 'warrior', water: 'warrior', grain: 'warrior'
 // City-paid folk: if they fall they take two seasons to replace.
 export const EMPLOYEES = ['water', 'grain', 'druid'];
 
+// Formations are shapes with a stance. line/column/wedge/diamond drive both the
+// slot layout (see formationSlots) and the stat profile.
 export const FORMATIONS = {
-  wall:  { label: 'Claí Sciath', ga: 'shield-wall', atk: 0.9, tough: 1.5, speed: 0.75, hold: 1.6, cols: 4 },
-  wedge: { label: 'Rinn',        ga: 'spear-point', atk: 1.35, tough: 0.85, speed: 1.1, hold: 0.95, cols: 3 },
-  loose: { label: 'Scaoilte',    ga: 'skirmish',    atk: 0.9, tough: 0.9, speed: 1.35, hold: 1.0, cols: 6 },
+  line:    { label: 'Líne',   ga: 'rows abreast',  atk: 1.0, tough: 1.1, speed: 1.0, hold: 1.15 },
+  column:  { label: 'Colún',  ga: 'deep column',   atk: 1.0, tough: 0.9, speed: 1.25, hold: 1.0 },
+  wedge:   { label: 'Rinn',   ga: 'a V / spear-point', atk: 1.35, tough: 0.85, speed: 1.1, hold: 0.9 },
+  diamond: { label: 'Fáinne', ga: 'diamond, all-round', atk: 0.9, tough: 1.45, speed: 0.72, hold: 1.5 },
 };
-export const FORMATION_KEYS = ['wall', 'wedge', 'loose'];
+export const FORMATION_KEYS = ['line', 'column', 'wedge', 'diamond'];
 
 // Matchup by category: gods crush mortals and shrug off their blows; heroes
 // bridge; a company of levy is dust before a god unless it is a great many.

@@ -470,9 +470,11 @@ body.in-battle #inspect-fab, body.in-battle #brightness-btn, body.in-battle #adv
 #bs-phase small { color: var(--ink); opacity: 0.75; font-family: var(--font-body); }
 #bs-flash { font-size: 12px; color: #e0563a; text-align: center; padding: 4px; }
 #bs-flash.hidden { display: none; }
-#bs-formations { display: flex; gap: 5px; }
-#bs-formations button { flex: 1; background: rgba(15,28,34,0.9); border: 1px solid var(--border); color: var(--ink); border-radius: 8px; padding: 7px 3px; font-size: 11px; }
+#bs-formations { display: flex; gap: 5px; flex-wrap: wrap; }
+#bs-formations button { flex: 1 1 44%; background: rgba(15,28,34,0.9); border: 1px solid var(--border); color: var(--ink); border-radius: 8px; padding: 7px 3px; font-size: 11px; }
 #bs-formations button.on { background: var(--gold); color: #1c130a; border-color: var(--gold); }
+#bs-marquee.on { background: var(--gold); color: #1c130a; border-color: var(--gold); }
+#bs-cry { background: var(--gold); color: #1c130a; border-color: var(--gold) !important; font-family: var(--font-display); }
 .bs-sec { font-family: var(--font-display); color: var(--gold); font-size: 12px; opacity: 0.85; margin-top: 4px; border-bottom: 1px solid var(--border); padding-bottom: 2px; }
 #bs-roster { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .bs-unit { text-align: left; background: rgba(15,28,34,0.9); border: 1px solid var(--border); border-left-width: 3px; color: var(--ink); border-radius: 7px; padding: 5px 7px; display: flex; flex-direction: column; line-height: 1.15; }

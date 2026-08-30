@@ -6,13 +6,17 @@ import { makeBuildingChip, makeWalkerChip } from '../render/chips.js?v=CBUST';
 import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNickname, UPSKILL, EMPLOYEES } from './units.js?v=CBUST';
 
 const MAP = 20;
-const CLASH_DT = 0.5;
-const MOVE = 0.7;
+const CLASH_DT = 0.55;
+const MOVE = 0.58;         // slower march so there's time to react and re-order
 const ATTACK_RANGE = 1.7;
 const AGGRO = 6;
-const KU = 0.2;
-const KB = 0.4;
+const KU = 0.15;           // gentler casualties — battles breathe
+const KB = 0.35;
 const TEAM = { player: 0x4a86ff, enemy: 0xe0563a };
+// Each side has two livery colours; every company flies them in a different
+// pattern so warbands read apart on the field.
+const LIVERY = { player: [0x2f5fc0, 0xeae2c8], enemy: [0xb0362a, 0x141414] };
+const FLAG_PATTERNS = ['half', 'stripes', 'checker', 'chevron', 'circle', 'quarters', 'saltire', 'bendy'];
 
 // Enemy hosts are pre-mustered; the player musters their own companies on their
 // side of the pitch. musterMinZ marks the player's side (tile z >= this).
@@ -27,7 +31,7 @@ const SCENARIOS = {
     ],
     availability: { villager: 8, water: 4, grain: 4, deaglan: 1, druid: 3, seasoned: 6, curadh: 2, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 },
     enemyCompanies: [
-      { name: ['Fomhóraigh', 'the Fomorians'], formation: 'wall', types: ['seasoned', 'seasoned', 'seasoned', 'seasoned', 'villager', 'villager'], x: 10, z: 2 },
+      { name: ['Fomhóraigh', 'the Fomorians'], formation: 'line', types: ['seasoned', 'seasoned', 'seasoned', 'seasoned', 'villager', 'villager'], x: 10, z: 2 },
       { name: ['Lucht Mara', 'the sea-host'], formation: 'wedge', types: ['villager', 'villager', 'villager', 'villager', 'seasoned'], x: 5, z: 2 },
     ],
     enemyLone: [['curadh', 15, 2]],
@@ -43,7 +47,7 @@ export class Battle {
     this.onTruce = onTruce || (() => {});
     this.active = false; this.phase = 'idle'; this.started = false;
     this.units = []; this.companies = []; this.buildings = []; this.selected = new Set();
-    this.forming = null; this.placing = false;
+    this.forming = null; this.placing = false; this.marquee = false;
     this._clashAcc = 0; this._pointers = new Map();
     // Your war-band, kept in memory between battles: folk grow tiers by surviving
     // wins, and fall in defeat. (Later this is derived from the settlement itself.)
@@ -95,8 +99,8 @@ export class Battle {
     this.units = []; this.companies = []; this.buildings = []; this.selected.clear();
     for (const d of this.cfg.buildings || []) this._spawnBuilding(d);
     for (const c of this.cfg.enemyCompanies || []) this._placeCompany('enemy', c.name, c.formation, c.types, this._worldOf(c.x, c.z));
-    for (const [t, x, z] of this.cfg.enemyLone || []) this._placeCompany('enemy', null, 'loose', [t], this._worldOf(x, z));
-    this.forming = { types: [], name: nextNickname(), formation: 'wall' };
+    for (const [t, x, z] of this.cfg.enemyLone || []) this._placeCompany('enemy', null, 'line', [t], this._worldOf(x, z));
+    this.forming = { types: [], name: nextNickname(), formation: 'line' };
     this.pool = Object.assign({}, this.roster); // muster draws from your war-band
     document.getElementById('battle-ui').classList.remove('hidden');
     document.getElementById('battle-sidebar').classList.remove('hidden');
@@ -201,7 +205,7 @@ export class Battle {
   // ---------- companies & units ----------
   _placeCompany(team, name, formation, types, at) {
     const co = { id: ++_uid, team, name: name || null, formation, units: [], leader: null, morale: 0, target: null, routing: false, lone: types.length === 1 };
-    const slots = formationSlots(types.length, FORMATIONS[formation]);
+    const slots = formationSlots(types.length, formation);
     types.forEach((type, i) => {
       const s = slots[i];
       const u = this._makeUnit(team, type, at.x + s.dx, at.z + s.dz, co);
@@ -214,7 +218,7 @@ export class Battle {
     co.morale = Math.min(100, avg + lead + aura);
     co.morale0 = co.morale;
     // a standard borne by the leader marks the company's ground
-    co.flag = makeFlag(team, UNIT_TYPES[co.leader.type]);
+    co.flag = makeFlag(team, this.companies.filter((c) => c.team === team).length); // each warband a different pattern
     co.flag.position.y = (UNIT_TYPES[co.leader.type].piece ? UNIT_TYPES[co.leader.type].piece.tall + 0.6 : 1.7);
     co.leader.mesh.add(co.flag);
     this.companies.push(co);
@@ -384,36 +388,41 @@ export class Battle {
     if (this._pointers.size >= 2) { this._pinch = this._pointerDist(); this._panMid = this._pointerMid(); this._dragStart = null; return; }
     if (e.button === 2) { this._panLast = { x: e.clientX, y: e.clientY }; return; } // right-drag pans
     this._dragStart = { x: e.clientX, y: e.clientY }; this._dragging = false;
+    this._panLast = { x: e.clientX, y: e.clientY }; // one-finger drag pans, like the city map
   }
   pointerMove(e) {
     if (this._pointers.has(e.pointerId)) this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (this._pointers.size >= 2) { const d = this._pointerDist(); if (this._pinch && d > 0) this.zoom(this._pinch / d); this._pinch = d;
       const m = this._pointerMid(); if (this._panMid) this._panScreen(m.x - this._panMid.x, m.y - this._panMid.y); this._panMid = m; return; }
-    if (this._panLast) { this._panScreen(e.clientX - this._panLast.x, e.clientY - this._panLast.y); this._panLast = { x: e.clientX, y: e.clientY }; return; }
-    if (!this._dragStart) return;
+    if (!this._dragStart) { if (this._panLast) { this._panScreen(e.clientX - this._panLast.x, e.clientY - this._panLast.y); this._panLast = { x: e.clientX, y: e.clientY }; } return; }
     const dx = e.clientX - this._dragStart.x, dy = e.clientY - this._dragStart.y;
     if (!this._dragging && Math.hypot(dx, dy) > 8) this._dragging = true;
-    if (this._dragging && this.phase === 'battle') {
+    if (this._dragging && this.marquee && this.phase === 'battle') { // marquee mode: box-select
       const box = document.getElementById('battle-select-box');
       box.style.left = Math.min(e.clientX, this._dragStart.x) + 'px'; box.style.top = Math.min(e.clientY, this._dragStart.y) + 'px';
       box.style.width = Math.abs(dx) + 'px'; box.style.height = Math.abs(dy) + 'px'; box.classList.remove('hidden');
+    } else if (this._dragging && this._panLast) { // otherwise pan the field
+      this._panScreen(e.clientX - this._panLast.x, e.clientY - this._panLast.y); this._panLast = { x: e.clientX, y: e.clientY };
     }
   }
   pointerUp(e) {
     const wasMulti = this._pointers.size >= 2;
     this._pointers.delete(e.pointerId);
-    if (this._panLast && e.button === 2) { this._panLast = null; return; }
-    if (wasMulti || this._pointers.size >= 1) { this._panMid = null; this._pinch = 0; return; }
+    if (e.button === 2) { this._panLast = null; return; }
+    if (wasMulti || this._pointers.size >= 1) { this._panMid = null; this._pinch = 0; this._panLast = null; return; }
     document.getElementById('battle-select-box').classList.add('hidden');
+    this._panLast = null;
     if (!this._dragStart) return;
     const start = this._dragStart; this._dragStart = null;
     if (this._dragging) {
       this._dragging = false;
-      if (this.phase !== 'battle') return;
-      const x0 = Math.min(e.clientX, start.x), x1 = Math.max(e.clientX, start.x), y0 = Math.min(e.clientY, start.y), y1 = Math.max(e.clientY, start.y);
-      const cos = new Set();
-      for (const u of this._liveUnits('player')) { const s = this._screen(u.pos); if (s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1) cos.add(u.company); }
-      this._select([...cos]); return;
+      if (this.marquee && this.phase === 'battle') {
+        const x0 = Math.min(e.clientX, start.x), x1 = Math.max(e.clientX, start.x), y0 = Math.min(e.clientY, start.y), y1 = Math.max(e.clientY, start.y);
+        const cos = new Set();
+        for (const u of this._liveUnits('player')) { const s = this._screen(u.pos); if (s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1) cos.add(u.company); }
+        this._select([...cos]); this._setMarquee(false);
+      }
+      return; // a drag was a pan (or a marquee) — never an order
     }
     const w = this._worldAt(e); if (!w) return;
     if (this.phase === 'muster') { this._musterTap(w); return; }
@@ -458,6 +467,7 @@ export class Battle {
   }
   setFormation(form) { for (const c of this.selected) c.formation = form; this._renderCommand(); }
   battleCry() { for (const c of this.selected) if (!c.routing && (!c.cd || c.cd <= 0)) { c.morale = Math.min(100, c.morale + 22); c.cryT = 4; c.cd = 14; } this._renderCommand(); }
+  _setMarquee(on) { this.marquee = on; const b = document.getElementById('bs-marquee'); if (b) { b.classList.toggle('on', on); b.textContent = on ? '⬚ drag to box…' : '⬚ Select a group'; } }
 
   // ---------- DOM ----------
   _dom() {
@@ -467,6 +477,7 @@ export class Battle {
     document.getElementById('bs-clear').addEventListener('click', () => { this.forming.types = []; this.placing = false; this._renderMuster(); });
     document.getElementById('bs-reroll').addEventListener('click', () => { this.forming.name = nextNickname(); this._renderMuster(); });
     document.getElementById('bs-cry').addEventListener('click', () => this.battleCry());
+    document.getElementById('bs-marquee').addEventListener('click', () => this._setMarquee(!this.marquee));
     document.querySelectorAll('#bs-formations [data-form]').forEach((b) => b.addEventListener('click', () => {
       if (this.phase === 'muster') { this.forming.formation = b.dataset.form; this._renderMuster(); } else this.setFormation(b.dataset.form);
     }));
@@ -535,20 +546,37 @@ function makeUnitVisual(type, team) {
 }
 // A company standard: a billboard pole + team pennant with a sigil dot in the
 // leader's colour, borne above the leader to mark the company's ground.
-function makeFlag(team, leaderType) {
-  const cv = document.createElement('canvas'); cv.width = 48; cv.height = 72;
+function hex(c) { return '#' + c.toString(16).padStart(6, '0'); }
+function makeFlag(team, patternIdx) {
+  const [c1, c2] = LIVERY[team];
+  const pat = FLAG_PATTERNS[patternIdx % FLAG_PATTERNS.length];
+  const cv = document.createElement('canvas'); cv.width = 60; cv.height = 76;
   const x = cv.getContext('2d');
-  x.fillStyle = '#6b5230'; x.fillRect(9, 6, 4, 62);
-  x.fillStyle = '#' + TEAM[team].toString(16).padStart(6, '0');
-  x.beginPath(); x.moveTo(13, 8); x.lineTo(46, 20); x.lineTo(13, 34); x.closePath(); x.fill();
-  x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = 1.5; x.stroke();
-  const sig = (leaderType.piece ? leaderType.piece.color : 0xf0e0c0);
-  x.fillStyle = '#' + sig.toString(16).padStart(6, '0');
-  x.beginPath(); x.arc(24, 20, 4.5, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#6b5230'; x.fillRect(10, 6, 4, 66);           // pole
+  const X = 14, Y = 8, W = 44, H = 32;
+  x.save();
+  x.beginPath(); x.moveTo(X, Y); x.lineTo(X + W, Y + 3); x.lineTo(X + W, Y + H - 3); x.lineTo(X, Y + H); x.closePath(); x.clip();
+  drawPattern(x, pat, c1, c2, X, Y, W, H);
+  x.restore();
+  x.strokeStyle = 'rgba(0,0,0,0.45)'; x.lineWidth = 1.5;
+  x.beginPath(); x.moveTo(X, Y); x.lineTo(X + W, Y + 3); x.lineTo(X + W, Y + H - 3); x.lineTo(X, Y + H); x.closePath(); x.stroke();
   const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  s.center.set(0.23, 0); s.scale.set(0.9, 1.35, 1);
+  s.center.set(0.2, 0); s.scale.set(1.05, 1.33, 1);
   return s;
+}
+function drawPattern(x, pat, c1, c2, X, Y, W, H) {
+  const A = hex(c1), B = hex(c2);
+  x.fillStyle = A; x.fillRect(X, Y, W, H);
+  x.fillStyle = B;
+  if (pat === 'half') x.fillRect(X + W / 2, Y, W / 2, H);
+  else if (pat === 'stripes') { for (let i = 0; i < 3; i++) x.fillRect(X, Y + (i * 2 + 1) * H / 6, W, H / 6); }
+  else if (pat === 'checker') { const cw = W / 4, ch = H / 3; for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) if ((r + c) % 2) x.fillRect(X + c * cw, Y + r * ch, cw, ch); }
+  else if (pat === 'quarters') { x.fillRect(X, Y, W / 2, H / 2); x.fillRect(X + W / 2, Y + H / 2, W / 2, H / 2); }
+  else if (pat === 'circle') { x.beginPath(); x.arc(X + W / 2, Y + H / 2, Math.min(W, H) / 3.2, 0, Math.PI * 2); x.fill(); }
+  else if (pat === 'saltire') { x.strokeStyle = B; x.lineWidth = Math.max(3, W / 9); x.beginPath(); x.moveTo(X, Y); x.lineTo(X + W, Y + H); x.moveTo(X + W, Y); x.lineTo(X, Y + H); x.stroke(); }
+  else if (pat === 'chevron') { x.strokeStyle = B; x.lineWidth = Math.max(3, H / 7); for (let i = 0; i < 3; i++) { const yy = Y + H * 0.22 + i * H * 0.28; x.beginPath(); x.moveTo(X, yy); x.lineTo(X + W / 2, yy + H * 0.16); x.lineTo(X + W, yy); x.stroke(); } }
+  else { x.strokeStyle = B; x.lineWidth = W / 6; for (let i = -1; i < 4; i++) { x.beginPath(); x.moveTo(X + i * W / 3, Y); x.lineTo(X + i * W / 3 + H, Y + H); x.stroke(); } } // bendy
 }
 function selectRing(u) { u.ring.material.color.setHex(0xffe08a); u.ring.material.opacity = 0.95; }
 function restoreRing(u) { u.ring.material.color.setHex(u.ring.userData.team); u.ring.material.opacity = 0.5; }
@@ -574,9 +602,22 @@ function drawBar(sprite, frac, color) { const cv = sprite.userData.cv, x = cv.ge
   x.fillStyle = '#' + color.toString(16).padStart(6, '0'); x.fillRect(1, 1, 62 * Math.max(0, Math.min(1, frac)), 8); sprite.userData.tex.needsUpdate = true; }
 
 // formation slot offsets for n units
-function formationSlots(n, f) {
-  const cols = Math.min(f.cols, n), sp = 0.95, out = [];
-  for (let i = 0; i < n; i++) { const c = i % cols, r = (i / cols) | 0; out.push({ dx: (c - (cols - 1) / 2) * sp, dz: r * sp * (f.label === 'Rinn' ? 1.1 : 1) }); }
+function formationSlots(n, shape) {
+  const sp = 0.95, out = [];
+  if (shape === 'column') {
+    const cols = Math.min(2, n);
+    for (let i = 0; i < n; i++) { const c = i % cols, r = (i / cols) | 0; out.push({ dx: (c - (cols - 1) / 2) * sp, dz: r * sp - (Math.ceil(n / cols) - 1) * sp / 2 }); }
+  } else if (shape === 'wedge') {
+    out.push({ dx: 0, dz: -sp }); // the point leads
+    let k = 1;
+    for (let i = 1; i < n; i += 2) { const a = k * sp; out.push({ dx: -a * 0.75, dz: -sp + a }); if (i + 1 < n) out.push({ dx: a * 0.75, dz: -sp + a }); k++; }
+  } else if (shape === 'diamond') {
+    const ring = [[0, 0], [0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [-1, -1], [1, 1], [-1, 1], [0, -2], [0, 2], [2, 0], [-2, 0]];
+    for (let i = 0; i < n; i++) { const p = ring[i % ring.length]; out.push({ dx: p[0] * sp * 0.9, dz: p[1] * sp * 0.9 }); }
+  } else { // line — rows abreast, broad front
+    const cols = Math.min(6, n);
+    for (let i = 0; i < n; i++) { const c = i % cols, r = (i / cols) | 0; out.push({ dx: (c - (cols - 1) / 2) * sp, dz: r * sp }); }
+  }
   return out;
 }
 function dist2(a, b) { const dx = a.pos ? a.pos.x - b.x : a.x - b.x, dz = a.pos ? a.pos.z - b.z : a.z - b.z; return dx * dx + dz * dz; }
