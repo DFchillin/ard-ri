@@ -3,7 +3,7 @@ import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIs
 import { Tilemap, T } from '../sim/tilemap.js?v=CBUST';
 import { WorldView } from '../render/world_view.js?v=CBUST';
 import { makeBuildingChip, makeWalkerChip } from '../render/chips.js?v=CBUST';
-import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNickname } from './units.js?v=CBUST';
+import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNickname, UPSKILL, EMPLOYEES } from './units.js?v=CBUST';
 
 const MAP = 20;
 const CLASH_DT = 0.5;
@@ -45,6 +45,10 @@ export class Battle {
     this.units = []; this.companies = []; this.buildings = []; this.selected = new Set();
     this.forming = null; this.placing = false;
     this._clashAcc = 0; this._pointers = new Map();
+    // Your war-band, kept in memory between battles: folk grow tiers by surviving
+    // wins, and fall in defeat. (Later this is derived from the settlement itself.)
+    this.roster = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 };
+    this.employeeDebt = 0; // city folk lost, awaiting replacement
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1d2a19);
@@ -93,7 +97,7 @@ export class Battle {
     for (const c of this.cfg.enemyCompanies || []) this._placeCompany('enemy', c.name, c.formation, c.types, this._worldOf(c.x, c.z));
     for (const [t, x, z] of this.cfg.enemyLone || []) this._placeCompany('enemy', null, 'loose', [t], this._worldOf(x, z));
     this.forming = { types: [], name: nextNickname(), formation: 'wall' };
-    this.pool = Object.assign({}, this.cfg.availability || {}); // your muster, kept in memory
+    this.pool = Object.assign({}, this.roster); // muster draws from your war-band
     document.getElementById('battle-ui').classList.remove('hidden');
     document.getElementById('battle-sidebar').classList.remove('hidden');
     document.body.classList.add('in-battle');
@@ -120,6 +124,8 @@ export class Battle {
   }
   _commence() {
     document.getElementById('parley-overlay').classList.add('hidden');
+    // the mustered folk march out of the war-band; survivors return after the battle
+    for (const u of this.units) if (u.team === 'player') this.roster[u.type] = Math.max(0, (this.roster[u.type] || 0) - 1);
     this.phase = 'battle'; this.started = true;
     for (const c of this.companies) {
       if (c.team === 'enemy' && this.cfg.defend) { const b = pick(c, this.buildings.filter((x) => !x.dead)); if (b) c.target = { foe: b }; }
@@ -251,7 +257,7 @@ export class Battle {
       const spd = UNIT_TYPES[u.type].speed * MOVE * 1.1;
       const dz = (u.team === 'player' ? this.map.half + 3 : -this.map.half - 3) - u.pos.z;
       u.pos.z += Math.sign(dz) * Math.min(spd * dt, Math.abs(dz));
-      if (Math.abs(u.pos.z) > this.map.half + 1) { u.dead = true; this.unitGroup.remove(u.mesh); }
+      if (Math.abs(u.pos.z) > this.map.half + 1) { u.dead = true; u.fled = true; this.unitGroup.remove(u.mesh); }
       else u.mesh.position.set(u.pos.x, 0, u.pos.z);
       return;
     }
@@ -308,7 +314,7 @@ export class Battle {
       if (t.hp <= 0) {
         t.dead = true;
         if (t.kind === 'building') { this.buildingGroup.remove(t.chip); this.buildingGroup.remove(t.bar); }
-        else { this.unitGroup.remove(t.mesh); if (t.company.leader === t) took.set(t.company, (took.get(t.company) || 0) + t.hp0 * 2); } // a fallen leader shakes the company
+        else { t.killed = true; this.unitGroup.remove(t.mesh); if (t.company.leader === t) took.set(t.company, (took.get(t.company) || 0) + t.hp0 * 2); } // a fallen leader shakes the company
       }
     }
     // collective morale per company
@@ -337,9 +343,26 @@ export class Battle {
   _checkEnd() {
     if (!this.started) return;
     const rath = this.buildings.some((b) => !b.dead && b.team === 'player');
-    if (this._liveCompanies('enemy').length === 0) { this.started = false; this.onVictory(); }
-    else if (this._liveCompanies('player').length === 0) { this.started = false; this._defeat('Your slua is broken.'); }
-    else if (this.cfg.defend && !rath) { this.started = false; this._defeat('Your ráth is burned.'); }
+    if (this._liveCompanies('enemy').length === 0) { this.started = false; const s = this._resolveRoster(true); this.onVictory({ sub: 'The enemy slua is broken and flees the field. ' + s }); }
+    else if (this._liveCompanies('player').length === 0) { this.started = false; this._defeat('Your slua is broken. ' + this._resolveRoster(false)); }
+    else if (this.cfg.defend && !rath) { this.started = false; this._defeat('Your ráth is burned. ' + this._resolveRoster(false)); }
+  }
+
+  // After a battle the survivors return to the war-band; on a win some grow a
+  // tier, and the fallen (city folk especially) leave a hole to fill.
+  _resolveRoster(won) {
+    const grew = {}; let fell = 0, empLost = 0;
+    for (const u of this.units) {
+      if (u.team !== 'player') continue;
+      if (u.killed) { fell++; if (EMPLOYEES.includes(u.type)) empLost++; continue; }
+      let t = u.type; // survivors (alive or fled home) return
+      if (won && UPSKILL[t] && Math.random() < (UPSKILL[t] === 'seasoned' ? 0.32 : 0.4)) { t = UPSKILL[t]; grew[t] = (grew[t] || 0) + 1; }
+      this.roster[t] = (this.roster[t] || 0) + 1;
+    }
+    this.employeeDebt += empLost;
+    const grewStr = Object.entries(grew).map(([k, n]) => `${n} rose to ${UNIT_TYPES[k].label}`).join(', ');
+    if (won) return `The host returns${grewStr ? ' — ' + grewStr : ''}${fell ? `; ${fell} fell` : ' with no losses'}.` + (empLost ? ` (${empLost} of the settlement's own lost — two seasons to replace.)` : '');
+    return `${fell} fell and the rest scattered home.` + (empLost ? ` ${empLost} city folk among the dead — two seasons to replace.` : '');
   }
 
   // ---------- input ----------
@@ -459,7 +482,7 @@ export class Battle {
   _renderMuster() {
     const roster = document.getElementById('bs-roster'); roster.innerHTML = '';
     const inForming = (k) => this.forming.types.filter((x) => x === k).length;
-    for (const key of ['villager', 'water', 'grain', 'deaglan', 'druid', 'seasoned', 'curadh', 'cuchulainn', 'fionn', 'dagda', 'morrigan']) {
+    for (const key of ['villager', 'water', 'grain', 'deaglan', 'druid', 'warrior', 'seasoned', 'curadh', 'cuchulainn', 'fionn', 'dagda', 'morrigan']) {
       const t = UNIT_TYPES[key]; const left = (this.pool[key] || 0) - inForming(key);
       const b = document.createElement('button'); b.className = 'bs-unit cat-' + t.cat;
       b.innerHTML = `<b>${t.label} <span class="bs-left">${left}</span></b><small>${t.ga}</small>`; b.title = t.ga;
@@ -534,7 +557,8 @@ function buildPiece(g, col, tall, cat) {
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 0.16, 16), mat(darken(col, 0.5))); base.position.y = 0.08; g.add(base);
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.26, tall * 0.7, 16), mat(col)); body.position.y = 0.16 + tall * 0.35; g.add(body);
   let head;
-  if (cat === 'seasoned') head = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.3, 0.34), mat(col));
+  if (cat === 'warrior') head = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.32, 16), mat(col));
+  else if (cat === 'seasoned') head = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.3, 0.34), mat(col));
   else if (cat === 'special') head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), mat(col));
   else if (cat === 'god') head = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.66, 16), mat(col));
   else head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), mat(col)); // hero

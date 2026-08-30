@@ -481,6 +481,7 @@ body.in-battle #inspect-fab, body.in-battle #brightness-btn, body.in-battle #adv
 .bs-unit small { font-size: 10px; opacity: 0.6; }
 .bs-unit:disabled { opacity: 0.38; cursor: default; }
 .bs-unit.cat-regular { border-left-color: #6f9bd0; }
+.bs-unit.cat-warrior { border-left-color: #b0763a; }
 .bs-unit.cat-seasoned { border-left-color: #4a6fae; }
 .bs-unit.cat-special { border-left-color: #e0c060; }
 .bs-unit.cat-hero { border-left-color: #e8a030; }
