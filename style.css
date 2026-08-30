@@ -476,8 +476,10 @@ body.in-battle #inspect-fab, body.in-battle #brightness-btn, body.in-battle #adv
 .bs-sec { font-family: var(--font-display); color: var(--gold); font-size: 12px; opacity: 0.85; margin-top: 4px; border-bottom: 1px solid var(--border); padding-bottom: 2px; }
 #bs-roster { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .bs-unit { text-align: left; background: rgba(15,28,34,0.9); border: 1px solid var(--border); border-left-width: 3px; color: var(--ink); border-radius: 7px; padding: 5px 7px; display: flex; flex-direction: column; line-height: 1.15; }
-.bs-unit b { font-size: 12px; font-weight: 600; }
+.bs-unit b { font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; }
+.bs-unit .bs-left { color: var(--gold); font-weight: normal; font-size: 11px; }
 .bs-unit small { font-size: 10px; opacity: 0.6; }
+.bs-unit:disabled { opacity: 0.38; cursor: default; }
 .bs-unit.cat-regular { border-left-color: #6f9bd0; }
 .bs-unit.cat-seasoned { border-left-color: #4a6fae; }
 .bs-unit.cat-special { border-left-color: #e0c060; }

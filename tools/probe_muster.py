@@ -18,12 +18,14 @@ with sync_playwright() as pw:
         pt = pg.evaluate("(p) => window.ardri.battle._screen({x:p[0],z:p[1]})", [sx, sz])
         pg.mouse.click(pt['x'], pt['y']); pg.wait_for_timeout(120)
 
-    place([0,0,0,5,5,6], -4.0, 5.5)   # a company: villagers + seasoned + curadh, west
-    place([1,2,3,4], 4.0, 5.5)        # water/grain/deaglan/druid, east
-    place([7], 0.0, 6.5)              # a lone hero (Cú Chulainn)
+    place([0,0,0,5,5,6], -4.0, 0.0)   # villagers + seasoned + curadh, west (in front of ráth)
+    place([1,2,3,4], 4.0, 0.0)        # water/grain/deaglan/druid, east
+    place([7], 0.0, 1.0)              # a lone hero (Cú Chulainn)
     st = pg.evaluate("""() => { const B=window.ardri.battle; return {
       companies:B.companies.filter(c=>c.team==='player').length,
       units:B.units.filter(u=>u.team==='player').length,
+      flags:B.companies.filter(c=>c.team==='player'&&c.flag).length,
+      poolVillager:B.pool.villager, poolCuchulainn:B.pool.cuchulainn,
       names:B.companies.filter(c=>c.team==='player').map(c=>c.name?c.name[0]:'lone') }; }""")
     print('mustered:', json.dumps(st))
     pg.screenshot(path='/home/user/ard-ri/tools/muster1.png')
@@ -38,7 +40,7 @@ with sync_playwright() as pw:
     print('command panel:', json.dumps(cmd))
     pg.screenshot(path='/home/user/ard-ri/tools/muster_mid.png')
     outcome=None
-    for i in range(45):
+    for i in range(80):
         pg.wait_for_timeout(1000)
         s = pg.evaluate("""() => { const B=window.ardri.battle; return {
           f:B._liveCompanies('player').length, e:B._liveCompanies('enemy').length,

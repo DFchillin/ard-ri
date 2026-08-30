@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera } from '../iso_camera.js?v=CBUST';
-import { Tilemap } from '../sim/tilemap.js?v=CBUST';
+import { Tilemap, T } from '../sim/tilemap.js?v=CBUST';
 import { WorldView } from '../render/world_view.js?v=CBUST';
 import { makeBuildingChip, makeWalkerChip } from '../render/chips.js?v=CBUST';
 import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNickname } from './units.js?v=CBUST';
@@ -19,11 +19,13 @@ const TEAM = { player: 0x4a86ff, enemy: 0xe0563a };
 const SCENARIOS = {
   defend: {
     title: 'Cosaint — hold your ráth', defend: true, musterMinZ: 6,
+    // the ráth sits at the back (south), behind the defending line
     buildings: [
-      { role: 'dwelling', x: 6, z: 10, w: 2, h: 2, hp: 24, team: 'player' },
-      { role: 'dwelling', x: 12, z: 10, w: 2, h: 2, hp: 24, team: 'player' },
-      { role: 'granary', x: 9, z: 12, w: 2, h: 2, hp: 34, team: 'player' },
+      { role: 'dwelling', x: 5, z: 15, w: 2, h: 2, hp: 24, team: 'player' },
+      { role: 'dwelling', x: 13, z: 15, w: 2, h: 2, hp: 24, team: 'player' },
+      { role: 'granary', x: 9, z: 16, w: 2, h: 2, hp: 34, team: 'player' },
     ],
+    availability: { villager: 8, water: 4, grain: 4, deaglan: 1, druid: 3, seasoned: 6, curadh: 2, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 },
     enemyCompanies: [
       { name: ['Fomhóraigh', 'the Fomorians'], formation: 'wall', types: ['seasoned', 'seasoned', 'seasoned', 'seasoned', 'villager', 'villager'], x: 10, z: 2 },
       { name: ['Lucht Mara', 'the sea-host'], formation: 'wedge', types: ['villager', 'villager', 'villager', 'villager', 'seasoned'], x: 5, z: 2 },
@@ -44,13 +46,15 @@ export class Battle {
     this._clashAcc = 0; this._pointers = new Map();
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x243c22);
+    this.scene.background = new THREE.Color(0x1d2a19);
     this.aspect = window.innerWidth / window.innerHeight;
     this.camera = createIsoCamera(13, this.aspect);
-    this.scene.add(new THREE.HemisphereLight(0xeafbe0, 0x54683f, 1.9));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.7); sun.position.set(30, 60, 20); this.scene.add(sun);
+    // gentler light so the pasture doesn't blow out to washed yellow-green
+    this.scene.add(new THREE.HemisphereLight(0xcdd8c6, 0x445536, 1.15));
+    const sun = new THREE.DirectionalLight(0xf6f2e2, 1.15); sun.position.set(30, 60, 20); this.scene.add(sun);
 
     this.map = new Tilemap(MAP, 1, 9);
+    this._carveObstacles();
     this.view = new WorldView(this.scene, this.map);
     this.pickPlane = this.view.pickPlane;
     this.unitGroup = new THREE.Group(); this.scene.add(this.unitGroup);
@@ -60,6 +64,21 @@ export class Battle {
   }
 
   _worldOf(tx, tz) { return { x: tx - this.map.half + 0.5, z: tz - this.map.half + 0.5 }; }
+
+  // Tactical obstacle terrain: mires on the flanks, a boggy neck up the middle,
+  // so a charge up the wings bogs down and the ground shapes the fight.
+  _carveObstacles() {
+    const set = (x, z, t) => { const tile = this.map.get(x, z); if (tile) tile.terrain = t; };
+    for (let x = 2; x <= 6; x++) { set(x, 8, T.BOG); set(x, 9, T.BOG); }
+    for (let x = 14; x <= 18; x++) { set(x, 8, T.BOG); set(x, 9, T.BOG); }
+    set(9, 6, T.BOG); set(10, 6, T.BOG); set(10, 5, T.BOG); set(9, 5, T.BOG);
+    set(4, 12, T.WATER); set(3, 12, T.WATER); set(16, 12, T.WATER); set(17, 12, T.WATER);
+  }
+  _terrainFactor(x, z) {
+    const tl = this.map.worldToTile(x, z); if (!tl) return 1;
+    const t = this.map.get(tl.x, tl.z); if (!t) return 1;
+    return t.terrain === T.WATER ? 0.4 : t.terrain === T.BOG ? 0.5 : t.terrain === T.ROCK ? 0.5 : t.terrain === T.WOODS ? 0.75 : 1;
+  }
 
   // ---------- entry & muster ----------
   enter(scenario = 'defend') {
@@ -73,6 +92,7 @@ export class Battle {
     for (const c of this.cfg.enemyCompanies || []) this._placeCompany('enemy', c.name, c.formation, c.types, this._worldOf(c.x, c.z));
     for (const [t, x, z] of this.cfg.enemyLone || []) this._placeCompany('enemy', null, 'loose', [t], this._worldOf(x, z));
     this.forming = { types: [], name: nextNickname(), formation: 'wall' };
+    this.pool = Object.assign({}, this.cfg.availability || {}); // your muster, kept in memory
     document.getElementById('battle-ui').classList.remove('hidden');
     document.getElementById('battle-sidebar').classList.remove('hidden');
     document.body.classList.add('in-battle');
@@ -127,6 +147,10 @@ export class Battle {
     const aura = Math.max(...co.units.map((u) => UNIT_TYPES[u.type].aura));
     co.morale = Math.min(100, avg + lead + aura);
     co.morale0 = co.morale;
+    // a standard borne by the leader marks the company's ground
+    co.flag = makeFlag(team, UNIT_TYPES[co.leader.type]);
+    co.flag.position.y = (UNIT_TYPES[co.leader.type].piece ? UNIT_TYPES[co.leader.type].piece.tall + 0.6 : 1.7);
+    co.leader.mesh.add(co.flag);
     this.companies.push(co);
     return co;
   }
@@ -177,7 +201,7 @@ export class Battle {
     const cp = this._targetPos(c); if (!cp) return;
     const isFoe = !!(c.target && c.target.foe);
     const dest = { x: cp.x + u.slot.dx, z: cp.z + u.slot.dz };
-    const spd = UNIT_TYPES[u.type].speed * MOVE * FORMATIONS[c.formation].speed;
+    const spd = UNIT_TYPES[u.type].speed * MOVE * FORMATIONS[c.formation].speed * this._terrainFactor(u.pos.x, u.pos.z);
     const dx = dest.x - u.pos.x, dz = dest.z - u.pos.z, dist = Math.hypot(dx, dz);
     const stop = isFoe ? ATTACK_RANGE - 0.3 : 0.15;
     if (dist > stop) {
@@ -332,6 +356,7 @@ export class Battle {
     if (!this.placing || !this.forming.types.length) return;
     if (w.tile.z < this.cfg.musterMinZ) { this._flashMuster('Set your folk on your own side of the pitch.'); return; }
     this._placeCompany('player', this.forming.name, this.forming.formation, this.forming.types.slice(), { x: w.x, z: w.z });
+    for (const k of this.forming.types) if (this.pool[k] != null) this.pool[k] = Math.max(0, this.pool[k] - 1); // spend from the muster
     this.forming = { types: [], name: nextNickname(), formation: this.forming.formation };
     this.placing = false; this._renderMuster();
   }
@@ -373,10 +398,13 @@ export class Battle {
   }
   _renderMuster() {
     const roster = document.getElementById('bs-roster'); roster.innerHTML = '';
+    const inForming = (k) => this.forming.types.filter((x) => x === k).length;
     for (const key of ['villager', 'water', 'grain', 'deaglan', 'druid', 'seasoned', 'curadh', 'cuchulainn', 'fionn', 'dagda', 'morrigan']) {
-      const t = UNIT_TYPES[key]; const b = document.createElement('button'); b.className = 'bs-unit cat-' + t.cat;
-      b.innerHTML = `<b>${t.label}</b><small>${t.ga}</small>`; b.title = t.ga;
-      b.addEventListener('click', () => { if (this.forming.types.length < 6) { this.forming.types.push(key); this.placing = false; this._renderMuster(); } });
+      const t = UNIT_TYPES[key]; const left = (this.pool[key] || 0) - inForming(key);
+      const b = document.createElement('button'); b.className = 'bs-unit cat-' + t.cat;
+      b.innerHTML = `<b>${t.label} <span class="bs-left">${left}</span></b><small>${t.ga}</small>`; b.title = t.ga;
+      b.disabled = left <= 0;
+      b.addEventListener('click', () => { if (this.forming.types.length < 6 && (this.pool[key] || 0) - inForming(key) > 0) { this.forming.types.push(key); this.placing = false; this._renderMuster(); } });
       roster.appendChild(b);
     }
     document.getElementById('bs-name').textContent = `${this.forming.name[0]} — ${this.forming.name[1]}`;
@@ -421,6 +449,23 @@ function makeUnitVisual(type, team) {
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; ring.userData.team = TEAM[team]; g.add(ring); g.userData.ring = ring;
   const bar = makeBar(0.7); bar.position.y = tall + 0.5; g.add(bar); g.userData.bar = bar;
   return g;
+}
+// A company standard: a billboard pole + team pennant with a sigil dot in the
+// leader's colour, borne above the leader to mark the company's ground.
+function makeFlag(team, leaderType) {
+  const cv = document.createElement('canvas'); cv.width = 48; cv.height = 72;
+  const x = cv.getContext('2d');
+  x.fillStyle = '#6b5230'; x.fillRect(9, 6, 4, 62);
+  x.fillStyle = '#' + TEAM[team].toString(16).padStart(6, '0');
+  x.beginPath(); x.moveTo(13, 8); x.lineTo(46, 20); x.lineTo(13, 34); x.closePath(); x.fill();
+  x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = 1.5; x.stroke();
+  const sig = (leaderType.piece ? leaderType.piece.color : 0xf0e0c0);
+  x.fillStyle = '#' + sig.toString(16).padStart(6, '0');
+  x.beginPath(); x.arc(24, 20, 4.5, 0, Math.PI * 2); x.fill();
+  const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  s.center.set(0.23, 0); s.scale.set(0.9, 1.35, 1);
+  return s;
 }
 function selectRing(u) { u.ring.material.color.setHex(0xffe08a); u.ring.material.opacity = 0.95; }
 function restoreRing(u) { u.ring.material.color.setHex(u.ring.userData.team); u.ring.material.opacity = 0.5; }
