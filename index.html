@@ -55,6 +55,7 @@
   </div>
 
   <button id="brightness-btn" title="Screen brightness">☀</button>
+  <button id="map-fab" title="The kingdoms of Ériu">🗺️</button>
   <button id="advisors-fab" title="Trusted advisors">📜</button>
   <button id="inspect-fab" title="Inspect (full screen)">🔍</button>
   <button id="build-toggle" title="Build menu">🔨</button>
@@ -140,6 +141,34 @@
         <h2>An Idirbheartaíocht · The Parley</h2>
         <div id="parley-body"></div>
         <div id="parley-actions"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="kingdoms-screen" class="modal hidden">
+    <div class="kg-wrap">
+      <h2 id="kg-title">The Kingdoms of Ériu</h2>
+      <p id="kg-hint">Choose the túath you will call home.</p>
+      <div class="kg-cols">
+        <svg id="kg-map" viewBox="0 0 360 480" aria-label="A map of Ériu"></svg>
+        <div class="kg-detail">
+          <div id="kg-none" class="dim">Tap a kingdom to learn its seat.</div>
+          <div id="kg-info" class="hidden">
+            <h3 id="kg-name"></h3>
+            <div id="kg-ga" class="kg-ga"></div>
+            <div id="kg-seat" class="kg-seat"></div>
+          </div>
+          <div id="kg-livery" class="hidden">
+            <div class="kg-livery-h">Your battle colours</div>
+            <div class="kg-swatches">
+              <label>Field <input type="color" id="kg-c1" value="#2f5fc0" /></label>
+              <label>Charge <input type="color" id="kg-c2" value="#eae2c8" /></label>
+            </div>
+            <canvas id="kg-flag" width="60" height="76"></canvas>
+          </div>
+          <button id="kg-action" class="continue-btn" disabled>Begin your reign ▸</button>
+          <button id="kg-close">✕ Close</button>
+        </div>
       </div>
     </div>
   </div>

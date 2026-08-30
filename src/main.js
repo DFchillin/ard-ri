@@ -8,6 +8,7 @@ import { UI } from './ui.js?v=CBUST';
 import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=CBUST';
 import { setCamera } from './render/assets.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
+import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById } from './data/kingdoms.js?v=CBUST';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -153,6 +154,87 @@ function startMission(n) {
   started = true; triggerFestival(FESTIVALS[1]);
 }
 
+// --- Campaign: a home kingdom and your battle livery, kept per device ---
+const CAMPAIGN_KEY = 'ardri_campaign';
+let campaign = { home: null, livery: ['#2f5fc0', '#eae2c8'] };
+try { const s = localStorage.getItem(CAMPAIGN_KEY); if (s) campaign = Object.assign(campaign, JSON.parse(s)); } catch (e) {}
+function saveCampaign() { try { localStorage.setItem(CAMPAIGN_KEY, JSON.stringify(campaign)); } catch (e) {} }
+battle.setLivery(campaign.livery);
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+const kg = { built: false, mode: 'choose', sel: null, regions: {} };
+function buildKingdomMap() {
+  if (kg.built) return;
+  const svg = document.getElementById('kg-map');
+  const mk = (tag, a) => { const e = document.createElementNS(SVGNS, tag); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  svg.appendChild(mk('rect', { class: 'kg-sea', x: 0, y: 0, width: 360, height: 480 }));
+  svg.appendChild(mk('path', { class: 'kg-isle', d: ISLAND }));
+  for (const k of KINGDOMS) {
+    const poly = mk('polygon', { class: 'kg-region', points: k.pts, fill: k.color });
+    poly.addEventListener('click', () => selectKingdom(k.id));
+    svg.appendChild(poly); kg.regions[k.id] = poly;
+    const t = mk('text', { class: 'kg-label', x: k.label[0], y: k.label[1] }); t.textContent = k.en; svg.appendChild(t);
+  }
+  kg.homeMark = mk('polygon', { class: 'kg-home', points: '' }); kg.homeMark.style.display = 'none'; svg.appendChild(kg.homeMark);
+  document.getElementById('kg-close').addEventListener('click', closeKingdomMap);
+  document.getElementById('kg-action').addEventListener('click', kingdomAction);
+  const c1 = document.getElementById('kg-c1'), c2 = document.getElementById('kg-c2');
+  c1.value = campaign.livery[0]; c2.value = campaign.livery[1];
+  const onCol = () => { campaign.livery = [c1.value, c2.value]; battle.setLivery(campaign.livery); drawFlagPreview(); };
+  c1.addEventListener('input', onCol); c2.addEventListener('input', onCol);
+  document.getElementById('kingdoms-screen').addEventListener('click', (e) => { if (e.target.id === 'kingdoms-screen') closeKingdomMap(); });
+  kg.built = true;
+}
+function drawFlagPreview() {
+  const cv = document.getElementById('kg-flag'); if (!cv) return;
+  const x = cv.getContext('2d'); x.clearRect(0, 0, 60, 76);
+  x.fillStyle = '#6b5230'; x.fillRect(10, 6, 4, 66);
+  const X = 14, Y = 8, W = 40, H = 30;
+  x.fillStyle = campaign.livery[0]; x.fillRect(X, Y, W, H);
+  x.fillStyle = campaign.livery[1]; x.beginPath(); x.arc(X + W / 2, Y + H / 2, 9, 0, Math.PI * 2); x.fill();
+  x.strokeStyle = 'rgba(0,0,0,0.45)'; x.strokeRect(X, Y, W, H);
+}
+function selectKingdom(id) {
+  if (kg.mode === 'war' && id === campaign.home) return;
+  kg.sel = id;
+  for (const rid in kg.regions) kg.regions[rid].classList.toggle('sel', rid === id);
+  const k = kingdomById(id);
+  document.getElementById('kg-none').classList.add('hidden');
+  document.getElementById('kg-info').classList.remove('hidden');
+  document.getElementById('kg-name').textContent = k.en;
+  document.getElementById('kg-ga').textContent = k.ga;
+  document.getElementById('kg-seat').textContent = kg.mode === 'war' ? `A raid on ${k.seat}.` : `Seat of ${k.seat}.`;
+  const act = document.getElementById('kg-action'); act.disabled = false;
+  act.textContent = kg.mode === 'war' ? `Raid ${k.en} ⚔` : `Begin in ${k.en} ▸`;
+}
+function openKingdomMap(mode) {
+  buildKingdomMap();
+  kg.mode = mode; kg.sel = null;
+  document.getElementById('kg-title').textContent = mode === 'war' ? 'Where will you raid?' : 'The Kingdoms of Ériu';
+  document.getElementById('kg-hint').textContent = mode === 'war'
+    ? 'Choose a kingdom to fall upon. Your own lands are barred.'
+    : 'Choose the túath you will call home, and the colours your slua will carry.';
+  document.getElementById('kg-none').classList.remove('hidden');
+  document.getElementById('kg-info').classList.add('hidden');
+  document.getElementById('kg-livery').classList.toggle('hidden', mode === 'war');
+  const act = document.getElementById('kg-action'); act.disabled = true;
+  act.textContent = mode === 'war' ? 'Raid ⚔' : 'Begin your reign ▸';
+  for (const rid in kg.regions) {
+    kg.regions[rid].classList.remove('sel');
+    kg.regions[rid].classList.toggle('dim', mode === 'war' && rid === campaign.home);
+  }
+  if (campaign.home && kg.regions[campaign.home]) { kg.homeMark.setAttribute('points', kingdomById(campaign.home).pts); kg.homeMark.style.display = ''; }
+  else kg.homeMark.style.display = 'none';
+  drawFlagPreview();
+  document.getElementById('kingdoms-screen').classList.remove('hidden');
+}
+function closeKingdomMap() { document.getElementById('kingdoms-screen').classList.add('hidden'); }
+function kingdomAction() {
+  if (!kg.sel) return;
+  if (kg.mode === 'war') { closeKingdomMap(); battle.enter('attack'); return; }
+  campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery); closeKingdomMap();
+}
+
 function pauseGame() { if (savedSpeed === null) savedSpeed = sim.speed; sim.speed = 0; ui.reflectSpeed(0); }
 function resumeGame() { if (savedSpeed !== null) { sim.speed = savedSpeed; ui.reflectSpeed(sim.speed); savedSpeed = null; } }
 
@@ -209,7 +291,10 @@ applySeason(curSeason);
 pushStats();
 updateDate();
 ui.setCompass(cameraDirLabel(camera));
+const mapFab = document.getElementById('map-fab');
+if (mapFab) mapFab.addEventListener('click', () => openKingdomMap(campaign.home ? 'war' : 'choose'));
 ui.showTitle(); // title screen; Mission One starts the game
+if (!campaign.home) openKingdomMap('choose'); // first run: pick a home and colours
 
 // --- Placement preview ---
 const preview = new THREE.Mesh(
@@ -602,7 +687,7 @@ window.addEventListener('resize', () => {
   battle.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera, battle,
+window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, campaign,
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
     const v = new THREE.Vector3(w.x, 0.1, w.z).project(camera);

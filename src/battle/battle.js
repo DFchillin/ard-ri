@@ -458,6 +458,7 @@ export class Battle {
     this.placing = false; this._renderMuster();
   }
 
+  setLivery(pair) { if (Array.isArray(pair) && pair.length === 2) LIVERY.player = pair.map((c) => typeof c === 'string' ? parseInt(c.replace('#', ''), 16) : c); }
   rotate(d) { rotateIsoCamera(this.camera, d); }
   zoom(f) { zoomIsoCamera(this.camera, f, this.aspect); }
   resize(aspect) { this.aspect = aspect; resizeIsoCamera(this.camera, aspect); }
