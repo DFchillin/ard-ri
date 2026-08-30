@@ -616,7 +616,8 @@ const clock = new THREE.Clock();
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
-  if (battle.active) { battle.update(dt); battle.render(renderer); return; }
+  if (battle.active) { setCamera(battle.camera); battle.update(dt); battle.render(renderer); return; }
+  setCamera(camera);
   const scaled = started ? dt * sim.speed : 0;
   game.update(scaled);
   game.updateFx(dt); // ambient effects run in real time

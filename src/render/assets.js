@@ -26,7 +26,7 @@ export function tex(path, onError) {
   return t;
 }
 
-function onReady(texture, fn) {
+export function onReady(texture, fn) {
   if (texture.image && texture.image.width) fn();
   else (texture._cbs = texture._cbs || []).push(fn);
 }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { tex, spriteFrom, fitWidth, sizeSprite, screenDir } from './assets.js?v=CBUST';
+import { tex, spriteFrom, fitWidth, sizeSprite, screenDir, onReady } from './assets.js?v=CBUST';
 
 const DIRS = ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'];
 const WALK_CYCLE = [0, 2, 1, 2]; // step1, stand, step2, stand
@@ -105,6 +105,37 @@ export function makeWalkerChip(type) {
     } else {
       s.material.map = frames[2];
     }
+  };
+  return s;
+}
+
+// Battle sprites: 8 facings × 5 frames (idle, step1, step2, wind-up, strike)
+// sliced from the character sheet. Walks on the step frames, and plays a short
+// wind-up → strike when it lands a blow. `h` is the world height to draw at.
+const B_WALK = ['step1', 'idle', 'step2', 'idle'];
+const B_STEP = 0.28;
+const STRIKE_DUR = 0.5;
+export function makeWarriorChip(art, h = 1.6) {
+  const F = {};
+  for (const d of DIRS) F[d] = {};
+  const frames = ['idle', 'step1', 'step2', 'windup', 'strike'];
+  for (const d of DIRS) for (const f of frames) F[d][f] = tex(`assets/battle/${art}/${d}_${f}.png`);
+  const first = F.s.idle;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: first, transparent: true, alphaTest: 0.14 }));
+  s.center.set(0.5, 0);
+  s.scale.set(h * 0.75, h, 1);
+  const fit = () => { const i = first.image; if (i && i.width) s.scale.set(h * (i.width / i.height), h, 1); };
+  onReady(first, fit);
+  s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._strike = 0;
+  s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
+  s.strike = () => { if (s._strike <= 0) s._strike = STRIKE_DUR; };
+  s.animate = (dt, moving) => {
+    const fr = F[screenDir(s._dx, s._dz)] || F.s;
+    let key;
+    if (s._strike > 0) { s._strike -= dt; key = s._strike > STRIKE_DUR * 0.45 ? 'windup' : 'strike'; }
+    else if (moving) { s._t += dt; if (s._t >= B_STEP) { s._t -= B_STEP; s._phase = (s._phase + 1) % 4; } key = B_WALK[s._phase]; }
+    else key = 'idle';
+    if (s.material.map !== fr[key]) { s.material.map = fr[key]; s.material.needsUpdate = true; }
   };
   return s;
 }

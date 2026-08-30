@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIsoCamera } from '../iso_camera.js?v=CBUST';
 import { Tilemap, T } from '../sim/tilemap.js?v=CBUST';
 import { WorldView } from '../render/world_view.js?v=CBUST';
-import { makeBuildingChip, makeWalkerChip } from '../render/chips.js?v=CBUST';
+import { makeBuildingChip, makeWalkerChip, makeWarriorChip } from '../render/chips.js?v=CBUST';
 import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNickname, UPSKILL, EMPLOYEES } from './units.js?v=CBUST';
 
 const MAP = 20;
@@ -219,7 +219,7 @@ export class Battle {
     co.morale0 = co.morale;
     // a standard borne by the leader marks the company's ground
     co.flag = makeFlag(team, this.companies.filter((c) => c.team === team).length); // each warband a different pattern
-    co.flag.position.y = (UNIT_TYPES[co.leader.type].piece ? UNIT_TYPES[co.leader.type].piece.tall + 0.6 : 1.7);
+    { const lt = UNIT_TYPES[co.leader.type]; co.flag.position.y = (lt.battle ? lt.battle.h + 0.4 : lt.piece ? lt.piece.tall + 0.6 : 1.7); }
     co.leader.mesh.add(co.flag);
     this.companies.push(co);
     return co;
@@ -247,6 +247,7 @@ export class Battle {
     dt = Math.min(dt, 0.05);
     for (const c of this.companies) if (c.cryT > 0) c.cryT -= dt;
     for (const u of this.units) if (!u.dead) this._move(u, dt);
+    for (const u of this.units) { const spr = u.mesh.userData.spr; if (spr && spr.animate && !u.dead) spr.animate(dt, !!u._moving); }
     this._clashAcc += dt;
     if (this._clashAcc >= CLASH_DT) { this._clashAcc -= CLASH_DT; this._clash(); this._checkEnd(); }
     if (this.selected.size) this._renderCommand();
@@ -257,17 +258,20 @@ export class Battle {
 
   _move(u, dt) {
     const c = u.company;
+    u._moving = false;
     if (c.routing) {
       const spd = UNIT_TYPES[u.type].speed * MOVE * 1.1;
       const dz = (u.team === 'player' ? this.map.half + 3 : -this.map.half - 3) - u.pos.z;
       u.pos.z += Math.sign(dz) * Math.min(spd * dt, Math.abs(dz));
       if (Math.abs(u.pos.z) > this.map.half + 1) { u.dead = true; u.fled = true; this.unitGroup.remove(u.mesh); }
-      else u.mesh.position.set(u.pos.x, 0, u.pos.z);
+      else { u.mesh.position.set(u.pos.x, 0, u.pos.z); u._moving = true; const spr = u.mesh.userData.spr; if (spr && spr.faceWorld) spr.faceWorld(0, Math.sign(dz)); }
       return;
     }
-    // hold to fight an enemy already in reach
+    // hold to fight an enemy already in reach — turn to face the nearest foe
     const enemies = u.team === 'player' ? this._liveUnits('enemy') : this._liveUnits('player');
-    for (const o of enemies) if (dist2(u.pos, o.pos) <= ATTACK_RANGE * ATTACK_RANGE) return;
+    let near = null, nd = ATTACK_RANGE * ATTACK_RANGE;
+    for (const o of enemies) { const d = dist2(u.pos, o.pos); if (d <= nd) { nd = d; near = o; } }
+    if (near) { const spr = u.mesh.userData.spr; if (spr && spr.faceWorld) spr.faceWorld(near.pos.x - u.pos.x, near.pos.z - u.pos.z); return; }
     const cp = this._targetPos(c); if (!cp) return;
     const isFoe = !!(c.target && c.target.foe);
     const dest = { x: cp.x + u.slot.dx, z: cp.z + u.slot.dz };
@@ -278,6 +282,7 @@ export class Battle {
       const step = Math.min(spd * dt, dist);
       u.pos.x += (dx / dist) * step; u.pos.z += (dz / dist) * step;
       u.mesh.position.set(u.pos.x, 0, u.pos.z);
+      u._moving = true;
       if (u.mesh.userData.spr && u.mesh.userData.spr.faceWorld) u.mesh.userData.spr.faceWorld(dx, dz);
     } else if (c.target && c.target.point && this._companyArrived(c)) c.target = null;
   }
@@ -310,7 +315,7 @@ export class Battle {
       for (const o of foes) { const d = dist2(u.pos, o.pos); if (d < td) { td = d; tgt = o; } }
       if (!tgt) for (const b of this.buildings) if (!b.dead && b.team !== u.team &&
         Math.abs(u.pos.x - b.pos.x) <= b.w / 2 + ATTACK_RANGE - 0.4 && Math.abs(u.pos.z - b.pos.z) <= b.h / 2 + ATTACK_RANGE - 0.4) { tgt = b; break; }
-      if (tgt) add(tgt, this._dmgTo(u, tgt));
+      if (tgt) { add(tgt, this._dmgTo(u, tgt)); const spr = u.mesh.userData.spr; if (spr && spr.strike) { spr.strike(); if (spr.faceWorld) spr.faceWorld(tgt.pos.x - u.pos.x, tgt.pos.z - u.pos.z); } }
     }
     for (const [t, n] of dmg) {
       t.hp -= n;
@@ -537,7 +542,8 @@ function makeUnitVisual(type, team) {
   const t = UNIT_TYPES[type];
   const g = new THREE.Group();
   let tall = 1.0;
-  if (t.sprite) { const spr = makeWalkerChip(t.sprite); spr.scale.multiplyScalar(0.85); g.add(spr); g.userData.spr = spr; tall = 1.4; }
+  if (t.battle) { const spr = makeWarriorChip(t.battle.art, t.battle.h); g.add(spr); g.userData.spr = spr; tall = t.battle.h; }
+  else if (t.sprite) { const spr = makeWalkerChip(t.sprite); spr.scale.multiplyScalar(0.85); g.add(spr); g.userData.spr = spr; tall = 1.4; }
   else { buildPiece(g, t.piece.color, t.piece.tall, t.cat); tall = t.piece.tall + 0.5; }
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.5, 20), new THREE.MeshBasicMaterial({ color: TEAM[team], transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; ring.userData.team = TEAM[team]; g.add(ring); g.userData.ring = ring;

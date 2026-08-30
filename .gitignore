@@ -3,3 +3,5 @@
 node_modules/
 .preview.png
 .ftp-deploy-sync-state.json
+
+/tools/
