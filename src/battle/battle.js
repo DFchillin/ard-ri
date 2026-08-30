@@ -37,9 +37,10 @@ const SCENARIOS = {
 let _uid = 0;
 
 export class Battle {
-  constructor({ onVictory, onExit } = {}) {
+  constructor({ onVictory, onExit, onTruce } = {}) {
     this.onVictory = onVictory || (() => {});
     this.onExit = onExit || (() => {});
+    this.onTruce = onTruce || (() => {});
     this.active = false; this.phase = 'idle'; this.started = false;
     this.units = []; this.companies = []; this.buildings = []; this.selected = new Set();
     this.forming = null; this.placing = false;
@@ -106,16 +107,75 @@ export class Battle {
     this.onExit();
   }
 
-  giveBattle() {
+  // ---------- parley ----------
+  rideToParley() {
     if (this.phase !== 'muster') return;
     if (!this.companies.some((c) => c.team === 'player')) { this._flashMuster('Muster at least one company.'); return; }
+    this.phase = 'parley'; this._showPhase(); this._showParley();
+  }
+  backToMuster() {
+    if (this.phase !== 'parley') return;
+    document.getElementById('parley-overlay').classList.add('hidden');
+    this.phase = 'muster'; this._showPhase(); this._renderMuster();
+  }
+  _commence() {
+    document.getElementById('parley-overlay').classList.add('hidden');
     this.phase = 'battle'; this.started = true;
-    // raiders march on the nearest standing building; defenders hold with a hearth edge
     for (const c of this.companies) {
       if (c.team === 'enemy' && this.cfg.defend) { const b = pick(c, this.buildings.filter((x) => !x.dead)); if (b) c.target = { foe: b }; }
       if (c.team === 'player' && this.cfg.defend) c.morale = Math.min(100, c.morale + 6);
     }
     this._showPhase();
+  }
+
+  _strength(team) {
+    let s = 0;
+    for (const u of this.units) if (u.team === team && !u.dead) { const t = UNIT_TYPES[u.type]; s += t.atk * t.hp * (1 + (t.aura || 0) / 15); }
+    return Math.round(s);
+  }
+  _hostLines(team) {
+    return this.companies.filter((c) => c.team === team).map((c) => {
+      const lead = UNIT_TYPES[c.leader.type];
+      const tag = lead.cat === 'god' ? ' ⚡' : lead.cat === 'hero' ? ' ★' : '';
+      return `<li>${c.name ? c.name[0] : lead.label} <small>×${c.units.length} · ${lead.label}${tag}</small></li>`;
+    }).join('');
+  }
+  _showParley() {
+    const ps = this._strength('player'), es = this._strength('enemy');
+    const gods = this.units.filter((u) => u.team === 'enemy' && UNIT_TYPES[u.type].cat === 'god').length;
+    const heroes = this.units.filter((u) => u.team === 'enemy' && UNIT_TYPES[u.type].cat === 'hero').length;
+    const r = ps / Math.max(1, es);
+    let stance, tribute, mood;
+    if (r >= 1.35) { stance = 'offer'; tribute = Math.round(es * 0.06) + 4; mood = 'Their captain looks over your host and blanches. He would sooner pay than bleed.'; }
+    else if (r <= 0.72) { stance = 'demand'; tribute = Math.round(ps * 0.08) + 5; mood = (gods || heroes) ? 'Their captain is unafraid — greater names stand at his back. He bids you yield.' : 'Their captain is unafraid — he counts far more spears than you can field, and bids you yield.'; }
+    else { stance = 'even'; tribute = Math.round(ps * 0.07) + 4; mood = 'The captains take each other\'s measure. It is finely balanced — this will be a hard day.'; }
+    const revealed = (gods || heroes) ? ` <span class="parley-warn">${gods ? gods + ' god' + (gods > 1 ? 's' : '') : ''}${gods && heroes ? ' & ' : ''}${heroes ? heroes + ' hero' + (heroes > 1 ? 'es' : '') : ''} among them.</span>` : '';
+    document.getElementById('parley-body').innerHTML =
+      `<p class="parley-mood">${mood}</p>` +
+      `<div class="parley-hosts"><div><h4>Their host <span>⚔ ${es}</span></h4><ul>${this._hostLines('enemy')}</ul>${revealed}</div>` +
+      `<div><h4>Your slua <span>⚔ ${ps}</span></h4><ul>${this._hostLines('player')}</ul></div></div>`;
+    const acts = document.getElementById('parley-actions'); acts.innerHTML = '';
+    const btn = (label, cls, fn) => { const b = document.createElement('button'); b.className = cls; b.innerHTML = label; b.addEventListener('click', fn); acts.appendChild(b); };
+    if (stance === 'offer') {
+      btn(`Accept their surrender ▸<small>+${tribute} cattle bóruma</small>`, 'parley-yes', () => this._parleyWin(tribute));
+      btn('No mercy — give battle', 'parley-fight', () => this._commence());
+    } else if (stance === 'demand') {
+      btn('Give battle — we do not yield', 'parley-fight', () => this._commence());
+      btn(`Pay the bóruma & withdraw<small>−${tribute} cattle</small>`, 'parley-pay', () => this._parleyTruce(tribute));
+    } else {
+      btn('Give battle', 'parley-fight', () => this._commence());
+      btn(`Sue for peace & withdraw<small>−${tribute} cattle</small>`, 'parley-pay', () => this._parleyTruce(tribute));
+    }
+    btn('↩ back to the muster', 'parley-back', () => this.backToMuster());
+    document.getElementById('parley-overlay').classList.remove('hidden');
+  }
+  _parleyWin(cattle) {
+    document.getElementById('parley-overlay').classList.add('hidden');
+    this.onVictory({ sub: `Rather than face your slua, they laid down their spears and paid a bóruma of ${cattle} cattle. A bloodless victory — Ériu remembers.`, cattle });
+  }
+  _parleyTruce(cattle) {
+    document.getElementById('parley-overlay').classList.add('hidden');
+    this.onTruce(cattle);
   }
 
   // ---------- building ----------
@@ -379,7 +439,7 @@ export class Battle {
   // ---------- DOM ----------
   _dom() {
     document.getElementById('battle-exit').addEventListener('click', () => this.exit());
-    document.getElementById('bs-give-battle').addEventListener('click', () => this.giveBattle());
+    document.getElementById('bs-give-battle').addEventListener('click', () => this.rideToParley());
     document.getElementById('bs-place').addEventListener('click', () => { if (this.forming.types.length) { this.placing = true; this._renderMuster(); } });
     document.getElementById('bs-clear').addEventListener('click', () => { this.forming.types = []; this.placing = false; this._renderMuster(); });
     document.getElementById('bs-reroll').addEventListener('click', () => { this.forming.name = nextNickname(); this._renderMuster(); });
@@ -389,7 +449,7 @@ export class Battle {
     }));
   }
   _showPhase() {
-    const label = this.phase === 'muster' ? 'An Cruinniú · Muster' : this.cfg.title;
+    const label = this.phase === 'muster' ? 'An Cruinniú · Muster' : this.phase === 'parley' ? 'An Idirbheartaíocht · Parley' : this.cfg.title;
     const f = this._liveCompanies('player').length, e = this._liveCompanies('enemy').length;
     document.getElementById('bs-phase').innerHTML = this.phase === 'battle'
       ? `${label}<br><small>${f} vs ${e} companies</small>` : label;

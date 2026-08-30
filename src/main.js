@@ -134,7 +134,16 @@ function showLedger() {
 
 let battleWon = false;
 const battle = new Battle({
-  onVictory: () => { battleWon = true; ui.showFestival({ name: 'Victory!', emoji: '🏆', sub: 'The enemy slua is broken and flees the field. Ériu will remember this cath.' }); },
+  onVictory: (info) => {
+    battleWon = true;
+    if (info && info.cattle) { game.cattle += info.cattle; pushStats(); }
+    ui.showFestival({ name: 'Victory!', emoji: '🏆', sub: (info && info.sub) || 'The enemy slua is broken and flees the field. Ériu will remember this cath.' });
+  },
+  onTruce: (cattle) => {
+    battle.exit();
+    if (cattle) { game.cattle = Math.max(0, game.cattle - cattle); pushStats(); }
+    ui.showFestival({ name: 'A Truce', emoji: '🕊️', sub: `You paid a bóruma of ${cattle} cattle and withdrew. No blood was shed this day — though the foe remembers your silver.` });
+  },
   onExit: () => ui.showTitle(),
 });
 

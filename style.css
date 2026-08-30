@@ -502,3 +502,22 @@ body.in-battle #inspect-fab, body.in-battle #brightness-btn, body.in-battle #adv
 #bs-sel-info .ok { color: #6cc551; } #bs-sel-info .warn { color: #e0b83a; } #bs-sel-info .rout { color: #e0563a; }
 #bs-sel-info a { color: var(--gold); text-decoration: underline; cursor: pointer; }
 @media (max-width: 640px) { #battle-sidebar { width: 200px; } }
+
+/* Parley */
+.parley-card { width: min(540px, 94vw); text-align: left; max-height: 88vh; overflow-y: auto; }
+.parley-mood { font-style: italic; opacity: 0.9; margin: 8px 0 12px; text-align: center; font-size: 14px; line-height: 1.4; }
+.parley-hosts { display: flex; gap: 12px; flex-wrap: wrap; }
+.parley-hosts > div { flex: 1 1 200px; background: rgba(15,28,34,0.6); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.parley-hosts h4 { font-family: var(--font-display); color: var(--gold); font-weight: normal; font-size: 14px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 6px; }
+.parley-hosts h4 span { color: #e08a6a; font-family: var(--font-body); }
+.parley-hosts ul { list-style: none; }
+.parley-hosts li { font-size: 13px; padding: 2px 0; }
+.parley-hosts li small { opacity: 0.6; font-size: 11px; }
+.parley-warn { color: #e0563a; font-size: 12px; display: block; margin-top: 6px; }
+#parley-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+#parley-actions button { padding: 10px 14px; border-radius: 9px; border: 1px solid var(--border); font-size: 14px; background: rgba(15,28,34,0.92); color: var(--ink); display: flex; flex-direction: column; align-items: center; line-height: 1.25; cursor: pointer; }
+#parley-actions button small { opacity: 0.75; font-size: 11px; }
+#parley-actions .parley-fight { background: var(--gold); color: #1c130a; border-color: var(--gold); font-family: var(--font-display); }
+#parley-actions .parley-yes { border-color: #6cc551; color: #9ce08a; }
+#parley-actions .parley-pay { border-color: #b98cff; color: #cdb0ff; }
+#parley-actions .parley-back { background: transparent; border: none; color: var(--ink); opacity: 0.55; font-size: 12px; padding: 4px; }
