@@ -64,6 +64,7 @@ export const CODEX = [
     entries: [
       { icon: '🌍', name: 'An Domhan Mór', ga: 'the wider world', repr: 'a trade screen opened from your homestead', lore: 'Send cattle to foreign merchants for wine, iron, salt, gold and marble — things no Gaelic smith or field can make.' },
       { icon: '🏛️', name: 'Hosting a Hero', ga: 'aíocht', repr: 'spend goods to add a hero/god to your muster', lore: 'A champion answers a champion’s hall: gather the right foreign goods and host Cú Chulainn, Fionn, the Dagda or the Mhórrígan into your war-band.' },
+      { icon: '🏴', name: 'A Colony', ga: 'coilíneacht', repr: 'a gold-ringed region on the map of Ériu', lore: 'Raid a kingdom far across the water — not a neighbour — and win, and you plant a Dál there, as the Gaels did in Alba. Each turn of the year it renders tribute in cattle and foreign goods; lose a defence at home and a distant colony may throw off your rule.' },
     ],
   },
   {

@@ -111,6 +111,7 @@ function showAdvisors() {
       row('Cattle', game.cattle) +
       row('Silver', `🪙 ${game.silver}`) +
       row('Fighting folk', spearmen) +
+      row('Colonies', campaign.colonies.length ? campaign.colonies.map((c) => c.name).join(', ') : '—') +
       `<tr class="net"><td>War-band</td><td>${host}</td></tr>` +
     `</table></div>` +
     `<p class="fest-note">The Toísech reckons your strength from folk, cattle and silver — the raid-wealth of a Gaelic king.</p>`;
@@ -146,7 +147,10 @@ const battle = new Battle({
   onVictory: (info) => {
     battleWon = true;
     if (info && info.cattle) setCattle(campaign.cattle + info.cattle);
-    ui.showFestival({ name: 'Victory!', emoji: '🏆', sub: (info && info.sub) || 'The enemy slua is broken and flees the field. Ériu will remember this cath.' });
+    let sub = (info && info.sub) || 'The enemy slua is broken and flees the field. Ériu will remember this cath.';
+    if (campaign._newColony) { sub += ` And a new Dál is planted in ${campaign._newColony} — your rule now reaches across the water.`; campaign._newColony = null; }
+    ui.showFestival({ name: campaign._colonyWin ? 'A New Dál' : 'Victory!', emoji: campaign._colonyWin ? '🏴' : '🏆', sub });
+    campaign._colonyWin = false;
   },
   onTruce: (cattle) => {
     battle.exit();
@@ -161,8 +165,13 @@ const battle = new Battle({
     if (won && battle.scenario === 'attack') {
       setCattle(campaign.cattle + 8 + ((Math.random() * 8) | 0)); // plunder driven home from a won raid
       if (Math.random() < 0.5) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; campaign._looted = gk; } // and sometimes foreign spoils
+      if (campaign._raidFar && campaign.target && !isColony(campaign.target)) { const k = foundColony(campaign.target); if (k) { campaign._newColony = k.en; campaign._colonyWin = true; } }
     }
-    if (ransack) { const lost = Math.floor(campaign.cattle / 2) + 6; setCattle(campaign.cattle - lost); campaign._ransacked = lost; }
+    if (ransack) {
+      const lost = Math.floor(campaign.cattle / 2) + 6; setCattle(campaign.cattle - lost); campaign._ransacked = lost;
+      if (campaign.colonies.length && Math.random() < 0.5) { const gone = campaign.colonies.splice((Math.random() * campaign.colonies.length) | 0, 1)[0]; campaign._ransacked = lost; flashNotice(`🏴 While you fought at home, ${gone.name} threw off your yoke.`); }
+    }
+    campaign._raidFar = false;
     saveCampaign();
   },
 });
@@ -189,6 +198,38 @@ function startCampaign() {
 // Drop into the standing ráth — the clock starts because the title is hidden.
 function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); }
 
+// A brief, non-blocking banner for seasonal news (colony tribute, revolts).
+let _noticeEl = null, _noticeT = 0;
+function flashNotice(msg) {
+  if (!_noticeEl) { _noticeEl = document.createElement('div'); _noticeEl.id = 'notice-toast'; document.getElementById('ui-overlay').appendChild(_noticeEl); }
+  _noticeEl.innerHTML = msg; _noticeEl.classList.add('show');
+  clearTimeout(_noticeT); _noticeT = setTimeout(() => _noticeEl.classList.remove('show'), 4200);
+}
+
+// --- Colonies: land won by raiding further afield (a Dál Riata), sending tribute home ---
+const NEIGHBOURS_OF = (id) => NEIGHBOURS[id] || [];
+function isColony(region) { return campaign.colonies.some((c) => c.region === region); }
+function foundColony(region) {
+  if (isColony(region)) return null;
+  const k = kingdomById(region);
+  campaign.colonies.push({ region, name: k.en, seasons: 0 });
+  saveCampaign();
+  return k;
+}
+// Each turn of the year, the colonies render their tribute to the homestead.
+function collectColonyTribute() {
+  if (!campaign.colonies.length) return;
+  let cattle = 0; const goods = [];
+  for (const c of campaign.colonies) {
+    c.seasons = (c.seasons || 0) + 1;
+    cattle += 4 + ((Math.random() * 5) | 0);
+    if (Math.random() < 0.4) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; goods.push(GOODS[gk].icon); }
+  }
+  if (cattle) setCattle(campaign.cattle + cattle);
+  saveCampaign();
+  flashNotice(`🏴 Tribute from ${campaign.colonies.length} ${campaign.colonies.length > 1 ? 'colonies' : 'colony'}: 🐄 ${cattle}${goods.length ? ' · ' + goods.join(' ') : ''}`);
+}
+
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
 const CAMPAIGN_KEY = 'ardri_campaign';
 const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 };
@@ -197,6 +238,7 @@ if (!campaign.roster) campaign.roster = { ...DEFAULT_ROSTER };
 if (!campaign.fallen) campaign.fallen = [];
 if (!campaign.goods) campaign.goods = {};
 if (!campaign.hosted) campaign.hosted = {};
+if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won by raiding further afield
 if (campaign.mapSeed == null) campaign.mapSeed = _mapSeed;
 function saveCampaign() { try { localStorage.setItem(CAMPAIGN_KEY, JSON.stringify(campaign)); } catch (e) {} }
 function saveSettlement() { campaign.settlement = game.snapshot(); campaign.cattle = game.cattle; saveCampaign(); }
@@ -231,6 +273,7 @@ function buildKingdomMap() {
     const t = mk('text', { class: 'kg-label', x: k.label[0], y: k.label[1] }); t.textContent = k.en; svg.appendChild(t);
   }
   kg.homeMark = mk('polygon', { class: 'kg-home', points: '' }); kg.homeMark.style.display = 'none'; svg.appendChild(kg.homeMark);
+  kg.colonyGroup = mk('g', {}); svg.appendChild(kg.colonyGroup);
   document.getElementById('kg-close').addEventListener('click', closeKingdomMap);
   document.getElementById('kg-action').addEventListener('click', kingdomAction);
   const c1 = document.getElementById('kg-c1'), c2 = document.getElementById('kg-c2');
@@ -251,6 +294,7 @@ function drawFlagPreview() {
 }
 function selectKingdom(id) {
   if (kg.mode === 'war' && id === campaign.home) return;
+  if (kg.mode === 'war' && isColony(id)) return; // already held
   kg.sel = id;
   for (const rid in kg.regions) kg.regions[rid].classList.toggle('sel', rid === id);
   const k = kingdomById(id);
@@ -258,9 +302,13 @@ function selectKingdom(id) {
   document.getElementById('kg-info').classList.remove('hidden');
   document.getElementById('kg-name').textContent = k.en;
   document.getElementById('kg-ga').textContent = k.ga;
-  document.getElementById('kg-seat').textContent = kg.mode === 'war' ? `A raid on ${k.seat}.` : `Seat of ${k.seat}.`;
   const act = document.getElementById('kg-action'); act.disabled = false;
-  act.textContent = kg.mode === 'war' ? `Raid ${k.en} ⚔` : `Begin in ${k.en} ▸`;
+  if (kg.mode !== 'war') { document.getElementById('kg-seat').textContent = `Seat of ${k.seat}.`; act.textContent = `Begin in ${k.en} ▸`; return; }
+  const far = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(id);
+  document.getElementById('kg-seat').textContent = far
+    ? `Far across the water — win here and plant a colony in ${k.seat}, a new Dál that renders tribute home.`
+    : `A cattle-raid on ${k.seat}. Drive off their herd.`;
+  act.textContent = far ? `Sail against ${k.en} 🏴` : `Raid ${k.en} ⚔`;
 }
 function openKingdomMap(mode, then) {
   buildKingdomMap();
@@ -276,10 +324,18 @@ function openKingdomMap(mode, then) {
   act.textContent = mode === 'war' ? 'Raid ⚔' : 'Begin your reign ▸';
   for (const rid in kg.regions) {
     kg.regions[rid].classList.remove('sel');
-    kg.regions[rid].classList.toggle('dim', mode === 'war' && rid === campaign.home);
+    kg.regions[rid].classList.toggle('held', isColony(rid));
+    kg.regions[rid].classList.toggle('dim', mode === 'war' && (rid === campaign.home || isColony(rid)));
   }
   if (campaign.home && kg.regions[campaign.home]) { kg.homeMark.setAttribute('points', kingdomById(campaign.home).pts); kg.homeMark.style.display = ''; }
   else kg.homeMark.style.display = 'none';
+  // colony overlay marks (bright, above the dimmed regions) in your field colour
+  while (kg.colonyGroup.firstChild) kg.colonyGroup.removeChild(kg.colonyGroup.firstChild);
+  for (const c of campaign.colonies) {
+    const k = kingdomById(c.region); if (!k) continue;
+    const poly = document.createElementNS(SVGNS, 'polygon'); poly.setAttribute('class', 'kg-colony'); poly.setAttribute('points', k.pts); poly.setAttribute('stroke', campaign.livery[0]); kg.colonyGroup.appendChild(poly);
+    const flag = document.createElementNS(SVGNS, 'text'); flag.setAttribute('class', 'kg-colony-flag'); flag.setAttribute('x', k.label[0]); flag.setAttribute('y', k.label[1] - 12); flag.textContent = '🏴'; kg.colonyGroup.appendChild(flag);
+  }
   drawFlagPreview();
   document.getElementById('kingdoms-screen').classList.remove('hidden');
 }
@@ -365,7 +421,7 @@ function renderTrade() {
 }
 function kingdomAction() {
   if (!kg.sel) return;
-  if (kg.mode === 'war') { campaign.target = kg.sel; campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); enterBattle('attack'); return; }
+  if (kg.mode === 'war') { campaign.target = kg.sel; campaign._raidFar = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(kg.sel); campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); enterBattle('attack'); return; }
   campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery);
   if (kg.then === 'war') { openKingdomMap('war'); return; } // ride out to raid
   if (kg.then === 'settle') { enterSettlement(); return; } // into your ráth to build
@@ -404,7 +460,7 @@ function advanceDay() {
     cal.day = 1;
     cal.month = (cal.month + 1) % 12;
     const s = seasonOfMonth(cal.month);
-    if (s !== curSeason) { curSeason = s; applySeason(s); }
+    if (s !== curSeason) { curSeason = s; applySeason(s); collectColonyTribute(); } // colonies render tribute each turn of the year
     const fest = FESTIVALS[cal.month];
     if (fest) { festivalToday = true; triggerFestival(fest); }
   }
@@ -851,6 +907,7 @@ window.addEventListener('resize', () => {
 });
 
 window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
+  _dbg: { foundColony, collectColonyTribute, isColony },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
     const v = new THREE.Vector3(w.x, 0.1, w.z).project(camera);
