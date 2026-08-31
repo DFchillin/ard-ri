@@ -60,6 +60,7 @@ let curSeason = seasonOfMonth(cal.month);
 let tool = null;
 let savedSpeed = null;
 let started = false;
+const titleScreenEl = document.getElementById('title-screen');
 let missionDone = false;
 
 const ui = new UI({
@@ -178,13 +179,15 @@ function startMission(n) {
   if (n === '3') { enterBattle('attack'); return; }     // sandbox: a pitched battle to test the field
 }
 
-// The campaign alternates: you ride out to raid a kingdom, then raiders come
-// back to fall upon you — lose the defence and your ráth is ransacked.
+// The Campaign hub is your own ráth: build and hold it here. Ride out to raid
+// from the 🗺 map when you choose, and raiders answer in their own time.
 function startCampaign() {
-  if (!campaign.home) { openKingdomMap('choose', 'war'); return; } // first pick a home, then straight to raiding
+  if (!campaign.home) { openKingdomMap('choose', 'settle'); return; } // first pick a home, then into your ráth
   if (campaign.nextIsDefend) { campaign.nextIsDefend = false; saveCampaign(); ui.showFestival({ name: 'Raiders on the Wind', emoji: '🔥', sub: 'Word comes two seasons early: a war-band marches on your ráth. Muster the folk and hold the field.', onDone: () => enterBattle('defend') }); return; }
-  openKingdomMap('war');
+  enterSettlement();
 }
+// Drop into the standing ráth — the clock starts because the title is hidden.
+function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); }
 
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
 const CAMPAIGN_KEY = 'ardri_campaign';
@@ -364,7 +367,8 @@ function kingdomAction() {
   if (!kg.sel) return;
   if (kg.mode === 'war') { campaign.target = kg.sel; campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); enterBattle('attack'); return; }
   campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery);
-  if (kg.then === 'war') { openKingdomMap('war'); return; } // just picked a home for the campaign — ride out to raid
+  if (kg.then === 'war') { openKingdomMap('war'); return; } // ride out to raid
+  if (kg.then === 'settle') { enterSettlement(); return; } // into your ráth to build
   closeKingdomMap();
 }
 
@@ -763,7 +767,7 @@ function panByScreen(dxPix, dyPix) {
   camera.getWorldDirection(_fwd); _fwd.y = 0; _fwd.normalize();
   _right.set(_fwd.z, 0, -_fwd.x);
   const wpp = (2 * camera.userData.viewSize) / window.innerHeight;
-  const mx = dxPix * wpp, my = -dyPix * wpp; // inverted drag
+  const mx = -dxPix * wpp, my = -dyPix * wpp; // drag moves the ground under the finger — matches the battle map
   panIsoCamera(camera, _right.x * mx + _fwd.x * my, _right.z * mx + _fwd.z * my);
 }
 
@@ -862,7 +866,11 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.1);
   if (battle.active) { setCamera(battle.camera); battle.update(dt); battle.render(renderer); return; }
   setCamera(camera);
-  const scaled = started ? dt * sim.speed : 0;
+  // The world-clock runs whenever the settlement is the scene you're looking at
+  // (title hidden, not in battle). Festivals/menus still pause via sim.speed.
+  const live = titleScreenEl.classList.contains('hidden');
+  if (live) started = true; // play has begun — day-saves and onboarding may run
+  const scaled = live ? dt * sim.speed : 0;
   game.update(scaled);
   game.updateFx(dt); // ambient effects run in real time
   econAcc += scaled;
