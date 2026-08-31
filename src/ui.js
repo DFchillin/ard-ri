@@ -233,16 +233,18 @@ export class UI {
     this.onInspectClose();
   }
 
-  showFestival({ name, emoji, sub }) {
+  showFestival({ name, emoji, sub, onDone }) {
     document.getElementById('fest-name').textContent = name;
     document.getElementById('fest-emoji').textContent = emoji;
     document.getElementById('fest-sub').textContent = sub;
+    this._festDone = onDone || null;
     this.festival.classList.remove('hidden');
   }
   hideFestival() {
     if (this.festival.classList.contains('hidden')) return;
     this.festival.classList.add('hidden');
-    this.onFestivalContinue();
+    const done = this._festDone; this._festDone = null;
+    if (done) done(); else this.onFestivalContinue();
   }
 
   setObjectives(objectives) {

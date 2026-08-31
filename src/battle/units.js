@@ -13,15 +13,15 @@ export const UNIT_TYPES = {
   deaglan:      { label: 'Deaglán',        ga: 'the path-maker',    cat: 'regular', rank: 1, atk: 1.5, hp: 4, build: 0.4, speed: 4.4, morale: 62, aura: 0, sprite: 'market_trader' },
   druid:        { label: 'Druid',          ga: 'draoi',             cat: 'regular', rank: 1, atk: 1.8, hp: 4, build: 0.3, speed: 3.2, morale: 72, aura: 8, sprite: 'druid' },
   // --- trained tiers: folk grow into these by surviving won battles ---
-  warrior:      { label: 'Warrior',        ga: 'laoch',             cat: 'warrior', rank: 2, atk: 2.0, hp: 5, build: 0.6, speed: 3.2, morale: 66, aura: 0, battle: { art: 'warrior', h: 1.55 }, piece: { color: 0xb0763a, tall: 0.9 } },
-  seasoned:     { label: 'Seasoned Warrior', ga: 'óglach',          cat: 'seasoned', rank: 3, atk: 2.7, hp: 8, build: 0.9, speed: 2.8, morale: 80, aura: 0, battle: { art: 'curadh', h: 1.7 }, piece: { color: 0x4a6fae, tall: 1.05 } },
-  curadh:       { label: 'Curadh',         ga: 'champion',          cat: 'special', rank: 4, atk: 4.4, hp: 16, build: 1.3, speed: 3.2, morale: 90, aura: 12, battle: { art: 'curadh', h: 1.9 }, piece: { color: 0xe0c060, tall: 1.2 } },
-  // --- summoned heroes of the Fianna & the Red Branch ---
-  cuchulainn:   { label: 'Cú Chulainn',    ga: 'the Hound of Ulster', cat: 'hero', rank: 5, atk: 6.5, hp: 24, build: 1.8, speed: 3.4, morale: 96, aura: 14, battle: { art: 'cuchulainn', h: 2.1 }, piece: { color: 0xe8a030, tall: 1.35 } },
-  fionn:        { label: 'Fionn mac Cumhaill', ga: 'lord of the Fianna', cat: 'hero', rank: 5, atk: 5.2, hp: 22, build: 1.6, speed: 3.2, morale: 95, aura: 22, battle: { art: 'fionn', h: 2.15 }, piece: { color: 0xe8c86b, tall: 1.35 } },
-  // --- summoned gods of the Túatha Dé ---
-  dagda:        { label: 'An Dagda',       ga: 'the Good God',      cat: 'god', rank: 6, atk: 9.0, hp: 40, build: 3.4, speed: 2.8, morale: 100, aura: 24, battle: { art: 'dagda', h: 2.5 }, piece: { color: 0xf2ead6, tall: 1.7 } },
-  morrigan:     { label: 'An Mhórríon',    ga: 'phantom queen of war', cat: 'god', rank: 6, atk: 8.0, hp: 32, build: 2.4, speed: 3.4, morale: 100, aura: 24, battle: { art: 'morrigan', h: 2.35 }, piece: { color: 0xc86a8a, tall: 1.6 } },
+  warrior:      { label: 'Warrior',        ga: 'laoch',             cat: 'warrior', rank: 2, atk: 2.0, hp: 5, build: 0.6, speed: 3.2, morale: 66, aura: 0, battle: { art: 'warrior', h: 1.5 }, piece: { color: 0xb0763a, tall: 0.9 } },
+  seasoned:     { label: 'Seasoned Warrior', ga: 'óglach',          cat: 'seasoned', rank: 3, atk: 2.7, hp: 8, build: 0.9, speed: 2.8, morale: 80, aura: 0, battle: { art: 'curadh', h: 1.6 }, piece: { color: 0x4a6fae, tall: 1.05 } },
+  curadh:       { label: 'Curadh',         ga: 'champion',          cat: 'special', rank: 4, atk: 4.4, hp: 16, build: 1.3, speed: 3.2, morale: 90, aura: 12, battle: { art: 'curadh', h: 1.8 }, piece: { color: 0xe0c060, tall: 1.2 } },
+  // --- summoned heroes of the Fianna & the Red Branch: twice a mortal's height ---
+  cuchulainn:   { label: 'Cú Chulainn',    ga: 'the Hound of Ulster', cat: 'hero', rank: 5, atk: 6.5, hp: 24, build: 1.8, speed: 3.4, morale: 96, aura: 14, battle: { art: 'cuchulainn', h: 2.9, tiles: 1 }, piece: { color: 0xe8a030, tall: 1.35 } },
+  fionn:        { label: 'Fionn mac Cumhaill', ga: 'lord of the Fianna', cat: 'hero', rank: 5, atk: 5.2, hp: 22, build: 1.6, speed: 3.2, morale: 95, aura: 22, battle: { art: 'fionn', h: 2.9, tiles: 1 }, piece: { color: 0xe8c86b, tall: 1.35 } },
+  // --- summoned gods of the Túatha Dé: giants that stand across four squares ---
+  dagda:        { label: 'An Dagda',       ga: 'the Good God',      cat: 'god', rank: 6, atk: 9.0, hp: 40, build: 3.4, speed: 2.8, morale: 100, aura: 24, battle: { art: 'dagda', h: 3.8, tiles: 2 }, piece: { color: 0xf2ead6, tall: 1.7 } },
+  morrigan:     { label: 'An Mhórríon',    ga: 'phantom queen of war', cat: 'god', rank: 6, atk: 8.0, hp: 32, build: 2.4, speed: 3.4, morale: 100, aura: 24, battle: { art: 'morrigan', h: 3.5, tiles: 2 }, piece: { color: 0xc86a8a, tall: 1.6 } },
 };
 
 // Promotion path: a regular who survives a won battle may grow into a warrior,

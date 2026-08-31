@@ -444,7 +444,7 @@ export class Battle {
     const f = new THREE.Vector3(); this.camera.getWorldDirection(f); f.y = 0; f.normalize();
     const r = new THREE.Vector3(f.z, 0, -f.x);
     const wpp = (2 * this.camera.userData.viewSize) / window.innerHeight;
-    const mx = -dxPix * wpp, my = dyPix * wpp;
+    const mx = -dxPix * wpp, my = -dyPix * wpp; // match the city map: drag moves the ground under the finger
     panIsoCamera(this.camera, r.x * mx + f.x * my, r.z * mx + f.z * my);
   }
 
@@ -546,9 +546,11 @@ function makeUnitVisual(type, team) {
   if (t.battle) { const spr = makeWarriorChip(t.battle.art, t.battle.h); g.add(spr); g.userData.spr = spr; tall = t.battle.h; }
   else if (t.sprite) { const spr = makeWalkerChip(t.sprite); spr.scale.multiplyScalar(0.85); g.add(spr); g.userData.spr = spr; tall = 1.4; }
   else { buildPiece(g, t.piece.color, t.piece.tall, t.cat); tall = t.piece.tall + 0.5; }
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.5, 20), new THREE.MeshBasicMaterial({ color: TEAM[team], transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
+  const foot = (t.battle && t.battle.tiles) || 1; // heroes stand on 1 square, gods on ~4 (2x2)
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.34 * foot, 0.5 * foot, 24), new THREE.MeshBasicMaterial({ color: TEAM[team], transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; ring.userData.team = TEAM[team]; g.add(ring); g.userData.ring = ring;
-  const bar = makeBar(0.7); bar.position.y = tall + 0.5; g.add(bar); g.userData.bar = bar;
+  const bar = makeBar(0.7 * Math.max(1, foot * 0.8)); bar.position.y = tall + 0.5; g.add(bar); g.userData.bar = bar;
+  g.userData.foot = foot;
   return g;
 }
 // A company standard: a billboard pole + team pennant with a sigil dot in the

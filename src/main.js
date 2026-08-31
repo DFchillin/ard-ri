@@ -149,9 +149,18 @@ const battle = new Battle({
 });
 
 function startMission(n) {
-  if (String(n) === '2') { battle.enter('attack'); return; }
-  if (String(n) === '3') { battle.enter('defend'); return; }
-  started = true; triggerFestival(FESTIVALS[1]);
+  n = String(n);
+  if (n === '1') { startCampaign(); return; }           // the raid & be-raided loop on the map of Ériu
+  if (n === '2') { started = true; triggerFestival(FESTIVALS[1]); return; } // sandbox: build a settlement
+  if (n === '3') { battle.enter('attack'); return; }     // sandbox: a pitched battle to test the field
+}
+
+// The campaign alternates: you ride out to raid a kingdom, then raiders come
+// back to fall upon you — lose the defence and your ráth is ransacked.
+function startCampaign() {
+  if (!campaign.home) { openKingdomMap('choose', 'war'); return; } // first pick a home, then straight to raiding
+  if (campaign.nextIsDefend) { campaign.nextIsDefend = false; saveCampaign(); ui.showFestival({ name: 'Raiders on the Wind', emoji: '🔥', sub: 'Word comes two seasons early: a war-band marches on your ráth. Muster the folk and hold the field.', onDone: () => battle.enter('defend') }); return; }
+  openKingdomMap('war');
 }
 
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
@@ -207,9 +216,9 @@ function selectKingdom(id) {
   const act = document.getElementById('kg-action'); act.disabled = false;
   act.textContent = kg.mode === 'war' ? `Raid ${k.en} ⚔` : `Begin in ${k.en} ▸`;
 }
-function openKingdomMap(mode) {
+function openKingdomMap(mode, then) {
   buildKingdomMap();
-  kg.mode = mode; kg.sel = null;
+  kg.mode = mode; kg.sel = null; kg.then = then || null;
   document.getElementById('kg-title').textContent = mode === 'war' ? 'Where will you raid?' : 'The Kingdoms of Ériu';
   document.getElementById('kg-hint').textContent = mode === 'war'
     ? 'Choose a kingdom to fall upon. Your own lands are barred.'
@@ -231,8 +240,10 @@ function openKingdomMap(mode) {
 function closeKingdomMap() { document.getElementById('kingdoms-screen').classList.add('hidden'); }
 function kingdomAction() {
   if (!kg.sel) return;
-  if (kg.mode === 'war') { closeKingdomMap(); battle.enter('attack'); return; }
-  campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery); closeKingdomMap();
+  if (kg.mode === 'war') { campaign.target = kg.sel; campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); battle.enter('attack'); return; }
+  campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery);
+  if (kg.then === 'war') { openKingdomMap('war'); return; } // just picked a home for the campaign — ride out to raid
+  closeKingdomMap();
 }
 
 function pauseGame() { if (savedSpeed === null) savedSpeed = sim.speed; sim.speed = 0; ui.reflectSpeed(0); }
