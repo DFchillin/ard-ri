@@ -11,6 +11,7 @@ import { Battle } from './battle/battle.js?v=CBUST';
 import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById } from './data/kingdoms.js?v=CBUST';
 import { CODEX } from './data/codex.js?v=CBUST';
 import { UNIT_TYPES } from './battle/units.js?v=CBUST';
+import { GOODS, HOSTING, HOST_ORDER, canHost, reqText } from './data/trade.js?v=CBUST';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -156,7 +157,10 @@ const battle = new Battle({
     campaign.ghosts = roster.ghost || 0;
     const r = { ...roster }; delete r.ghost; campaign.roster = r;
     for (const f of fallen) campaign.fallen.push({ type: f.type, name: DEAD_NAMES[(Math.random() * DEAD_NAMES.length) | 0], season: curSeason });
-    if (won && battle.scenario === 'attack') setCattle(campaign.cattle + 8 + ((Math.random() * 8) | 0)); // plunder driven home from a won raid
+    if (won && battle.scenario === 'attack') {
+      setCattle(campaign.cattle + 8 + ((Math.random() * 8) | 0)); // plunder driven home from a won raid
+      if (Math.random() < 0.5) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; campaign._looted = gk; } // and sometimes foreign spoils
+    }
     if (ransack) { const lost = Math.floor(campaign.cattle / 2) + 6; setCattle(campaign.cattle - lost); campaign._ransacked = lost; }
     saveCampaign();
   },
@@ -188,6 +192,8 @@ const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, 
 let campaign = Object.assign({ home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 40, mapSeed: _mapSeed, settlement: null }, _savedCampaign);
 if (!campaign.roster) campaign.roster = { ...DEFAULT_ROSTER };
 if (!campaign.fallen) campaign.fallen = [];
+if (!campaign.goods) campaign.goods = {};
+if (!campaign.hosted) campaign.hosted = {};
 if (campaign.mapSeed == null) campaign.mapSeed = _mapSeed;
 function saveCampaign() { try { localStorage.setItem(CAMPAIGN_KEY, JSON.stringify(campaign)); } catch (e) {} }
 function saveSettlement() { campaign.settlement = game.snapshot(); campaign.cattle = game.cattle; saveCampaign(); }
@@ -303,6 +309,57 @@ function buildCodex() {
   codexBuilt = true;
 }
 function openCodex() { buildCodex(); document.getElementById('codex-screen').classList.remove('hidden'); }
+
+// The Wider World — spend cattle on foreign goods, then host heroes and gods.
+let tradeWired = false;
+function openTrade() {
+  if (!tradeWired) {
+    document.getElementById('trade-close').addEventListener('click', () => document.getElementById('trade-screen').classList.add('hidden'));
+    document.getElementById('trade-screen').addEventListener('click', (e) => { if (e.target.id === 'trade-screen') e.currentTarget.classList.add('hidden'); });
+    tradeWired = true;
+  }
+  renderTrade();
+  document.getElementById('trade-screen').classList.remove('hidden');
+}
+function renderTrade() {
+  document.getElementById('trade-cattle').textContent = campaign.cattle;
+  const body = document.getElementById('trade-body'); body.innerHTML = '';
+  const goodsSec = document.createElement('div'); goodsSec.className = 'trade-sec';
+  goodsSec.innerHTML = '<h3>Foreign merchants</h3>';
+  for (const key in GOODS) {
+    const g = GOODS[key]; const have = campaign.goods[key] || 0;
+    const row = document.createElement('div'); row.className = 'trade-row';
+    row.innerHTML = `<div class="tr-ico">${g.icon}</div><div class="tr-main"><div class="tr-name">${g.label} <span class="cx-ga">${g.ga}</span></div><div class="tr-sub">${g.desc} — from ${g.from}</div></div><div class="tr-have">have ${have}</div>`;
+    const buy = document.createElement('button'); buy.textContent = `🐄 ${g.price}`;
+    buy.disabled = campaign.cattle < g.price;
+    buy.addEventListener('click', () => { if (campaign.cattle >= g.price) { setCattle(campaign.cattle - g.price); campaign.goods[key] = (campaign.goods[key] || 0) + 1; saveCampaign(); renderTrade(); } });
+    row.appendChild(buy); goodsSec.appendChild(row);
+  }
+  body.appendChild(goodsSec);
+  const hostSec = document.createElement('div'); hostSec.className = 'trade-sec';
+  hostSec.innerHTML = '<h3>Host a hero or god</h3>';
+  for (const key of HOST_ORDER) {
+    const t = UNIT_TYPES[key]; const h = HOSTING[key];
+    const row = document.createElement('div'); row.className = 'trade-row';
+    const hosted = campaign.hosted[key];
+    row.innerHTML = `<div class="tr-ico">${key === 'dagda' || key === 'morrigan' ? '⚡' : key === 'curadh' ? '🏆' : '🦸'}</div><div class="tr-main"><div class="tr-name">${t.label} <span class="cx-ga">${t.ga}</span></div><div class="tr-sub">${h.title} · needs ${reqText(key)}</div></div>`;
+    if (hosted) { row.classList.add('hosted'); const d = document.createElement('div'); d.className = 'tr-done'; d.textContent = 'Hosted ✓'; row.appendChild(d); }
+    else {
+      const btn = document.createElement('button'); btn.textContent = 'Host ▸'; btn.disabled = !canHost(campaign.goods, key);
+      btn.addEventListener('click', () => {
+        if (!canHost(campaign.goods, key)) return;
+        for (const [gk, n] of Object.entries(h.req)) campaign.goods[gk] -= n;
+        campaign.hosted[key] = true;
+        campaign.roster[key] = (campaign.roster[key] || 0) + 1; // now musters with your war-band
+        saveCampaign(); renderTrade();
+        ui.showFestival({ name: `${t.label} Hosted`, emoji: '🌟', sub: `You have raised ${h.title}. ${t.label} will answer your muster in the battles to come.` });
+      });
+      row.appendChild(btn);
+    }
+    hostSec.appendChild(row);
+  }
+  body.appendChild(hostSec);
+}
 function kingdomAction() {
   if (!kg.sel) return;
   if (kg.mode === 'war') { campaign.target = kg.sel; campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); enterBattle('attack'); return; }
@@ -567,7 +624,7 @@ function buildingHtml(inst) {
   if (d.role === 'granary' || d.role === 'market') extra = `<p>Grain in store: ${inst.stock}</p>`;
   if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10 · Water: ${inst.water}/10 · Culture: ${inst.culture}/10</p>`;
   if (d.role === 'altar') extra = altarHtml();
-  if (d.role === 'homestead') { const graze = game._grazing(inst); const cap = 20 + graze * 4; extra = `<p>Herd: 🐄 ${inst.herd} / ${cap} · Grazing land: ${graze} tiles</p><p class="dim">Leave open pasture around the ráth and the herd grows faster. Cattle is your wealth in the wider world — and what a raider carries off.</p>`; }
+  if (d.role === 'homestead') { const graze = game._grazing(inst); const cap = 20 + graze * 4; extra = `<p>Herd: 🐄 ${inst.herd} / ${cap} · Grazing land: ${graze} tiles</p><p class="dim">Leave open pasture around the ráth and the herd grows faster. Cattle is your wealth in the wider world — and what a raider carries off.</p><button id="trade-btn" class="continue-btn">🌍 Trade in the wider world</button>`; }
   return `<h3>${d.label}</h3><div class="role">${d.role === 'homestead' ? 'Your seat' : 'Building'}</div><p>${d.desc}</p>${extra}`;
 }
 // An altar is also a place to pray to the war-dead — the roll of the fallen,
@@ -608,6 +665,7 @@ function inspectAt(e) {
   const tile = map.get(t.x, t.z);
   ui.showInspect(tile.occupant ? buildingHtml(tile.occupant) : terrainHtml(tile), false);
   if (tile.occupant && tile.occupant.def.role === 'altar') wireAltar();
+  if (tile.occupant && tile.occupant.def.role === 'homestead') { const tb = document.getElementById('trade-btn'); if (tb) tb.addEventListener('click', openTrade); }
 }
 // Demolish, like build, is confirmed: mark the target red, then "Raze ✓".
 function showDemolishGhost(t) {
@@ -788,7 +846,7 @@ window.addEventListener('resize', () => {
   battle.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, campaign, saveSettlement, setCattle,
+window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
     const v = new THREE.Vector3(w.x, 0.1, w.z).project(camera);

@@ -59,6 +59,14 @@ export const CODEX = [
     ],
   },
   {
+    title: 'The Wider World',
+    blurb: 'Ériu cannot make everything. Cattle is your coin abroad — trade the herd for foreign goods, or take them by raiding, then host a hero or god.',
+    entries: [
+      { icon: '🌍', name: 'An Domhan Mór', ga: 'the wider world', repr: 'a trade screen opened from your homestead', lore: 'Send cattle to foreign merchants for wine, iron, salt, gold and marble — things no Gaelic smith or field can make.' },
+      { icon: '🏛️', name: 'Hosting a Hero', ga: 'aíocht', repr: 'spend goods to add a hero/god to your muster', lore: 'A champion answers a champion’s hall: gather the right foreign goods and host Cú Chulainn, Fionn, the Dagda or the Mhórrígan into your war-band.' },
+    ],
+  },
+  {
     title: 'On the Field',
     blurb: 'The ceremony of battle.',
     entries: [
