@@ -551,7 +551,8 @@ function buildingHtml(inst) {
   if (d.role === 'granary' || d.role === 'market') extra = `<p>Grain in store: ${inst.stock}</p>`;
   if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10 · Water: ${inst.water}/10 · Culture: ${inst.culture}/10</p>`;
   if (d.role === 'altar') extra = altarHtml();
-  return `<h3>${d.label}</h3><div class="role">Building</div><p>${d.desc}</p>${extra}`;
+  if (d.role === 'homestead') { const graze = game._grazing(inst); const cap = 20 + graze * 4; extra = `<p>Herd: 🐄 ${inst.herd} / ${cap} · Grazing land: ${graze} tiles</p><p class="dim">Leave open pasture around the ráth and the herd grows faster. Cattle is your wealth in the wider world — and what a raider carries off.</p>`; }
+  return `<h3>${d.label}</h3><div class="role">${d.role === 'homestead' ? 'Your seat' : 'Building'}</div><p>${d.desc}</p>${extra}`;
 }
 // An altar is also a place to pray to the war-dead — the roll of the fallen,
 // and the rite that calls one back to the muster as a ghost warrior.

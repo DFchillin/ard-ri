@@ -16,7 +16,7 @@ const DIAG_FILL = 0.6;
 
 const ROLE_FILE = {
   dwelling: 'roundhouse', farm: 'field', granary: 'granary',
-  market: 'market', well: 'well', altar: 'altar',
+  market: 'market', well: 'well', altar: 'altar', homestead: 'roundhouse',
 };
 const WALK_FILE = {
   villager: 'villager', grain_carrier: 'grain_carrier',
@@ -27,7 +27,27 @@ const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },
   granary: { color: 0xb0894a, h: 1.7 }, market: { color: 0xa8663a, h: 1.0 },
   well: { color: 0x5a8aa0, h: 0.8 }, altar: { color: 0x7a6a9a, h: 1.1 },
+  homestead: { color: 0xd8a24a, h: 1.4 },
 };
+
+// A single grazing cow, drawn on a canvas so it needs no sprite art — a
+// dun-and-white beast for the herd around the homestead.
+export function makeCowToken() {
+  const c = document.createElement('canvas'); c.width = 40; c.height = 30;
+  const x = c.getContext('2d');
+  x.fillStyle = 'rgba(30,24,14,0.28)'; x.beginPath(); x.ellipse(20, 26, 12, 3, 0, 0, Math.PI * 2); x.fill(); // shadow
+  x.fillStyle = '#efe6d2';                                  // body
+  x.beginPath(); x.ellipse(19, 16, 12, 7, 0, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#6b4a2a'; x.beginPath(); x.ellipse(14, 14, 4, 3, 0, 0, Math.PI * 2); x.fill(); // patches
+  x.beginPath(); x.ellipse(24, 18, 3, 2.5, 0, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#3a2c1a'; x.fillRect(10, 21, 2.5, 6); x.fillRect(26, 21, 2.5, 6); // legs
+  x.fillStyle = '#efe6d2'; x.beginPath(); x.ellipse(31, 12, 4.5, 4, 0, 0, Math.PI * 2); x.fill(); // head
+  x.fillStyle = '#d8c8a8'; x.beginPath(); x.moveTo(33, 8); x.lineTo(36, 5); x.lineTo(34, 9); x.fill(); // horn
+  const tx = new THREE.CanvasTexture(c); tx.magFilter = THREE.NearestFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true }));
+  s.center.set(0.5, 0); s.scale.set(0.85, 0.64, 1);
+  return s;
+}
 
 // A building is a Group holding one billboard sprite (so the alert marker can be
 // a child without being scaled by the sprite). Two textures — empty / full.

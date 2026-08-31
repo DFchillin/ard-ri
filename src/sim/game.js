@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js?v=CBUST';
-import { makeBuildingChip, makeAlertMarker, makeInspectDot, setChipActive } from '../render/chips.js?v=CBUST';
+import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, setChipActive } from '../render/chips.js?v=CBUST';
 import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor } from '../render/effects.js?v=CBUST';
 
@@ -20,6 +20,9 @@ const FARM_GROW = 24;      // econ ticks for a field to ripen
 const FARM_HARVESTS = 2;   // grain-carriers a ripe field sends before regrowing
 const FARM_MIN_FOLK = 4;   // hands the settlement needs to bring a harvest in
 const MAX_PER_BLD = 2;     // most walkers any one building keeps on the roads (2 druids per shrine)
+const HERD_GROW = 5;       // econ ticks between calvings at the homestead
+const HERD_RADIUS = 3;     // tiles of open pasture around the homestead that count as grazing
+const COW_PER_TOKEN = 5;   // cattle each grazing cow-token on the map stands for (max 10 shown)
 const CULTURE_BONUS = 1.25; // rent multiplier for a fed, watered AND cultured house
 // Settlement rank ladder — culture is weighted double, so a cultured túath rises fastest.
 const RANKS = [[120, 'Ard Rí'], [80, 'Rí Tuaithe'], [45, 'Mór-Thúath'], [20, 'Túath'], [8, 'Baile'], [0, 'Ráth']];
@@ -57,6 +60,29 @@ export class Game {
   }
 
   showInspectDots(on) { this._inspectDots = on; for (const b of this.buildings) if (b.dot) b.dot.visible = on; }
+  // Count the open pasture (bare grass, no road, no building) in a ring around
+  // the homestead — the grazing that lets the herd grow.
+  _grazing(b) {
+    let n = 0;
+    for (let z = b.z - HERD_RADIUS; z < b.z + b.h + HERD_RADIUS; z++)
+      for (let x = b.x - HERD_RADIUS; x < b.x + b.w + HERD_RADIUS; x++) {
+        const t = this.map.get(x, z);
+        if (t && t.terrain === 0 && !t.road && !t.occupant) n++;
+      }
+    return n;
+  }
+  // Show the herd as a scatter of grazing cows around the ráth (capped at 10).
+  _updateHerd(b) {
+    if (!b.herdGroup) return;
+    const want = Math.min(10, Math.floor(b.herd / COW_PER_TOKEN));
+    while (b.herdGroup.children.length < want) {
+      const cow = makeCowToken();
+      const a = Math.random() * Math.PI * 2, r = (b.w / 2 + 0.6 + Math.random() * 1.6) * this.map.tile;
+      cow.position.set(Math.cos(a) * r, 0.05, Math.sin(a) * r + this.map.tile * 0.3);
+      b.herdGroup.add(cow);
+    }
+    while (b.herdGroup.children.length > want) b.herdGroup.remove(b.herdGroup.children[b.herdGroup.children.length - 1]);
+  }
   count(role) { return this.buildings.filter((b) => b.def.role === role).length; }
   anyStock(role) { return this.buildings.some((b) => b.def.role === role && b.stock > 0); }
 
@@ -114,15 +140,17 @@ export class Game {
   place(key, f) {
     const def = BUILDINGS[key];
     if (this.silver < def.cost || !this.map.canPlace(f.x, f.z, f.w, f.h)) return false;
+    if (def.unique && this.buildings.some((b) => b.def.role === def.role)) return false; // one homestead only
 
     const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, water: 0, culture: 0, timer: 0,
       pop: 0, cap: def.folk || 0, incoming: 0, distress: 0, active: false,
-      grown: 0, ripe: false, harvestsLeft: 0, connected: false };
+      grown: 0, ripe: false, harvestsLeft: 0, connected: false, herd: def.role === 'homestead' ? 10 : 0 };
     this.map.place(f.x, f.z, f.w, f.h, inst);
 
     const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile);
     const c = this._center(f);
     chip.position.set(c.x, 0, c.z);
+    if (def.role === 'homestead') { const s = chip.userData && chip.userData.spr; if (s) s.material.color.setHex(0xf0dca8); inst.herdGroup = new THREE.Group(); chip.add(inst.herdGroup); }
     const alert = makeAlertMarker();
     alert.position.set(0, 2.7, 0);
     alert.visible = false;
@@ -140,6 +168,7 @@ export class Game {
 
     this.buildings.push(inst);
     this.silver -= def.cost;
+    if (def.role === 'homestead') this._updateHerd(inst);
     return true; // dwellings fill via immigrants, not instantly
   }
 
@@ -192,10 +221,11 @@ export class Game {
     for (const b of this.buildings) {
       const connected = !!entryRoadTile(this.map, b);
       b.connected = connected;
-      if (b.alert) b.alert.visible = !connected; // flag buildings with no road
+      if (b.alert) b.alert.visible = !connected && b.def.role !== 'homestead'; // the homestead needs no road
       // dwellings rise when occupied; a field only shows its golden crop when ripe; else road-connected
       const active = b.def.role === 'dwelling' ? b.pop > 0
         : b.def.role === 'farm' ? b.ripe
+        : b.def.role === 'homestead' ? true
         : connected;
       if (active !== b.active) { b.active = active; setChipActive(b.sprite, active); if (b.fx) b.fx.setActive(active); }
       this._tickBuilding(b);
@@ -239,6 +269,16 @@ export class Game {
         // and every dwelling they pass gains culture. Two druids at a time.
         if (!this.broke && this.folk > 0 && this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 3) {
           b.timer = 0; this._sendDruid(b);
+        }
+        break;
+      }
+      case 'homestead': {
+        // The herd calves on open grazing. Count the free pasture around the
+        // ráth; more open grass, a larger herd it can carry, the faster it grows.
+        const graze = this._grazing(b);
+        const cap = 20 + graze * 4;
+        if (b.herd < cap && ++b.timer >= HERD_GROW) {
+          b.timer = 0; b.herd += 1; this.cattle += 1; this._updateHerd(b);
         }
         break;
       }

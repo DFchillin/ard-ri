@@ -49,6 +49,7 @@ export const CODEX = [
     title: 'The Ráth',
     blurb: 'What you raise at home. Each building is a single billboarded chip that swaps art when it is working.',
     entries: [
+      { icon: '🐄', name: 'Leader’s Homestead', ga: 'ráth an rí', repr: 'an enlarged, gilded roundhouse ringed by grazing cattle', lore: 'Your seat and only one to a settlement. Cattle graze the open pasture around it and multiply — the true measure of a Gaelic king. Spend them in tribute or trade abroad, and guard them: a raider drives them off.' },
       { icon: '🛖', name: 'Dwelling', ga: 'teach', repr: 'a roundhouse chip', lore: 'Homes the folk. A cultured, happy home sends two to the muster — a mother and father both.' },
       { icon: '🌾', name: 'Field', ga: 'gort', repr: 'a field chip that ripens then empties', lore: 'Grows the grain that feeds the túath.' },
       { icon: '🏚️', name: 'Granary', ga: 'sciobol', repr: 'a granary chip', lore: 'Stores the harvest against winter and siege.' },
