@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js?v=CBUST';
-import { makeBuildingChip, makeAlertMarker, setChipActive } from '../render/chips.js?v=CBUST';
+import { makeBuildingChip, makeAlertMarker, makeInspectDot, setChipActive } from '../render/chips.js?v=CBUST';
 import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor } from '../render/effects.js?v=CBUST';
 
@@ -56,6 +56,7 @@ export class Game {
     ];
   }
 
+  showInspectDots(on) { this._inspectDots = on; for (const b of this.buildings) if (b.dot) b.dot.visible = on; }
   count(role) { return this.buildings.filter((b) => b.def.role === role).length; }
   anyStock(role) { return this.buildings.some((b) => b.def.role === role && b.stock > 0); }
 
@@ -127,6 +128,11 @@ export class Game {
     alert.visible = false;
     chip.add(alert);
     inst.alert = alert;
+    const dot = makeInspectDot();
+    dot.position.set(0, 1.4, 0);
+    chip.add(dot);
+    inst.dot = dot;
+    if (this._inspectDots) dot.visible = true;
     const fx = emitterFor(def.role, { w: f.w, h: f.h, tile: this.map.tile, topY: FX_TOP[def.role] || 2 });
     if (fx) { fx.setActive(false); chip.add(fx.group); inst.fx = fx; }
     this.buildingGroup.add(chip);

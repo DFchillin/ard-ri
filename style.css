@@ -160,6 +160,27 @@ html, body {
 .bright-row span { font-size: 16px; }
 #brightness { flex: 1; accent-color: var(--gold); height: 22px; cursor: pointer; }
 
+/* The Celtapedia — an in-game codex of folk, heroes, gods and buildings */
+#codex-screen { z-index: 45; }
+.codex-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; width: min(560px, 94vw); max-height: 90vh; display: flex; flex-direction: column; }
+.codex-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 6px; }
+.codex-head h2 { font-family: var(--font-title); color: var(--gold); font-weight: normal; font-size: 19px; margin: 0; }
+#codex-close { background: none; border: 1px solid var(--border); color: var(--ink); border-radius: 8px; width: 32px; height: 32px; cursor: pointer; }
+.codex-intro { font-size: 12px; opacity: 0.78; margin: 0 16px 8px; }
+#codex-body { overflow: auto; padding: 0 16px 16px; }
+.codex-sec { margin-top: 14px; }
+.codex-sec h3 { font-family: var(--font-display); color: var(--gold); font-size: 15px; font-weight: normal; margin: 0 0 2px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.codex-blurb { font-size: 12px; font-style: italic; opacity: 0.8; margin: 4px 0 8px; }
+.codex-entry { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(44,74,58,0.4); }
+.codex-entry .cx-ico { font-size: 22px; width: 30px; text-align: center; flex: 0 0 auto; }
+.codex-entry .cx-main { flex: 1 1 auto; }
+.codex-entry .cx-name { color: var(--ink); font-weight: 600; font-size: 14px; }
+.codex-entry .cx-ga { font-style: italic; opacity: 0.75; font-size: 12px; margin-left: 6px; }
+.codex-entry .cx-lore { font-size: 12.5px; opacity: 0.9; margin-top: 2px; }
+.codex-entry .cx-repr { font-size: 11px; opacity: 0.7; margin-top: 3px; }
+.codex-entry .cx-repr b { color: var(--gold); font-weight: 600; }
+.title-link { margin-top: 14px; background: none; border: none; color: var(--gold); font-family: var(--font-body); font-size: 14px; cursor: pointer; text-decoration: underline; opacity: 0.9; }
+
 /* Kingdoms of Ériu — start-of-game home + raid target picker */
 #kingdoms-screen { z-index: 40; }
 .kg-wrap {

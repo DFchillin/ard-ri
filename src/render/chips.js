@@ -163,6 +163,23 @@ export function makeCrosMarker() {
   return s;
 }
 
+// A small gold "tap here" dot, shown on every building while the magnifying
+// glass is active so it's clear what can be inspected.
+export function makeInspectDot() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 48;
+  const x = c.getContext('2d');
+  x.fillStyle = 'rgba(20,16,8,0.55)'; x.beginPath(); x.arc(24, 24, 20, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#e8c96b'; x.beginPath(); x.arc(24, 24, 12, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#1c130a'; x.font = 'bold 22px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText('🔍', 24, 25);
+  const tx = new THREE.CanvasTexture(c); tx.magFilter = THREE.NearestFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, depthTest: false, transparent: true }));
+  s.scale.set(0.7, 0.7, 0.7);
+  s.visible = false;
+  return s;
+}
+
 export function makeAlertMarker() {
   const c = document.createElement('canvas');
   c.width = c.height = 64;

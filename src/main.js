@@ -9,6 +9,7 @@ import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?
 import { setCamera } from './render/assets.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
 import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById } from './data/kingdoms.js?v=CBUST';
+import { CODEX } from './data/codex.js?v=CBUST';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -56,7 +57,7 @@ let started = false;
 let missionDone = false;
 
 const ui = new UI({
-  onTool: (kind) => { cancelPending(); tool = kind; if (!(tool === 'road' || BUILDINGS[tool])) preview.visible = false; },
+  onTool: (kind) => { cancelPending(); tool = kind; if (!(tool === 'road' || BUILDINGS[tool])) preview.visible = false; game.showInspectDots(kind === 'inspect'); },
   onSpeed: (s) => { sim.speed = s; savedSpeed = null; },
   onRotate: (d) => { if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
   onZoom: (f) => { if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
@@ -238,6 +239,34 @@ function openKingdomMap(mode, then) {
   document.getElementById('kingdoms-screen').classList.remove('hidden');
 }
 function closeKingdomMap() { document.getElementById('kingdoms-screen').classList.add('hidden'); }
+
+// The Celtapedia — built once from the CODEX data.
+let codexBuilt = false;
+function buildCodex() {
+  if (codexBuilt) return;
+  const body = document.getElementById('codex-body');
+  for (const sec of CODEX) {
+    const s = document.createElement('div'); s.className = 'codex-sec';
+    const h = document.createElement('h3'); h.textContent = sec.title; s.appendChild(h);
+    if (sec.blurb) { const bl = document.createElement('div'); bl.className = 'codex-blurb'; bl.textContent = sec.blurb; s.appendChild(bl); }
+    for (const e of sec.entries) {
+      const row = document.createElement('div'); row.className = 'codex-entry';
+      const ico = document.createElement('div'); ico.className = 'cx-ico'; ico.textContent = e.icon; row.appendChild(ico);
+      const main = document.createElement('div'); main.className = 'cx-main';
+      main.innerHTML = `<div><span class="cx-name"></span><span class="cx-ga"></span></div><div class="cx-lore"></div><div class="cx-repr">Shown as: <b></b></div>`;
+      main.querySelector('.cx-name').textContent = e.name;
+      main.querySelector('.cx-ga').textContent = e.ga;
+      main.querySelector('.cx-lore').textContent = e.lore;
+      main.querySelector('.cx-repr b').textContent = e.repr;
+      row.appendChild(main); s.appendChild(row);
+    }
+    body.appendChild(s);
+  }
+  document.getElementById('codex-close').addEventListener('click', () => document.getElementById('codex-screen').classList.add('hidden'));
+  document.getElementById('codex-screen').addEventListener('click', (ev) => { if (ev.target.id === 'codex-screen') ev.currentTarget.classList.add('hidden'); });
+  codexBuilt = true;
+}
+function openCodex() { buildCodex(); document.getElementById('codex-screen').classList.remove('hidden'); }
 function kingdomAction() {
   if (!kg.sel) return;
   if (kg.mode === 'war') { campaign.target = kg.sel; campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); battle.enter('attack'); return; }
@@ -304,6 +333,8 @@ updateDate();
 ui.setCompass(cameraDirLabel(camera));
 const mapFab = document.getElementById('map-fab');
 if (mapFab) mapFab.addEventListener('click', () => openKingdomMap(campaign.home ? 'war' : 'choose'));
+const codexBtn = document.getElementById('codex-open');
+if (codexBtn) codexBtn.addEventListener('click', openCodex);
 ui.showTitle(); // title screen; Mission One starts the game
 if (!campaign.home) openKingdomMap('choose'); // first run: pick a home and colours
 
