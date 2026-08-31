@@ -44,7 +44,7 @@ const SEASON_ACCENT = {
   geimhreadh: { color: 0x8fbfff, pos: [-45, 42, 45] },
 };
 
-const map = new Tilemap(32, 1, 7);
+const map = new Tilemap(32, 1, (Math.random() * 0x7fffffff) | 0); // a fresh ráth-land each session
 const view = new WorldView(scene, map);
 const game = new Game(map, scene);
 

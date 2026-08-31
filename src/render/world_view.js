@@ -14,8 +14,9 @@ export class WorldView {
     this.ts = map.tile;
     this.half = map.half;
 
-    scene.add(this._buildTerrain());
-    scene.add(this._buildScenery());
+    this.scene = scene;
+    this.terrainGroup = this._buildTerrain(); scene.add(this.terrainGroup);
+    this.sceneryGroup = this._buildScenery(); scene.add(this.sceneryGroup);
 
     this.roadGroup = new THREE.Group();
     scene.add(this.roadGroup);
@@ -38,6 +39,17 @@ export class WorldView {
     plane.rotation.x = -Math.PI / 2;
     scene.add(plane);
     this.pickPlane = plane;
+  }
+
+  // Rebuild the ground and scenery after the map's terrain changes (e.g. a
+  // fresh battlefield). Disposes the old meshes so the scene doesn't leak.
+  rebuildTerrain() {
+    for (const grp of [this.terrainGroup, this.sceneryGroup]) {
+      this.scene.remove(grp);
+      grp.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+    }
+    this.terrainGroup = this._buildTerrain(); this.scene.add(this.terrainGroup);
+    this.sceneryGroup = this._buildScenery(); this.scene.add(this.sceneryGroup);
   }
 
   _buildTerrain() {

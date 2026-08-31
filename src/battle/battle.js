@@ -83,6 +83,29 @@ export class Battle {
     set(9, 6, T.BOG); set(10, 6, T.BOG); set(10, 5, T.BOG); set(9, 5, T.BOG);
     set(4, 12, T.WATER); set(3, 12, T.WATER); set(16, 12, T.WATER); set(17, 12, T.WATER);
   }
+  // A fresh, random battlefield each fight: reset to pasture, then scatter a
+  // handful of mires, pools and copses across the clash-band — never on the
+  // deployment rows or on a building's ground, so nobody spawns in a bog.
+  _randomTerrain(seed) {
+    let a = seed | 0;
+    const rnd = () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    for (const tile of this.map.tiles) { tile.terrain = T.GRASS; tile.road = false; tile.occupant = null; tile.blocked = false; }
+    const blocked = new Set();
+    for (const b of this.cfg.buildings || []) for (let dz = -1; dz <= b.h; dz++) for (let dx = -1; dx <= b.w; dx++) blocked.add((b.x + dx) + ',' + (b.z + dz));
+    const kinds = [T.BOG, T.BOG, T.WATER, T.WOODS];
+    const patches = 5 + Math.floor(rnd() * 4);
+    for (let p = 0; p < patches; p++) {
+      const kind = kinds[Math.floor(rnd() * kinds.length)];
+      const cx = 2 + Math.floor(rnd() * (MAP - 4));
+      const cz = 4 + Math.floor(rnd() * 9); // clash-band only (rows 4..12): clear of muster (south) and the enemy back line
+      const rw = 1 + Math.floor(rnd() * 3), rh = 1 + Math.floor(rnd() * 2);
+      for (let dz = 0; dz < rh; dz++) for (let dx = 0; dx < rw; dx++) {
+        const x = cx + dx, z = cz + dz; const tile = this.map.get(x, z);
+        if (tile && !blocked.has(x + ',' + z)) tile.terrain = kind;
+      }
+    }
+    if (this.view) this.view.rebuildTerrain();
+  }
   _terrainFactor(x, z) {
     const tl = this.map.worldToTile(x, z); if (!tl) return 1;
     const t = this.map.get(tl.x, tl.z); if (!t) return 1;
@@ -97,6 +120,7 @@ export class Battle {
     for (const u of this.units) this.unitGroup.remove(u.mesh);
     for (const b of this.buildings) { this.buildingGroup.remove(b.chip); this.buildingGroup.remove(b.bar); }
     this.units = []; this.companies = []; this.buildings = []; this.selected.clear();
+    this._randomTerrain((Math.random() * 0x7fffffff) | 0); // a different field every fight
     for (const d of this.cfg.buildings || []) this._spawnBuilding(d);
     for (const c of this.cfg.enemyCompanies || []) this._placeCompany('enemy', c.name, c.formation, c.types, this._worldOf(c.x, c.z));
     for (const [t, x, z] of this.cfg.enemyLone || []) this._placeCompany('enemy', null, 'line', [t], this._worldOf(x, z));
