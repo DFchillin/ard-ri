@@ -45,7 +45,11 @@ const SEASON_ACCENT = {
   geimhreadh: { color: 0x8fbfff, pos: [-45, 42, 45] },
 };
 
-const map = new Tilemap(32, 1, (Math.random() * 0x7fffffff) | 0); // a fresh ráth-land each session
+// The ráth-land is randomised once, then it is your homeland — the same seed
+// (and the buildings on it) return every session. Read the seed before the map.
+const _savedCampaign = (() => { try { return JSON.parse(localStorage.getItem('ardri_campaign') || '{}'); } catch (e) { return {}; } })();
+const _mapSeed = _savedCampaign.mapSeed != null ? _savedCampaign.mapSeed : (Math.random() * 0x7fffffff) | 0;
+const map = new Tilemap(32, 1, _mapSeed);
 const view = new WorldView(scene, map);
 const game = new Game(map, scene);
 
@@ -139,12 +143,12 @@ let battleWon = false;
 const battle = new Battle({
   onVictory: (info) => {
     battleWon = true;
-    if (info && info.cattle) { game.cattle += info.cattle; pushStats(); }
+    if (info && info.cattle) setCattle(campaign.cattle + info.cattle);
     ui.showFestival({ name: 'Victory!', emoji: '🏆', sub: (info && info.sub) || 'The enemy slua is broken and flees the field. Ériu will remember this cath.' });
   },
   onTruce: (cattle) => {
     battle.exit();
-    if (cattle) { game.cattle = Math.max(0, game.cattle - cattle); pushStats(); }
+    if (cattle) setCattle(campaign.cattle - cattle);
     ui.showFestival({ name: 'A Truce', emoji: '🕊️', sub: `You paid a bóruma of ${cattle} cattle and withdrew. No blood was shed this day — though the foe remembers your silver.` });
   },
   onExit: () => ui.showTitle(),
@@ -152,8 +156,8 @@ const battle = new Battle({
     campaign.ghosts = roster.ghost || 0;
     const r = { ...roster }; delete r.ghost; campaign.roster = r;
     for (const f of fallen) campaign.fallen.push({ type: f.type, name: DEAD_NAMES[(Math.random() * DEAD_NAMES.length) | 0], season: curSeason });
-    if (won && battle.scenario === 'attack') { campaign.cattle += 8 + ((Math.random() * 8) | 0); game.cattle += 6; } // plunder from a won raid
-    if (ransack) { const lost = Math.floor(campaign.cattle / 2) + 6; campaign.cattle = Math.max(0, campaign.cattle - lost); campaign._ransacked = lost; }
+    if (won && battle.scenario === 'attack') setCattle(campaign.cattle + 8 + ((Math.random() * 8) | 0)); // plunder driven home from a won raid
+    if (ransack) { const lost = Math.floor(campaign.cattle / 2) + 6; setCattle(campaign.cattle - lost); campaign._ransacked = lost; }
     saveCampaign();
   },
 });
@@ -181,12 +185,23 @@ function startCampaign() {
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
 const CAMPAIGN_KEY = 'ardri_campaign';
 const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 };
-let campaign = { home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 0 };
-try { const s = localStorage.getItem(CAMPAIGN_KEY); if (s) campaign = Object.assign(campaign, JSON.parse(s)); } catch (e) {}
+let campaign = Object.assign({ home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 40, mapSeed: _mapSeed, settlement: null }, _savedCampaign);
 if (!campaign.roster) campaign.roster = { ...DEFAULT_ROSTER };
 if (!campaign.fallen) campaign.fallen = [];
+if (campaign.mapSeed == null) campaign.mapSeed = _mapSeed;
 function saveCampaign() { try { localStorage.setItem(CAMPAIGN_KEY, JSON.stringify(campaign)); } catch (e) {} }
+function saveSettlement() { campaign.settlement = game.snapshot(); campaign.cattle = game.cattle; saveCampaign(); }
+// Cattle is single-sourced on the campaign; the settlement mirrors it.
+function setCattle(n) { campaign.cattle = Math.max(0, Math.round(n)); game.cattle = campaign.cattle; pushStats(); saveCampaign(); }
 battle.setLivery(campaign.livery);
+// Restore a standing ráth if one was saved on this device.
+if (campaign.settlement) {
+  game.load(campaign.settlement);
+  game.cattle = campaign.cattle != null ? campaign.cattle : game.cattle;
+  view.rebuildRoads(); view.rebuildCros();
+  started = true; // you already have a settlement — the sim runs
+}
+saveCampaign();
 
 // A small Gaelic name-bank so the war-dead are remembered by name, not tally.
 const DEAD_NAMES = ['Bran', 'Oisín', 'Fergus', 'Niamh', 'Sadhbh', 'Cormac', 'Éimhear', 'Diarmuid', 'Lugh', 'Aoife', 'Conall', 'Gráinne', 'Naoise', 'Fiacha', 'Deirdre', 'Ruairí'];
@@ -337,6 +352,7 @@ function advanceDay() {
   if (game.broke && !wasBroke) triggerAdvisor();
   pushStats();
   updateDate();
+  if (started) saveSettlement(); // persist the standing ráth (herd growth, economy) each day
 }
 
 function triggerAdvisor() {
@@ -499,7 +515,7 @@ function commitRoad() {
   for (const p of pendingRoad) {
     if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = opt.kind; changed = true; }
   }
-  if (changed) view.rebuildRoads();
+  if (changed) { view.rebuildRoads(); saveSettlement(); }
   cancelPending();
 }
 
@@ -617,7 +633,7 @@ function commitDemolish() {
   const r = game.demolish(pendingDemolish.x, pendingDemolish.z);
   if (r === 'road') { view.rebuildRoads(); view.rebuildCros(); }
   if (r === 'cros') view.rebuildCros();
-  if (r) pushStats();
+  if (r) { pushStats(); saveSettlement(); }
   cancelPending();
 }
 
@@ -652,7 +668,7 @@ function confirmBuild() {
   if (pendingDemolish) { commitDemolish(); return; }
   if (!pendingBuild || !BUILDINGS[tool]) return;
   const f = footprint(tool, pendingBuild);
-  if (game.place(tool, f)) { pushStats(); cancelPending(); }
+  if (game.place(tool, f)) { pushStats(); saveSettlement(); cancelPending(); }
 }
 function cancelPending() {
   pendingBuild = null;
@@ -704,7 +720,7 @@ canvas.addEventListener('pointerdown', (e) => {
     if (tool === 'inspect') { inspectAt(e); return; }
     if (tool === 'demolish') { showDemolishGhost(tileUnderPointer(e)); return; }
     if (tool === 'road') { const t = tileUnderPointer(e); if (t) { roadStart = t; roadEnd = t; drawnPath = [{ x: t.x, z: t.z }]; drawingRoad = true; pendingRoad = drawnPath; showRoadGhost(); } return; }
-    if (tool === 'cros') { const t = tileUnderPointer(e); if (t && game.toggleCros(t.x, t.z)) view.rebuildCros(); return; }
+    if (tool === 'cros') { const t = tileUnderPointer(e); if (t && game.toggleCros(t.x, t.z)) { view.rebuildCros(); saveSettlement(); } return; }
     if (BUILDINGS[tool]) { movingBuild = true; showGhostAt(tileUnderPointer(e)); return; }
   }
   panLast = { x: e.clientX, y: e.clientY }; // no build tool, or right-drag → pan
@@ -772,7 +788,7 @@ window.addEventListener('resize', () => {
   battle.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, campaign,
+window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, campaign, saveSettlement, setCattle,
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
     const v = new THREE.Vector3(w.x, 0.1, w.z).project(camera);

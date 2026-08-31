@@ -141,7 +141,14 @@ export class Game {
     const def = BUILDINGS[key];
     if (this.silver < def.cost || !this.map.canPlace(f.x, f.z, f.w, f.h)) return false;
     if (def.unique && this.buildings.some((b) => b.def.role === def.role)) return false; // one homestead only
+    this._spawnBuilding(key, f);
+    this.silver -= def.cost;
+    return true; // dwellings fill via immigrants, not instantly
+  }
 
+  // Build the mesh + instance for a building. Shared by place() and restore().
+  _spawnBuilding(key, f) {
+    const def = BUILDINGS[key];
     const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, water: 0, culture: 0, timer: 0,
       pop: 0, cap: def.folk || 0, incoming: 0, distress: 0, active: false,
       grown: 0, ripe: false, harvestsLeft: 0, connected: false, herd: def.role === 'homestead' ? 10 : 0 };
@@ -167,9 +174,46 @@ export class Game {
     inst.sprite = chip;
 
     this.buildings.push(inst);
-    this.silver -= def.cost;
     if (def.role === 'homestead') this._updateHerd(inst);
-    return true; // dwellings fill via immigrants, not instantly
+    return inst;
+  }
+
+  // --- Persistence: the settlement is your standing ráth, kept between sessions ---
+  snapshot() {
+    const roads = [], cros = [];
+    for (let z = 0; z < this.map.size; z++) for (let x = 0; x < this.map.size; x++) {
+      const t = this.map.get(x, z);
+      if (t && t.road) roads.push({ x, z, kind: t.roadKind || null });
+      if (t && t.blocked) cros.push({ x, z });
+    }
+    const buildings = this.buildings.map((b) => ({ key: b.key, x: b.x, z: b.z,
+      pop: b.pop, stock: b.stock, food: b.food, water: b.water, culture: b.culture, herd: b.herd,
+      grown: b.grown, ripe: b.ripe, harvestsLeft: b.harvestsLeft }));
+    return { silver: this.silver, cattle: this.cattle, folk: this.folk, buildings, roads, cros };
+  }
+  load(snap) {
+    if (!snap) return;
+    for (const b of this.buildings.slice()) { this.buildingGroup.remove(b.sprite); if (b.fx) b.fx.dispose(); }
+    this.buildings = [];
+    for (const w of this.walkers.slice()) this.walkerGroup.remove(w.sprite);
+    this.walkers = [];
+    for (let z = 0; z < this.map.size; z++) for (let x = 0; x < this.map.size; x++) {
+      const t = this.map.get(x, z); if (!t) continue; t.occupant = null; if (t.road) this.map.setRoad(x, z, false); t.roadKind = null; t.blocked = false;
+    }
+    this.silver = snap.silver != null ? snap.silver : this.silver;
+    this.cattle = snap.cattle != null ? snap.cattle : this.cattle;
+    this.folk = snap.folk || 0;
+    for (const r of snap.roads || []) { if (this.map.setRoad(r.x, r.z, true)) { const t = this.map.get(r.x, r.z); if (t) t.roadKind = r.kind; } }
+    for (const c of snap.cros || []) { const t = this.map.get(c.x, c.z); if (t) t.blocked = true; }
+    for (const b of snap.buildings || []) {
+      const def = BUILDINGS[b.key]; if (!def) continue;
+      const [w, h] = def.footprint;
+      if (!this.map.canPlace(b.x, b.z, w, h)) continue;
+      const inst = this._spawnBuilding(b.key, { x: b.x, z: b.z, w, h });
+      Object.assign(inst, { pop: b.pop || 0, stock: b.stock || 0, food: b.food || 0, water: b.water || 0, culture: b.culture || 0,
+        grown: b.grown || 0, ripe: !!b.ripe, harvestsLeft: b.harvestsLeft || 0 });
+      if (def.role === 'homestead') { inst.herd = b.herd || 10; this._updateHerd(inst); }
+    }
   }
 
   // Remove a building (refund half) or a road at a tile.
