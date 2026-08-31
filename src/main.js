@@ -10,6 +10,7 @@ import { setCamera } from './render/assets.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
 import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById } from './data/kingdoms.js?v=CBUST';
 import { CODEX } from './data/codex.js?v=CBUST';
+import { UNIT_TYPES } from './battle/units.js?v=CBUST';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -147,29 +148,49 @@ const battle = new Battle({
     ui.showFestival({ name: 'A Truce', emoji: '🕊️', sub: `You paid a bóruma of ${cattle} cattle and withdrew. No blood was shed this day — though the foe remembers your silver.` });
   },
   onExit: () => ui.showTitle(),
+  onResolve: ({ won, roster, fallen, ransack }) => {
+    campaign.ghosts = roster.ghost || 0;
+    const r = { ...roster }; delete r.ghost; campaign.roster = r;
+    for (const f of fallen) campaign.fallen.push({ type: f.type, name: DEAD_NAMES[(Math.random() * DEAD_NAMES.length) | 0], season: curSeason });
+    if (won && battle.scenario === 'attack') { campaign.cattle += 8 + ((Math.random() * 8) | 0); game.cattle += 6; } // plunder from a won raid
+    if (ransack) { const lost = Math.floor(campaign.cattle / 2) + 6; campaign.cattle = Math.max(0, campaign.cattle - lost); campaign._ransacked = lost; }
+    saveCampaign();
+  },
 });
 
 function startMission(n) {
   n = String(n);
   if (n === '1') { startCampaign(); return; }           // the raid & be-raided loop on the map of Ériu
-  if (n === '2') { started = true; triggerFestival(FESTIVALS[1]); return; } // sandbox: build a settlement
-  if (n === '3') { battle.enter('attack'); return; }     // sandbox: a pitched battle to test the field
+  if (n === '2') {
+    started = true;
+    if (campaign._ransacked) { const lost = campaign._ransacked; campaign._ransacked = 0; saveCampaign(); triggerFestival({ name: 'The Ráth Ransacked', emoji: '🔥', sub: `The raiders drove off ${lost} head of cattle and put the ráth to the torch. Rebuild what was burned, and remember the fallen at your altars.` }); }
+    else triggerFestival(FESTIVALS[1]);
+    return;
+  } // sandbox / rebuild a settlement
+  if (n === '3') { enterBattle('attack'); return; }     // sandbox: a pitched battle to test the field
 }
 
 // The campaign alternates: you ride out to raid a kingdom, then raiders come
 // back to fall upon you — lose the defence and your ráth is ransacked.
 function startCampaign() {
   if (!campaign.home) { openKingdomMap('choose', 'war'); return; } // first pick a home, then straight to raiding
-  if (campaign.nextIsDefend) { campaign.nextIsDefend = false; saveCampaign(); ui.showFestival({ name: 'Raiders on the Wind', emoji: '🔥', sub: 'Word comes two seasons early: a war-band marches on your ráth. Muster the folk and hold the field.', onDone: () => battle.enter('defend') }); return; }
+  if (campaign.nextIsDefend) { campaign.nextIsDefend = false; saveCampaign(); ui.showFestival({ name: 'Raiders on the Wind', emoji: '🔥', sub: 'Word comes two seasons early: a war-band marches on your ráth. Muster the folk and hold the field.', onDone: () => enterBattle('defend') }); return; }
   openKingdomMap('war');
 }
 
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
 const CAMPAIGN_KEY = 'ardri_campaign';
-let campaign = { home: null, livery: ['#2f5fc0', '#eae2c8'] };
+const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 };
+let campaign = { home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 0 };
 try { const s = localStorage.getItem(CAMPAIGN_KEY); if (s) campaign = Object.assign(campaign, JSON.parse(s)); } catch (e) {}
+if (!campaign.roster) campaign.roster = { ...DEFAULT_ROSTER };
+if (!campaign.fallen) campaign.fallen = [];
 function saveCampaign() { try { localStorage.setItem(CAMPAIGN_KEY, JSON.stringify(campaign)); } catch (e) {} }
 battle.setLivery(campaign.livery);
+
+// A small Gaelic name-bank so the war-dead are remembered by name, not tally.
+const DEAD_NAMES = ['Bran', 'Oisín', 'Fergus', 'Niamh', 'Sadhbh', 'Cormac', 'Éimhear', 'Diarmuid', 'Lugh', 'Aoife', 'Conall', 'Gráinne', 'Naoise', 'Fiacha', 'Deirdre', 'Ruairí'];
+function enterBattle(scenario) { battle.loadWarband(campaign); battle.enter(scenario); }
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const kg = { built: false, mode: 'choose', sel: null, regions: {} };
@@ -269,7 +290,7 @@ function buildCodex() {
 function openCodex() { buildCodex(); document.getElementById('codex-screen').classList.remove('hidden'); }
 function kingdomAction() {
   if (!kg.sel) return;
-  if (kg.mode === 'war') { campaign.target = kg.sel; campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); battle.enter('attack'); return; }
+  if (kg.mode === 'war') { campaign.target = kg.sel; campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); enterBattle('attack'); return; }
   campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery);
   if (kg.then === 'war') { openKingdomMap('war'); return; } // just picked a home for the campaign — ride out to raid
   closeKingdomMap();
@@ -529,8 +550,28 @@ function buildingHtml(inst) {
   let extra = '';
   if (d.role === 'granary' || d.role === 'market') extra = `<p>Grain in store: ${inst.stock}</p>`;
   if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10 · Water: ${inst.water}/10 · Culture: ${inst.culture}/10</p>`;
+  if (d.role === 'altar') extra = altarHtml();
   return `<h3>${d.label}</h3><div class="role">Building</div><p>${d.desc}</p>${extra}`;
 }
+// An altar is also a place to pray to the war-dead — the roll of the fallen,
+// and the rite that calls one back to the muster as a ghost warrior.
+function altarHtml() {
+  const n = campaign.fallen.length;
+  const roll = campaign.fallen.slice(-5).map((f) => `${f.name} <span class="en">${UNIT_TYPES[f.type] ? UNIT_TYPES[f.type].label : f.type}</span>`).join('<br>');
+  return `<div class="altar-dead"><div class="role">The war-dead · ${n} fallen · ${campaign.ghosts} risen</div>` +
+    (n ? `<blockquote>${roll}${n > 5 ? '<br>…' : ''}</blockquote>` : `<p class="dim">None have fallen in your service yet.</p>`) +
+    `<button id="pray-btn" class="continue-btn"${n ? '' : ' disabled'}>🕯️ Pray — raise a ghost warrior</button></div>`;
+}
+function prayAtAltar() {
+  if (!campaign.fallen.length) return;
+  const f = campaign.fallen.pop();
+  campaign.ghosts = (campaign.ghosts || 0) + 1;
+  saveCampaign();
+  const body = document.getElementById('inspect-body');
+  if (body) body.innerHTML = `<h3>A Rite of Return</h3><div class="role">Altóir</div><p>${f.name} answers the prayer and rises again — a ghost warrior, pale and fearless, ready to muster. ${campaign.ghosts} of the dead now walk with you.</p>` + altarHtml();
+  wireAltar();
+}
+function wireAltar() { const b = document.getElementById('pray-btn'); if (b) b.addEventListener('click', prayAtAltar); }
 function terrainHtml(tile) {
   const info = TERRAIN_INFO[tile.terrain];
   return `<h3>${info.name}</h3><div class="role">Terrain</div><p>${info.desc}</p>`;
@@ -549,6 +590,7 @@ function inspectAt(e) {
   if (!t) return;
   const tile = map.get(t.x, t.z);
   ui.showInspect(tile.occupant ? buildingHtml(tile.occupant) : terrainHtml(tile), false);
+  if (tile.occupant && tile.occupant.def.role === 'altar') wireAltar();
 }
 // Demolish, like build, is confirmed: mark the target red, then "Raze ✓".
 function showDemolishGhost(t) {

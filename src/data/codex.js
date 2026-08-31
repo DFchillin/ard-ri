@@ -38,6 +38,14 @@ export const CODEX = [
     ],
   },
   {
+    title: 'The Returned Dead',
+    blurb: 'Those who fall in your service are remembered on the altar’s roll. Pray over them and one may rise again to fight.',
+    entries: [
+      { icon: '🕯️', name: 'The War-dead', ga: 'na mairbh chogaidh', repr: 'a roll of names on any altar', lore: 'Every villager, warrior or champion who falls is written into the roll — named, not merely tallied.' },
+      { icon: '👻', name: 'Ghost Warrior', ga: 'laoch taibhse', repr: 'a pale, translucent warrior sprite', lore: 'A fallen fighter prayed back at an altar. Knows no fear and never breaks — but if banished on the field, it is gone for good.' },
+    ],
+  },
+  {
     title: 'The Ráth',
     blurb: 'What you raise at home. Each building is a single billboarded chip that swaps art when it is working.',
     entries: [

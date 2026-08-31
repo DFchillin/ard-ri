@@ -41,10 +41,12 @@ const SCENARIOS = {
 let _uid = 0;
 
 export class Battle {
-  constructor({ onVictory, onExit, onTruce } = {}) {
+  constructor({ onVictory, onExit, onTruce, onResolve } = {}) {
     this.onVictory = onVictory || (() => {});
     this.onExit = onExit || (() => {});
     this.onTruce = onTruce || (() => {});
+    this.onResolve = onResolve || (() => {});
+    this.fallen = [];
     this.active = false; this.phase = 'idle'; this.started = false;
     this.units = []; this.companies = []; this.buildings = []; this.selected = new Set();
     this.forming = null; this.placing = false; this.marquee = false;
@@ -120,6 +122,7 @@ export class Battle {
     for (const u of this.units) this.unitGroup.remove(u.mesh);
     for (const b of this.buildings) { this.buildingGroup.remove(b.chip); this.buildingGroup.remove(b.bar); }
     this.units = []; this.companies = []; this.buildings = []; this.selected.clear();
+    this.fallen = [];
     this._randomTerrain((Math.random() * 0x7fffffff) | 0); // a different field every fight
     for (const d of this.cfg.buildings || []) this._spawnBuilding(d);
     for (const c of this.cfg.enemyCompanies || []) this._placeCompany('enemy', c.name, c.formation, c.types, this._worldOf(c.x, c.z));
@@ -241,6 +244,7 @@ export class Battle {
     const aura = Math.max(...co.units.map((u) => UNIT_TYPES[u.type].aura));
     co.morale = Math.min(100, avg + lead + aura);
     co.morale0 = co.morale;
+    co.spectral = co.units.every((u) => UNIT_TYPES[u.type].spectral); // a host of the dead knows no fear
     // a standard borne by the leader marks the company's ground
     co.flag = makeFlag(team, this.companies.filter((c) => c.team === team).length); // each warband a different pattern
     { const lt = UNIT_TYPES[co.leader.type]; co.flag.position.y = (lt.battle ? lt.battle.h + 0.4 : lt.piece ? lt.piece.tall + 0.6 : 1.7); }
@@ -363,6 +367,7 @@ export class Battle {
         c.morale -= (dealt / c.morale0) * 26 + Math.max(0, foes - friends) * 1.5;
       } else c.morale += 4 * CLASH_DT;
       c.morale = Math.max(0, Math.min(100, c.morale));
+      if (c.spectral) c.morale = Math.max(c.morale, ROUT_MISNEACH + 1); // the dead never break
       if (c.morale < ROUT_MISNEACH) { c.routing = true; this.selected.delete(c); }
       for (const u of alive) {
         drawBar(u.bar, Math.max(0, u.hp) / u.hp0, u.hp / u.hp0 > 0.5 ? 0x6cc551 : u.hp / u.hp0 > 0.25 ? 0xe0b83a : 0xe0563a);
@@ -387,12 +392,14 @@ export class Battle {
     const grew = {}; let fell = 0, empLost = 0;
     for (const u of this.units) {
       if (u.team !== 'player') continue;
-      if (u.killed) { fell++; if (EMPLOYEES.includes(u.type)) empLost++; continue; }
+      const spectral = UNIT_TYPES[u.type].spectral;
+      if (u.killed) { if (spectral) continue; fell++; this.fallen.push({ type: u.type }); if (EMPLOYEES.includes(u.type)) empLost++; continue; } // ghosts banished, not buried
       let t = u.type; // survivors (alive or fled home) return
       if (won && UPSKILL[t] && Math.random() < (UPSKILL[t] === 'seasoned' ? 0.32 : 0.4)) { t = UPSKILL[t]; grew[t] = (grew[t] || 0) + 1; }
       this.roster[t] = (this.roster[t] || 0) + 1;
     }
     this.employeeDebt += empLost;
+    this.onResolve({ won, roster: this.roster, fallen: this.fallen, ransack: won ? false : this.cfg.defend === true });
     const grewStr = Object.entries(grew).map(([k, n]) => `${n} rose to ${UNIT_TYPES[k].label}`).join(', ');
     if (won) return `The host returns${grewStr ? ' — ' + grewStr : ''}${fell ? `; ${fell} fell` : ' with no losses'}.` + (empLost ? ` (${empLost} of the settlement's own lost — two seasons to replace.)` : '');
     return `${fell} fell and the rest scattered home.` + (empLost ? ` ${empLost} city folk among the dead — two seasons to replace.` : '');
@@ -483,6 +490,12 @@ export class Battle {
   }
 
   setLivery(pair) { if (Array.isArray(pair) && pair.length === 2) LIVERY.player = pair.map((c) => typeof c === 'string' ? parseInt(c.replace('#', ''), 16) : c); }
+  // Adopt the campaign's persistent war-band, plus any ghost warriors prayed
+  // back at the altars, so the muster reflects what you actually hold.
+  loadWarband({ roster, ghosts } = {}) {
+    if (roster) this.roster = Object.assign({}, roster);
+    this.roster.ghost = ghosts || 0;
+  }
   rotate(d) { rotateIsoCamera(this.camera, d); }
   zoom(f) { zoomIsoCamera(this.camera, f, this.aspect); }
   resize(aspect) { this.aspect = aspect; resizeIsoCamera(this.camera, aspect); }
@@ -523,7 +536,9 @@ export class Battle {
   _renderMuster() {
     const roster = document.getElementById('bs-roster'); roster.innerHTML = '';
     const inForming = (k) => this.forming.types.filter((x) => x === k).length;
-    for (const key of ['villager', 'water', 'grain', 'deaglan', 'druid', 'warrior', 'seasoned', 'curadh', 'cuchulainn', 'fionn', 'dagda', 'morrigan']) {
+    const order = ['villager', 'water', 'grain', 'deaglan', 'druid', 'warrior', 'seasoned', 'curadh', 'cuchulainn', 'fionn', 'dagda', 'morrigan'];
+    if (this.pool.ghost > 0) order.push('ghost'); // only show the returned dead if you hold any
+    for (const key of order) {
       const t = UNIT_TYPES[key]; const left = (this.pool[key] || 0) - inForming(key);
       const b = document.createElement('button'); b.className = 'bs-unit cat-' + t.cat;
       b.innerHTML = `<b>${t.label} <span class="bs-left">${left}</span></b><small>${t.ga}</small>`; b.title = t.ga;
@@ -567,7 +582,8 @@ function makeUnitVisual(type, team) {
   const t = UNIT_TYPES[type];
   const g = new THREE.Group();
   let tall = 1.0;
-  if (t.battle) { const spr = makeWarriorChip(t.battle.art, t.battle.h); g.add(spr); g.userData.spr = spr; tall = t.battle.h; }
+  if (t.battle) { const spr = makeWarriorChip(t.battle.art, t.battle.h); g.add(spr); g.userData.spr = spr; tall = t.battle.h;
+    if (t.spectral) { spr.material.color.set(0x9fd0ff); spr.material.opacity = 0.6; spr.material.transparent = true; } } // a pale, translucent revenant
   else if (t.sprite) { const spr = makeWalkerChip(t.sprite); spr.scale.multiplyScalar(0.85); g.add(spr); g.userData.spr = spr; tall = 1.4; }
   else { buildPiece(g, t.piece.color, t.piece.tall, t.cat); tall = t.piece.tall + 0.5; }
   const foot = (t.battle && t.battle.tiles) || 1; // heroes stand on 1 square, gods on ~4 (2x2)
