@@ -147,7 +147,7 @@ const battle = new Battle({
   onVictory: (info) => {
     battleWon = true;
     if (info && info.cattle) setCattle(campaign.cattle + info.cattle);
-    let sub = (info && info.sub) || 'The enemy slua is broken and flees the field. Ériu will remember this cath.';
+    let sub = (info && info.sub) || `The enemy slua is broken and flees the field. Ériu will remember this cath, ${leaderName()}.`;
     if (campaign._newColony) { sub += ` And a new Dál is planted in ${campaign._newColony} — your rule now reaches across the water.`; campaign._newColony = null; }
     ui.showFestival({ name: campaign._colonyWin ? 'A New Dál' : 'Victory!', emoji: campaign._colonyWin ? '🏴' : '🏆', sub });
     campaign._colonyWin = false;
@@ -181,7 +181,7 @@ function startMission(n) {
   if (n === '1') { startCampaign(); return; }           // the raid & be-raided loop on the map of Ériu
   if (n === '2') {
     started = true;
-    if (campaign._ransacked) { const lost = campaign._ransacked; campaign._ransacked = 0; saveCampaign(); triggerFestival({ name: 'The Ráth Ransacked', emoji: '🔥', sub: `The raiders drove off ${lost} head of cattle and put the ráth to the torch. Rebuild what was burned, and remember the fallen at your altars.` }); }
+    if (campaign._ransacked) { const lost = campaign._ransacked; campaign._ransacked = 0; saveCampaign(); triggerFestival({ name: 'The Ráth Ransacked', emoji: '🔥', sub: `The raiders drove off ${lost} head of cattle and put the ráth to the torch, ${leaderName()}. Rebuild what was burned, and remember the fallen at your altars.` }); }
     else triggerFestival(FESTIVALS[1]);
     return;
   } // sandbox / rebuild a settlement
@@ -233,7 +233,7 @@ function collectColonyTribute() {
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
 const CAMPAIGN_KEY = 'ardri_campaign';
 const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 };
-let campaign = Object.assign({ home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 40, mapSeed: _mapSeed, settlement: null }, _savedCampaign);
+let campaign = Object.assign({ leader: null, home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 40, mapSeed: _mapSeed, settlement: null }, _savedCampaign);
 if (!campaign.roster) campaign.roster = { ...DEFAULT_ROSTER };
 if (!campaign.fallen) campaign.fallen = [];
 if (!campaign.goods) campaign.goods = {};
@@ -280,6 +280,8 @@ function buildKingdomMap() {
   c1.value = campaign.livery[0]; c2.value = campaign.livery[1];
   const onCol = () => { campaign.livery = [c1.value, c2.value]; battle.setLivery(campaign.livery); drawFlagPreview(); };
   c1.addEventListener('input', onCol); c2.addEventListener('input', onCol);
+  const nameIn = document.getElementById('kg-name-in');
+  if (nameIn) { nameIn.value = campaign.leader || ''; nameIn.addEventListener('input', () => { campaign.leader = nameIn.value.trim() || null; }); }
   document.getElementById('kingdoms-screen').addEventListener('click', (e) => { if (e.target.id === 'kingdoms-screen') closeKingdomMap(); });
   kg.built = true;
 }
@@ -320,6 +322,7 @@ function openKingdomMap(mode, then) {
   document.getElementById('kg-none').classList.remove('hidden');
   document.getElementById('kg-info').classList.add('hidden');
   document.getElementById('kg-livery').classList.toggle('hidden', mode === 'war');
+  { const ni = document.getElementById('kg-name-in'); if (ni && mode !== 'war') ni.value = campaign.leader || ''; }
   const act = document.getElementById('kg-action'); act.disabled = true;
   act.textContent = mode === 'war' ? 'Raid ⚔' : 'Begin your reign ▸';
   for (const rid in kg.regions) {
@@ -368,6 +371,43 @@ function buildCodex() {
   codexBuilt = true;
 }
 function openCodex() { buildCodex(); document.getElementById('codex-screen').classList.remove('hidden'); }
+function leaderName() { return campaign.leader || 'a Rí'; }
+
+// --- Manage Campaign: rename, export/import a JSON save, restart ---
+let manageWired = false;
+function openManage() {
+  if (!manageWired) {
+    const $ = (id) => document.getElementById(id);
+    const msg = (t) => { $('manage-msg').textContent = t || ''; };
+    $('manage-close').addEventListener('click', () => $('manage-screen').classList.add('hidden'));
+    $('manage-screen').addEventListener('click', (e) => { if (e.target.id === 'manage-screen') e.currentTarget.classList.add('hidden'); });
+    $('manage-save-name').addEventListener('click', () => { campaign.leader = ($('manage-name').value || '').trim() || null; saveCampaign(); $('manage-who').textContent = campaign.leader ? `You reign as ${campaign.leader}.` : 'No name set — you reign unnamed.'; msg('Name saved.'); });
+    $('manage-export').addEventListener('click', () => {
+      const json = JSON.stringify(campaign);
+      const ta = $('manage-json'); ta.classList.remove('hidden'); ta.value = json; ta.select();
+      try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = 'ardri-save.json'; a.click(); } catch (e) {}
+      msg('Save copied below and downloaded. Keep it safe.');
+    });
+    $('manage-import-open').addEventListener('click', () => { $('manage-json').classList.remove('hidden'); $('manage-json').value = ''; $('manage-import-btns').classList.remove('hidden'); msg('Paste a save, or choose a file, then Load.'); });
+    $('manage-file').addEventListener('change', (e) => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { $('manage-json').value = r.result; }; r.readAsText(f); });
+    $('manage-import-load').addEventListener('click', () => {
+      try { const data = JSON.parse($('manage-json').value); if (!data || typeof data !== 'object') throw 0; localStorage.setItem(CAMPAIGN_KEY, JSON.stringify(data)); msg('Loaded — reloading…'); setTimeout(() => location.reload(), 500); }
+      catch (e) { msg('That does not look like a valid save.'); }
+    });
+    $('manage-restart').addEventListener('click', () => {
+      if (!window.confirm('Restart the whole campaign? Your ráth, war-band, colonies and standing are lost. Export a save first if you want to keep it.')) return;
+      try { localStorage.removeItem(CAMPAIGN_KEY); } catch (e) {}
+      location.reload();
+    });
+    manageWired = true;
+  }
+  document.getElementById('manage-name').value = campaign.leader || '';
+  document.getElementById('manage-who').textContent = campaign.leader ? `You reign as ${campaign.leader}.` : 'No name set — you reign unnamed.';
+  document.getElementById('manage-msg').textContent = '';
+  document.getElementById('manage-json').classList.add('hidden');
+  document.getElementById('manage-import-btns').classList.add('hidden');
+  document.getElementById('manage-screen').classList.remove('hidden');
+}
 
 // The Wider World — spend cattle on foreign goods, then host heroes and gods.
 let tradeWired = false;
@@ -489,6 +529,14 @@ const mapFab = document.getElementById('map-fab');
 if (mapFab) mapFab.addEventListener('click', () => openKingdomMap(campaign.home ? 'war' : 'choose'));
 const codexBtn = document.getElementById('codex-open');
 if (codexBtn) codexBtn.addEventListener('click', openCodex);
+const manageBtn = document.getElementById('manage-open');
+if (manageBtn) manageBtn.addEventListener('click', openManage);
+// Mission checklist collapses on a tap of its heading, so it never crowds the fabs.
+const missionH = document.querySelector('#mission h4');
+if (missionH) {
+  try { if (localStorage.getItem('ardri_mission_collapsed') === '1') document.getElementById('mission').classList.add('collapsed'); } catch (e) {}
+  missionH.addEventListener('click', () => { const on = document.getElementById('mission').classList.toggle('collapsed'); try { localStorage.setItem('ardri_mission_collapsed', on ? '1' : '0'); } catch (e) {} });
+}
 ui.showTitle(); // title screen; Mission One starts the game
 if (!campaign.home) openKingdomMap('choose'); // first run: pick a home and colours
 

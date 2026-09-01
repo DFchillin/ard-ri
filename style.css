@@ -84,6 +84,7 @@ html, body {
   border-radius: 10px;
   padding: 10px 14px;
   max-width: 220px;
+  max-height: 42vh; overflow-y: auto;
 }
 #mission h4 {
   font-family: var(--font-display);
@@ -91,7 +92,12 @@ html, body {
   color: var(--gold);
   margin-bottom: 6px;
   font-weight: normal;
+  cursor: pointer; user-select: none;
 }
+#mission h4::before { content: '▾ '; font-size: 11px; }
+#mission.collapsed h4::before { content: '▸ '; }
+#mission.collapsed { max-height: none; }
+#mission.collapsed #mission-list { display: none; }
 #mission-list { list-style: none; }
 #mission-list li { font-size: 14px; padding: 3px 0; opacity: 0.92; }
 #mission-list li.done { color: #8fd48a; opacity: 0.7; text-decoration: line-through; }
@@ -180,6 +186,21 @@ html, body {
 .codex-entry .cx-repr { font-size: 11px; opacity: 0.7; margin-top: 3px; }
 .codex-entry .cx-repr b { color: var(--gold); font-weight: 600; }
 .title-link { margin-top: 14px; background: none; border: none; color: var(--gold); font-family: var(--font-body); font-size: 14px; cursor: pointer; text-decoration: underline; opacity: 0.9; }
+
+/* Manage Campaign modal + leader-name input */
+#kg-name-in, #manage-name {
+  width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-family: var(--font-body); font-size: 14px; margin-bottom: 8px;
+}
+.manage-row { display: flex; flex-direction: column; gap: 3px; text-align: left; font-size: 12px; margin: 8px 0; }
+.manage-btns { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.manage-btns button, #manage-close { background: var(--panel); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 9px; cursor: pointer; font-family: var(--font-body); font-size: 14px; }
+.manage-btns button.danger { border-color: #b0362a; color: #f0a89c; }
+.manage-btns .continue-btn { background: var(--gold); color: #1c130a; border: none; }
+#manage-json { width: 100%; box-sizing: border-box; height: 90px; background: rgba(0,0,0,0.35); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; font-size: 11px; font-family: monospace; padding: 6px; margin: 6px 0; }
+#manage-file { font-size: 12px; color: var(--ink); }
+#manage-msg { min-height: 16px; color: var(--gold); }
+#manage-close { width: 100%; margin-top: 6px; }
 
 /* Seasonal news banner (colony tribute, revolts) */
 #notice-toast {
