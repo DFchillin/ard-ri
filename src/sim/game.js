@@ -227,6 +227,7 @@ export class Game {
     if (fx) { fx.setActive(false); chip.add(fx.group); inst.fx = fx; }
     this.buildingGroup.add(chip);
     inst.sprite = chip;
+    chip.userData.inst = inst; // lets a tap on the billboard (or its dot) resolve to this building
 
     this.buildings.push(inst);
     if (def.role === 'homestead') this._updateHerd(inst);

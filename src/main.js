@@ -815,14 +815,23 @@ function inspectAt(e) {
     while (o && !(o.userData && o.userData.person)) o = o.parent;
     if (o && o.userData.person) { ui.showInspect(personHtml(o.userData.person), true); pauseGame(); return; }
   }
-  const hit = raycaster.intersectObject(view.pickPlane)[0];
-  if (!hit) return;
-  const t = map.worldToTile(hit.point.x, hit.point.z);
-  if (!t) return;
-  const tile = map.get(t.x, t.z);
-  ui.showInspect(tile.occupant ? buildingHtml(tile.occupant) : terrainHtml(tile), false);
-  if (tile.occupant && tile.occupant.def.role === 'altar') wireAltar();
-  if (tile.occupant && tile.occupant.def.role === 'homestead') { const tb = document.getElementById('trade-btn'); if (tb) tb.addEventListener('click', openTrade); }
+  // Tap the building billboard (or its floating dot) directly — no ground-plane
+  // guesswork, which used to land on the empty tile behind a tall roof.
+  let inst = null;
+  const bh = raycaster.intersectObjects(game.buildingGroup.children, true);
+  for (const h of bh) { let o = h.object; while (o && !(o.userData && o.userData.inst)) o = o.parent; if (o && o.userData.inst && !o.userData.inst.dead) { inst = o.userData.inst; break; } }
+  if (!inst) { // fall back to the ground tile (terrain, or a building whose base you hit)
+    const hit = raycaster.intersectObject(view.pickPlane)[0];
+    if (!hit) return;
+    const t = map.worldToTile(hit.point.x, hit.point.z);
+    if (!t) return;
+    const tile = map.get(t.x, t.z);
+    if (!tile.occupant) { ui.showInspect(terrainHtml(tile), false); return; }
+    inst = tile.occupant;
+  }
+  ui.showInspect(buildingHtml(inst), false);
+  if (inst.def.role === 'altar') wireAltar();
+  if (inst.def.role === 'homestead') { const tb = document.getElementById('trade-btn'); if (tb) tb.addEventListener('click', openTrade); }
 }
 // Demolish, like build, is confirmed: mark the target red, then "Raze ✓".
 function showDemolishGhost(t) {
