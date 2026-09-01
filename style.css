@@ -261,18 +261,15 @@ body.in-battle #menace-btn { display: none !important; }
 #kg-title { font-family: var(--font-title); color: var(--gold); font-weight: normal; margin: 0 0 2px; font-size: 22px; }
 #kg-hint { font-size: 13px; opacity: 0.82; margin: 0 0 12px; }
 .kg-cols { display: flex; gap: 16px; align-items: stretch; text-align: left; }
-#kg-map { width: 320px; max-width: 46vw; height: auto; background: #17130c; border: 1px solid var(--border); border-radius: 10px; flex: 0 0 auto; }
-#kg-map .kg-sea { fill: #17130c; }
-#kg-map .kg-isle { fill: #d9c8a0; stroke: #5a4a2c; stroke-width: 2; }
-#kg-map .kg-region { stroke: #3a2c16; stroke-width: 1.2; opacity: 0.72; cursor: pointer; transition: opacity 0.12s; }
-#kg-map .kg-region:hover { opacity: 0.92; }
-#kg-map .kg-region.sel { opacity: 1; stroke: var(--gold); stroke-width: 2.4; }
-#kg-map .kg-region.dim { opacity: 0.28; cursor: default; pointer-events: none; }
-#kg-map .kg-region.held { stroke: var(--gold); stroke-width: 2.2; stroke-dasharray: 3 2; }
-#kg-map .kg-colony { fill: none; stroke-width: 3; stroke-dasharray: 5 3; pointer-events: none; }
-#kg-map .kg-colony-flag { font-size: 13px; text-anchor: middle; pointer-events: none; }
-#kg-map .kg-label { font-family: var(--font-display); font-size: 10px; fill: #201708; pointer-events: none; text-anchor: middle; }
-#kg-map .kg-home { fill: none; stroke: var(--gold); stroke-width: 2.6; stroke-dasharray: 4 3; pointer-events: none; }
+#kg-map { width: min(460px, 54vw); max-width: 54vw; height: auto; border: 1px solid #5a4a2c; border-radius: 8px; flex: 0 0 auto; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+#kg-map .kg-region { fill: rgba(255,255,255,0); stroke: rgba(255,255,255,0); stroke-width: 3; cursor: pointer; transition: fill 0.12s, stroke 0.12s; }
+#kg-map .kg-region:hover { fill: rgba(232,201,107,0.18); stroke: rgba(232,201,107,0.55); }
+#kg-map .kg-region.sel { fill: rgba(232,201,107,0.32); stroke: var(--gold); stroke-width: 4; }
+#kg-map .kg-region.dim { pointer-events: none; }
+#kg-map .kg-region.dim:hover { fill: rgba(255,255,255,0); stroke: rgba(255,255,255,0); }
+#kg-map .kg-colony { fill: none; stroke-width: 5; stroke-dasharray: 9 6; pointer-events: none; }
+#kg-map .kg-colony-flag { font-size: 30px; text-anchor: middle; pointer-events: none; }
+#kg-map .kg-home { fill: none; stroke: var(--gold); stroke-width: 5; stroke-dasharray: 8 6; pointer-events: none; }
 .kg-detail { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; min-width: 180px; }
 .kg-detail h3 { font-family: var(--font-display); color: var(--gold); font-weight: normal; margin: 0; font-size: 17px; }
 .kg-ga { font-style: italic; opacity: 0.85; font-size: 13px; }

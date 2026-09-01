@@ -303,14 +303,16 @@ const kg = { built: false, mode: 'choose', sel: null, regions: {} };
 function buildKingdomMap() {
   if (kg.built) return;
   const svg = document.getElementById('kg-map');
+  svg.setAttribute('viewBox', '0 0 1000 800');
   const mk = (tag, a) => { const e = document.createElementNS(SVGNS, tag); for (const k in a) e.setAttribute(k, a[k]); return e; };
-  svg.appendChild(mk('rect', { class: 'kg-sea', x: 0, y: 0, width: 360, height: 480 }));
-  svg.appendChild(mk('path', { class: 'kg-isle', d: ISLAND }));
+  const img = mk('image', { x: 0, y: 0, width: 1000, height: 800 }); // the parchment map of Ériu
+  img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', 'assets/ui/eire_map.jpg?v=CBUST');
+  img.setAttribute('href', 'assets/ui/eire_map.jpg?v=CBUST');
+  svg.appendChild(img);
   for (const k of KINGDOMS) {
-    const poly = mk('polygon', { class: 'kg-region', points: k.pts, fill: k.color });
+    const poly = mk('polygon', { class: 'kg-region', points: k.pts }); // transparent hotspot; the parchment shows the land
     poly.addEventListener('click', () => selectKingdom(k.id));
     svg.appendChild(poly); kg.regions[k.id] = poly;
-    const t = mk('text', { class: 'kg-label', x: k.label[0], y: k.label[1] }); t.textContent = k.en; svg.appendChild(t);
   }
   kg.homeMark = mk('polygon', { class: 'kg-home', points: '' }); kg.homeMark.style.display = 'none'; svg.appendChild(kg.homeMark);
   kg.colonyGroup = mk('g', {}); svg.appendChild(kg.colonyGroup);
@@ -377,7 +379,7 @@ function openKingdomMap(mode, then) {
   for (const c of campaign.colonies) {
     const k = kingdomById(c.region); if (!k) continue;
     const poly = document.createElementNS(SVGNS, 'polygon'); poly.setAttribute('class', 'kg-colony'); poly.setAttribute('points', k.pts); poly.setAttribute('stroke', campaign.livery[0]); kg.colonyGroup.appendChild(poly);
-    const flag = document.createElementNS(SVGNS, 'text'); flag.setAttribute('class', 'kg-colony-flag'); flag.setAttribute('x', k.label[0]); flag.setAttribute('y', k.label[1] - 12); flag.textContent = '🏴'; kg.colonyGroup.appendChild(flag);
+    const flag = document.createElementNS(SVGNS, 'text'); flag.setAttribute('class', 'kg-colony-flag'); flag.setAttribute('x', k.label[0]); flag.setAttribute('y', k.label[1] - 22); flag.textContent = '🏴'; kg.colonyGroup.appendChild(flag);
   }
   drawFlagPreview();
   document.getElementById('kingdoms-screen').classList.remove('hidden');
