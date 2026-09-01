@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js?v=CBUST';
-import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, setChipActive } from '../render/chips.js?v=CBUST';
+import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeMenaceCreature, setChipActive } from '../render/chips.js?v=CBUST';
 import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor } from '../render/effects.js?v=CBUST';
 
@@ -31,9 +31,12 @@ const RANKS = [[120, 'Ard Rí'], [80, 'Rí Tuaithe'], [45, 'Mór-Thúath'], [20,
 export class Game {
   constructor(map, scene) {
     this.map = map;
+    this.scene = scene;
     this.buildingGroup = new THREE.Group();
     this.walkerGroup = new THREE.Group();
-    scene.add(this.buildingGroup, this.walkerGroup);
+    this.menaceGroup = new THREE.Group();
+    scene.add(this.buildingGroup, this.walkerGroup, this.menaceGroup);
+    this.menace = null;
 
     this.buildings = [];
     this.walkers = [];
@@ -53,6 +56,65 @@ export class Game {
   }
 
   showInspectDots(on) { this._inspectDots = on; for (const b of this.buildings) if (b.dot) b.dot.visible = on; }
+
+  // --- The menace: a blighted, unbuildable patrol zone with a Fomorian giant ---
+  spawnMenace(x, z, w, h) {
+    this.clearMenace();
+    x = Math.max(0, Math.min(x, this.map.size - w)); z = Math.max(0, Math.min(z, this.map.size - h));
+    this.menace = { x, z, w, h, t: 0 };
+    this._markMenace(true);
+    this._razeInMenace();
+    this._drawMenaceZone();
+    const cre = makeMenaceCreature(); this.menace.creature = cre; this.menaceGroup.add(cre);
+    this._moveMenaceCreature(0);
+  }
+  clearMenace() {
+    if (!this.menace) return;
+    this._markMenace(false);
+    while (this.menaceGroup.children.length) this.menaceGroup.remove(this.menaceGroup.children[0]);
+    this.menace = null;
+  }
+  hasMenace() { return !!this.menace; }
+  _markMenace(on) {
+    const m = this.menace; if (!m) return;
+    for (let z = m.z; z < m.z + m.h; z++) for (let x = m.x; x < m.x + m.w; x++) { const t = this.map.get(x, z); if (t) t.menace = on; }
+  }
+  _razeInMenace() {
+    const m = this.menace; if (!m) return;
+    for (const b of this.buildings.slice()) {
+      if (b.x < m.x + m.w && b.x + b.w > m.x && b.z < m.z + m.h && b.z + b.h > m.z) this.demolish(b.x, b.z, false); // razed, no refund
+    }
+  }
+  // Each turn of the year the blight creeps outward by one ring, engulfing more.
+  expandMenace() {
+    const m = this.menace; if (!m) return;
+    this._markMenace(false);
+    m.x = Math.max(0, m.x - 1); m.z = Math.max(0, m.z - 1);
+    m.w = Math.min(this.map.size - m.x, m.w + 2); m.h = Math.min(this.map.size - m.z, m.h + 2);
+    this._markMenace(true);
+    this._razeInMenace();
+    this._drawMenaceZone();
+    this._moveMenaceCreature(0);
+  }
+  _drawMenaceZone() {
+    const m = this.menace; if (!m) return;
+    for (const c of this.menaceGroup.children.slice()) if (c.userData && c.userData.zone) { this.menaceGroup.remove(c); if (c.geometry) c.geometry.dispose(); }
+    const ts = this.map.tile;
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(m.w * ts, m.h * ts),
+      new THREE.MeshBasicMaterial({ color: 0xa01c24, transparent: true, opacity: 0.42, side: THREE.DoubleSide, depthWrite: false })
+    );
+    plane.rotation.x = -Math.PI / 2; plane.position.set((m.x + m.w / 2) * ts - this.map.half, 0.06, (m.z + m.h / 2) * ts - this.map.half);
+    plane.userData.zone = true; this.menaceGroup.add(plane);
+  }
+  _moveMenaceCreature(dt) {
+    const m = this.menace; if (!m || !m.creature) return;
+    m.t += dt * 0.5;
+    const ts = this.map.tile;
+    const px = (m.x + m.w / 2 + Math.sin(m.t) * (m.w / 2 - 0.6)) * ts - this.map.half;
+    const pz = (m.z + m.h / 2 + Math.cos(m.t * 0.7) * (m.h / 2 - 0.6)) * ts - this.map.half;
+    m.creature.position.set(px, 0.1, pz);
+  }
   // Count the open pasture (bare grass, no road, no building) in a ring around
   // the homestead — the grazing that lets the herd grow.
   _grazing(b) {
@@ -182,16 +244,18 @@ export class Game {
     const buildings = this.buildings.map((b) => ({ key: b.key, x: b.x, z: b.z,
       pop: b.pop, stock: b.stock, food: b.food, water: b.water, culture: b.culture, herd: b.herd,
       grown: b.grown, ripe: b.ripe, harvestsLeft: b.harvestsLeft }));
-    return { silver: this.silver, cattle: this.cattle, folk: this.folk, buildings, roads, cros };
+    const menace = this.menace ? { x: this.menace.x, z: this.menace.z, w: this.menace.w, h: this.menace.h } : null;
+    return { silver: this.silver, cattle: this.cattle, folk: this.folk, buildings, roads, cros, menace };
   }
   load(snap) {
     if (!snap) return;
+    this.clearMenace();
     for (const b of this.buildings.slice()) { this.buildingGroup.remove(b.sprite); if (b.fx) b.fx.dispose(); }
     this.buildings = [];
     for (const w of this.walkers.slice()) this.walkerGroup.remove(w.sprite);
     this.walkers = [];
     for (let z = 0; z < this.map.size; z++) for (let x = 0; x < this.map.size; x++) {
-      const t = this.map.get(x, z); if (!t) continue; t.occupant = null; if (t.road) this.map.setRoad(x, z, false); t.roadKind = null; t.blocked = false;
+      const t = this.map.get(x, z); if (!t) continue; t.occupant = null; if (t.road) this.map.setRoad(x, z, false); t.roadKind = null; t.blocked = false; t.menace = false;
     }
     this.silver = snap.silver != null ? snap.silver : this.silver;
     this.cattle = snap.cattle != null ? snap.cattle : this.cattle;
@@ -207,6 +271,7 @@ export class Game {
         grown: b.grown || 0, ripe: !!b.ripe, harvestsLeft: b.harvestsLeft || 0 });
       if (def.role === 'homestead') { inst.herd = b.herd || 10; this._updateHerd(inst); }
     }
+    if (snap.menace) this.spawnMenace(snap.menace.x, snap.menace.z, snap.menace.w, snap.menace.h);
   }
 
   // Remove a building (refund half) or a road at a tile.
@@ -218,7 +283,7 @@ export class Game {
     return t.blocked ? 'cros' : 'uncros';
   }
 
-  demolish(x, z) {
+  demolish(x, z, refund = true) {
     const t = this.map.get(x, z);
     if (t && t.blocked) { t.blocked = false; return 'cros'; } // clear the Cros first, keep the road
     if (t && t.occupant) {
@@ -232,7 +297,7 @@ export class Game {
       if (inst.fx) inst.fx.dispose();
       this.buildings = this.buildings.filter((b) => b !== inst);
       if (inst.pop) this.folk = Math.max(0, this.folk - inst.pop);
-      this.silver += Math.floor(inst.def.cost / 2);
+      if (refund) this.silver += Math.floor(inst.def.cost / 2);
       return 'building';
     }
     if (t && t.road) { this.map.setRoad(x, z, false); t.roadKind = null; t.blocked = false; return 'road'; }
@@ -445,6 +510,7 @@ export class Game {
   // Ambient particle effects — real time, so they drift even while paused.
   updateFx(dt) {
     for (const b of this.buildings) if (b.fx) b.fx.update(dt);
+    if (this.menace) this._moveMenaceCreature(dt);
   }
 
   // --- Animation, one call per frame (dt already scaled by game speed) ---

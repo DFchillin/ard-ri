@@ -187,6 +187,16 @@ html, body {
 .codex-entry .cx-repr b { color: var(--gold); font-weight: 600; }
 .title-link { margin-top: 14px; background: none; border: none; color: var(--gold); font-family: var(--font-body); font-size: 14px; cursor: pointer; text-decoration: underline; opacity: 0.9; }
 
+/* March on the Menace — a prominent call to action at Level 3 */
+#menace-btn {
+  position: absolute; left: 50%; top: 92px; transform: translateX(-50%);
+  background: #6a1420; color: #ffe6df; border: 1px solid #d84a3a; border-radius: 10px;
+  padding: 10px 18px; font-family: var(--font-display); font-size: 15px; cursor: pointer; z-index: 6;
+  box-shadow: 0 2px 14px rgba(216,74,58,0.4); animation: menacePulse 1.8s ease-in-out infinite;
+}
+@keyframes menacePulse { 0%,100% { box-shadow: 0 2px 14px rgba(216,74,58,0.35); } 50% { box-shadow: 0 2px 22px rgba(216,74,58,0.7); } }
+body.in-battle #menace-btn { display: none !important; }
+
 /* Narrative interstitial between chapters (Zeus-style) */
 #narrative-screen { z-index: 60; background: rgba(4,8,10,0.86); }
 .narr-card { background: var(--panel); border: 1px solid var(--gold); border-radius: 14px; width: min(560px, 94vw); max-height: 92vh; overflow: auto; text-align: center; padding-bottom: 20px; }

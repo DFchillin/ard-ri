@@ -97,7 +97,7 @@ export class Tilemap {
 
   isBuildable(x, z) {
     const t = this.get(x, z);
-    return !!t && BUILDABLE.has(t.terrain) && !t.road && !t.occupant;
+    return !!t && BUILDABLE.has(t.terrain) && !t.road && !t.occupant && !t.menace;
   }
   canPlace(x, z, w, h) {
     for (let dz = 0; dz < h; dz++)

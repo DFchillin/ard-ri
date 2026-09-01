@@ -74,6 +74,7 @@ export const CODEX = [
       { icon: '🚩', name: 'Company', ga: 'buíon', repr: 'a group under one two-colour standard', lore: 'Up to six units mustered together, led by the highest-ranked among them, sharing one collective Misneach (courage).' },
       { icon: '🔷', name: 'Formation', ga: 'cóiriú', repr: 'Líne, Colún, Rinn, Fáinne', lore: 'A shape and a stance: broad line, fast column, hard-hitting wedge, or all-round diamond.' },
       { icon: '🕊️', name: 'The Parley', ga: 'an idirbheartaíocht', repr: 'captains ride out to meet', lore: 'Before blood: fight, pay tribute in cattle, or accept a foe’s surrender when they are outnumbered.' },
+      { icon: '☠️', name: 'The Menace', ga: 'an Fomhórach', repr: 'a horned, one-eyed giant patrolling a blighted zone', lore: 'A Fomorian giant that lays waste to a stretch of your land — nothing may be built where it treads, and its blight creeps outward each season. Muster a war-band and march on it: the fight is settled on the battlefield, not in the ráth.' },
     ],
   },
 ];

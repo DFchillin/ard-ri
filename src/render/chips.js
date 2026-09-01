@@ -160,6 +160,24 @@ export function makeWarriorChip(art, h = 1.6) {
   return s;
 }
 
+// The menace: a hulking Fomorian giant that patrols its blighted ground in the
+// settlement. Drawn on a canvas — a dark, one-eyed figure — until real art lands.
+export function makeMenaceCreature() {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 96;
+  const x = c.getContext('2d');
+  x.fillStyle = 'rgba(10,6,14,0.4)'; x.beginPath(); x.ellipse(32, 90, 20, 5, 0, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#2b2436';                                   // body
+  x.beginPath(); x.moveTo(20, 40); x.lineTo(44, 40); x.lineTo(48, 88); x.lineTo(16, 88); x.closePath(); x.fill();
+  x.beginPath(); x.ellipse(32, 26, 15, 16, 0, 0, Math.PI * 2); x.fill(); // head
+  x.fillStyle = '#3a3048'; x.fillRect(8, 44, 10, 30); x.fillRect(46, 44, 10, 30); // arms
+  x.fillStyle = '#d84a3a'; x.beginPath(); x.arc(32, 24, 5, 0, Math.PI * 2); x.fill(); // single red eye
+  x.fillStyle = '#c0b8cc'; x.fillRect(20, 12, 4, 8); x.fillRect(40, 12, 4, 8); // horns
+  const tx = new THREE.CanvasTexture(c); tx.magFilter = THREE.NearestFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true }));
+  s.center.set(0.5, 0); s.scale.set(2.2, 3.3, 1);
+  return s;
+}
+
 // A wayside high-cross that pens walkers to a route. Drawn on a canvas so it
 // needs no sprite-sheet art — a ringed Celtic cross in weathered stone.
 export function makeCrosMarker() {

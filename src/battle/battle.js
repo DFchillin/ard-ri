@@ -36,6 +36,15 @@ const SCENARIOS = {
     ],
     enemyLone: [['curadh', 15, 2]],
   },
+  // The menace: your mustered war-band against a Fomorian giant and its brood.
+  menace: {
+    title: 'An Sceimhle — face the menace', musterMinZ: 6,
+    buildings: [],
+    enemyCompanies: [
+      { name: ['Bríd Fhuar', 'the cold brood'], formation: 'line', types: ['fuath', 'fuath', 'fuath'], x: 7, z: 3 },
+    ],
+    enemyLone: [['fomor', 10, 2]],
+  },
 };
 
 let _uid = 0;
@@ -586,7 +595,7 @@ function makeUnitVisual(type, team) {
     if (t.spectral) { spr.material.color.set(0x9fd0ff); spr.material.opacity = 0.6; spr.material.transparent = true; } } // a pale, translucent revenant
   else if (t.sprite) { const spr = makeWalkerChip(t.sprite); spr.scale.multiplyScalar(0.85); g.add(spr); g.userData.spr = spr; tall = 1.4; }
   else { buildPiece(g, t.piece.color, t.piece.tall, t.cat); tall = t.piece.tall + 0.5; }
-  const foot = (t.battle && t.battle.tiles) || 1; // heroes stand on 1 square, gods on ~4 (2x2)
+  const foot = (t.battle && t.battle.tiles) || t.tiles || 1; // heroes stand on 1 square, gods/menace on more
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.34 * foot, 0.5 * foot, 24), new THREE.MeshBasicMaterial({ color: TEAM[team], transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; ring.userData.team = TEAM[team]; g.add(ring); g.userData.ring = ring;
   const bar = makeBar(0.7 * Math.max(1, foot * 0.8)); bar.position.y = tall + 0.5; g.add(bar); g.userData.bar = bar;

@@ -168,7 +168,7 @@ const battle = new Battle({
       if (Math.random() < 0.5) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; campaign._looted = gk; } // and sometimes foreign spoils
       if (campaign._raidFar && campaign.target && !isColony(campaign.target)) { const k = foundColony(campaign.target); if (k) { campaign._newColony = k.en; campaign._colonyWin = true; } }
     }
-    if (won && battle.scenario === 'defend' && campaign.level === 3) campaign._menaceRepelled = true; // the menace is thrown back
+    if (won && battle.scenario === 'menace') { campaign._menaceRepelled = true; game.clearMenace(); saveSettlement(); } // the menace is thrown back, the blight lifts
     if (ransack) {
       const lost = Math.floor(campaign.cattle / 2) + 6; setCattle(campaign.cattle - lost); campaign._ransacked = lost;
       if (campaign.colonies.length && Math.random() < 0.5) { const gone = campaign.colonies.splice((Math.random() * campaign.colonies.length) | 0, 1)[0]; campaign._ransacked = lost; flashNotice(`🏴 While you fought at home, ${gone.name} threw off your yoke.`); }
@@ -198,7 +198,7 @@ function startCampaign() {
   enterSettlement();
 }
 // Drop into the standing ráth — the clock starts because the title is hidden.
-function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); }
+function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); }
 
 // A brief, non-blocking banner for seasonal news (colony tribute, revolts).
 let _noticeEl = null, _noticeT = 0;
@@ -257,6 +257,20 @@ function loadLevel() {
   ui.setLevel(campaign.level);
   const h = document.querySelector('#mission h4'); if (h) h.textContent = lvl.title;
   refreshObjectives();
+  // Level 3 looses the menace onto your land if it is not already loose or beaten.
+  if (campaign.level === 3 && !campaign._menaceRepelled && !game.hasMenace()) { placeMenace(); saveSettlement(); }
+  updateMenaceButton();
+}
+function placeMenace() {
+  let cx = 16, cz = 14;
+  if (game.buildings.length) { let sx = 0, sz = 0; for (const b of game.buildings) { sx += b.x; sz += b.z; } cx = Math.round(sx / game.buildings.length) + 5; cz = Math.round(sz / game.buildings.length) - 1; }
+  game.spawnMenace(cx, cz, 4, 4);
+  flashNotice('☠️ A Fomorian giant strides out of the mist — its blight spreads, and nothing may be built where it treads.');
+}
+function warbandSize() { return campaign.roster ? Object.values(campaign.roster).reduce((a, b) => a + b, 0) : 0; }
+function updateMenaceButton() {
+  const btn = document.getElementById('menace-btn'); if (!btn) return;
+  btn.classList.toggle('hidden', !(campaign.level === 3 && game.hasMenace() && !battle.active));
 }
 function refreshObjectives() { ui.setObjectives(levelObjectives); }
 function completeLevel() {
@@ -526,7 +540,10 @@ function advanceDay() {
     cal.day = 1;
     cal.month = (cal.month + 1) % 12;
     const s = seasonOfMonth(cal.month);
-    if (s !== curSeason) { curSeason = s; applySeason(s); collectColonyTribute(); } // colonies render tribute each turn of the year
+    if (s !== curSeason) {
+      curSeason = s; applySeason(s); collectColonyTribute(); // colonies render tribute each turn of the year
+      if (campaign.level === 3 && game.hasMenace()) { game.expandMenace(); saveSettlement(); flashNotice('☠️ The blight creeps outward, devouring more of your land. Muster and march before it takes all.'); }
+    }
     const fest = FESTIVALS[cal.month];
     if (fest) { festivalToday = true; triggerFestival(fest); }
   }
@@ -558,6 +575,11 @@ const codexBtn = document.getElementById('codex-open');
 if (codexBtn) codexBtn.addEventListener('click', openCodex);
 const manageBtn = document.getElementById('manage-open');
 if (manageBtn) manageBtn.addEventListener('click', openManage);
+const menaceBtn = document.getElementById('menace-btn');
+if (menaceBtn) menaceBtn.addEventListener('click', () => {
+  if (warbandSize() < 4) { flashNotice('⚔ Gather a war-band of at least four before you march on the menace.'); return; }
+  enterBattle('menace');
+});
 // Mission checklist collapses on a tap of its heading, so it never crowds the fabs.
 const missionH = document.querySelector('#mission h4');
 if (missionH) {
