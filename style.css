@@ -196,6 +196,7 @@ html, body {
 }
 @keyframes menacePulse { 0%,100% { box-shadow: 0 2px 14px rgba(216,74,58,0.35); } 50% { box-shadow: 0 2px 22px rgba(216,74,58,0.7); } }
 body.in-battle #menace-btn { display: none !important; }
+#menace-btn.hidden { display: none; }
 
 /* Narrative interstitial between chapters (Zeus-style) */
 #narrative-screen { z-index: 60; background: rgba(4,8,10,0.86); }

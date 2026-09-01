@@ -56,7 +56,7 @@ const view = new WorldView(scene, map);
 const game = new Game(map, scene);
 
 const sim = { speed: 1 };
-const cal = { day: 1, month: 1 }; // start Feb — Imbolc, Spring
+const cal = { day: 5, month: 0 }; // open in the last days of winter, a breath before Imbolc
 let curSeason = seasonOfMonth(cal.month);
 let tool = null;
 let savedSpeed = null;
@@ -193,7 +193,7 @@ function startMission(n) {
 // The Campaign hub is your own ráth: build and hold it here. Ride out to raid
 // from the 🗺 map when you choose, and raiders answer in their own time.
 function startCampaign() {
-  if (!campaign.home) { openKingdomMap('choose', 'settle'); return; } // first pick a home, then into your ráth
+  if (!campaign.home) { openKingdomMap('choose', 'intro'); return; } // first pick a home, then the opening tale
   if (campaign.nextIsDefend) { campaign.nextIsDefend = false; saveCampaign(); ui.showFestival({ name: 'Raiders on the Wind', emoji: '🔥', sub: 'Word comes two seasons early: a war-band marches on your ráth. Muster the folk and hold the field.', onDone: () => enterBattle('defend') }); return; }
   enterSettlement();
 }
@@ -504,6 +504,7 @@ function kingdomAction() {
   if (kg.mode === 'war') { campaign.target = kg.sel; campaign._raidFar = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(kg.sel); campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); enterBattle('attack'); return; }
   campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery);
   if (kg.then === 'war') { openKingdomMap('war'); return; } // ride out to raid
+  if (kg.then === 'intro') { closeKingdomMap(); showIntro(); return; } // first time: opening tale, then into the ráth
   if (kg.then === 'settle') { enterSettlement(); return; } // into your ráth to build
   closeKingdomMap();
 }
@@ -587,7 +588,7 @@ if (missionH) {
   missionH.addEventListener('click', () => { const on = document.getElementById('mission').classList.toggle('collapsed'); try { localStorage.setItem('ardri_mission_collapsed', on ? '1' : '0'); } catch (e) {} });
 }
 ui.showTitle(); // title screen; Mission One starts the game
-if (!campaign.home) openKingdomMap('choose'); // first run: pick a home and colours
+if (!campaign.home) openKingdomMap('choose', 'intro'); // first run: pick a home, then the opening tale drops you into the ráth
 
 // --- Placement preview ---
 const preview = new THREE.Mesh(
@@ -1012,17 +1013,31 @@ function checkMission() {
 }
 
 // A Zeus-style illuminated interstitial between chapters.
-let narrativeWired = false;
-function showNarrative(nx) {
-  if (!nx) { advanceLevel(); return; }
+let narrativeWired = false, _narrDone = null;
+function showNarrative(nx, onDone) {
+  if (!nx) { (onDone || advanceLevel)(); return; }
+  _narrDone = onDone || advanceLevel;
   const $ = (id) => document.getElementById(id);
   $('narr-banner').style.background = nx.motif || 'linear-gradient(160deg,#2a3a1e,#4a6b2e)';
   $('narr-emoji').textContent = nx.emoji || '🌿';
   $('narr-title').textContent = nx.title || '';
   $('narr-ga').textContent = nx.ga || '';
   $('narr-body').innerHTML = (nx.body || []).map((p) => `<p>${p}</p>`).join('');
-  if (!narrativeWired) { $('narr-continue').addEventListener('click', () => { $('narrative-screen').classList.add('hidden'); advanceLevel(); }); narrativeWired = true; }
+  if (!narrativeWired) { $('narr-continue').addEventListener('click', () => { $('narrative-screen').classList.add('hidden'); const d = _narrDone; _narrDone = null; if (d) d(); }); narrativeWired = true; }
   $('narrative-screen').classList.remove('hidden');
+}
+// The opening: after choosing a home, an intro page, then into the ráth.
+function showIntro() {
+  const k = kingdomById(campaign.home);
+  campaign._introSeen = true; saveCampaign();
+  showNarrative({
+    emoji: '🌱', motif: 'linear-gradient(160deg,#2a3a1e,#4a6b2e)', title: 'A New Ráth', ga: 'Ráth Nua',
+    body: [
+      `${leaderName()}, you come to ${k ? k.en : 'this land'} in the last grey days of winter, your people at your back and a bare stretch of pasture before you.`,
+      'Imbolc is near — Brigid, daughter of the Dagda, will soon wake the earth. Before the festival fires are lit, raise your first hearths, sow the barley, and let a shrine stand.',
+      'These are the first steps of a reign that may yet end in the High Kingship of all Ériu. Build well — the land is watching.',
+    ],
+  }, enterSettlement);
 }
 
 window.addEventListener('resize', () => {
