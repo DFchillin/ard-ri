@@ -49,14 +49,7 @@ export class Game {
     gate.position.set(ew.x, 0, ew.z);
     scene.add(gate);
 
-    this.objectives = [
-      { text: 'Build 4 dwellings', done: false, check: (g) => g.count('dwelling') >= 4 },
-      { text: 'Sow a barley field', done: false, check: (g) => g.count('farm') >= 1 },
-      { text: 'Store grain', done: false, check: (g) => g.anyStock('granary') },
-      { text: 'Stock a market', done: false, check: (g) => g.anyStock('market') },
-      { text: 'Feed a dwelling', done: false, check: (g) => g.buildings.some((b) => b.def.role === 'dwelling' && b.food > 0) },
-      { text: 'Raise a shrine', done: false, check: (g) => g.count('altar') >= 1 },
-    ];
+    this.objectives = []; // set per-level by main via setObjectives()
   }
 
   showInspectDots(on) { this._inspectDots = on; for (const b of this.buildings) if (b.dot) b.dot.visible = on; }
@@ -274,7 +267,6 @@ export class Game {
       if (active !== b.active) { b.active = active; setChipActive(b.sprite, active); if (b.fx) b.fx.setActive(active); }
       this._tickBuilding(b);
     }
-    for (const o of this.objectives) if (!o.done && o.check(this)) o.done = true;
   }
 
   _tickBuilding(b) {

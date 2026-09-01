@@ -12,6 +12,7 @@ import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById } from './data/kingdoms.js?v=
 import { CODEX } from './data/codex.js?v=CBUST';
 import { UNIT_TYPES } from './battle/units.js?v=CBUST';
 import { GOODS, HOSTING, HOST_ORDER, canHost, reqText } from './data/trade.js?v=CBUST';
+import { LEVELS, levelById } from './data/levels.js?v=CBUST';
 
 const DAYS_PER_MONTH = 6;
 const SECONDS_PER_DAY = 2.6; // real seconds per in-game day at 1×
@@ -167,6 +168,7 @@ const battle = new Battle({
       if (Math.random() < 0.5) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; campaign._looted = gk; } // and sometimes foreign spoils
       if (campaign._raidFar && campaign.target && !isColony(campaign.target)) { const k = foundColony(campaign.target); if (k) { campaign._newColony = k.en; campaign._colonyWin = true; } }
     }
+    if (won && battle.scenario === 'defend' && campaign.level === 3) campaign._menaceRepelled = true; // the menace is thrown back
     if (ransack) {
       const lost = Math.floor(campaign.cattle / 2) + 6; setCattle(campaign.cattle - lost); campaign._ransacked = lost;
       if (campaign.colonies.length && Math.random() < 0.5) { const gone = campaign.colonies.splice((Math.random() * campaign.colonies.length) | 0, 1)[0]; campaign._ransacked = lost; flashNotice(`🏴 While you fought at home, ${gone.name} threw off your yoke.`); }
@@ -233,9 +235,11 @@ function collectColonyTribute() {
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
 const CAMPAIGN_KEY = 'ardri_campaign';
 const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 };
-let campaign = Object.assign({ leader: null, home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 40, mapSeed: _mapSeed, settlement: null }, _savedCampaign);
+let campaign = Object.assign({ leader: null, home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 0, mapSeed: _mapSeed, settlement: null, level: 1, doneObjectives: [] }, _savedCampaign);
 if (!campaign.roster) campaign.roster = { ...DEFAULT_ROSTER };
 if (!campaign.fallen) campaign.fallen = [];
+if (!campaign.level) campaign.level = 1;
+if (!campaign.doneObjectives) campaign.doneObjectives = [];
 if (!campaign.goods) campaign.goods = {};
 if (!campaign.hosted) campaign.hosted = {};
 if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won by raiding further afield
@@ -244,6 +248,27 @@ function saveCampaign() { try { localStorage.setItem(CAMPAIGN_KEY, JSON.stringif
 function saveSettlement() { campaign.settlement = game.snapshot(); campaign.cattle = game.cattle; saveCampaign(); }
 // Cattle is single-sourced on the campaign; the settlement mirrors it.
 function setCattle(n) { campaign.cattle = Math.max(0, Math.round(n)); game.cattle = campaign.cattle; pushStats(); saveCampaign(); }
+
+// --- Levels: the campaign told in chapters ---
+let levelObjectives = [];
+function loadLevel() {
+  const lvl = levelById(campaign.level);
+  levelObjectives = lvl.objectives.map((o) => ({ text: o.text, check: o.check, done: campaign.doneObjectives.includes(o.text) }));
+  ui.setLevel(campaign.level);
+  const h = document.querySelector('#mission h4'); if (h) h.textContent = lvl.title;
+  refreshObjectives();
+}
+function refreshObjectives() { ui.setObjectives(levelObjectives); }
+function completeLevel() {
+  pauseGame();
+  const lvl = levelById(campaign.level);
+  ui.showFestival({ name: 'Chapter Complete', emoji: '🏆', sub: `${lvl.title} — the folk prosper under ${leaderName()}.`, onDone: () => showNarrative(lvl.next) });
+}
+function advanceLevel() {
+  if (campaign.level < LEVELS.length) { campaign.level += 1; campaign.doneObjectives = []; missionDone = false; saveCampaign(); loadLevel(); }
+  else { campaign.won = true; saveCampaign(); }
+  resumeGame();
+}
 battle.setLivery(campaign.livery);
 // Restore a standing ráth if one was saved on this device.
 if (campaign.settlement) {
@@ -252,6 +277,7 @@ if (campaign.settlement) {
   view.rebuildRoads(); view.rebuildCros();
   started = true; // you already have a settlement — the sim runs
 }
+game.cattle = campaign.cattle; // single-source the herd from the start (fresh campaigns begin with none)
 saveCampaign();
 
 // A small Gaelic name-bank so the war-dead are remembered by name, not tally.
@@ -486,7 +512,7 @@ function applySeason(key) {
 }
 function pushStats() {
   ui.setStats({ cattle: game.cattle, silver: game.silver, folk: game.folk });
-  ui.setObjectives(game.objectives);
+  refreshObjectives();
 }
 function updateDate() {
   ui.setStats({ season: SEASONS[curSeason].ga, day: `${MONTHS_EN[cal.month].slice(0, 3)} ${cal.day}` });
@@ -522,6 +548,7 @@ function triggerAdvisor() {
 }
 
 applySeason(curSeason);
+loadLevel();
 pushStats();
 updateDate();
 ui.setCompass(cameraDirLabel(camera));
@@ -834,7 +861,10 @@ function confirmBuild() {
   if (pendingDemolish) { commitDemolish(); return; }
   if (!pendingBuild || !BUILDINGS[tool]) return;
   const f = footprint(tool, pendingBuild);
-  if (game.place(tool, f)) { pushStats(); saveSettlement(); cancelPending(); }
+  if (game.place(tool, f)) {
+    if (tool === 'homestead') { setCattle(campaign.cattle + 25); flashNotice('🐄 Your founding herd settles on the pasture — the wealth of a rí begins.'); } // cattle arrives with the homestead
+    pushStats(); saveSettlement(); cancelPending();
+  }
 }
 function cancelPending() {
   pendingBuild = null;
@@ -940,11 +970,28 @@ window.addEventListener('keydown', (e) => {
 });
 
 function checkMission() {
-  if (!missionDone && game.objectives.every((o) => o.done)) {
-    missionDone = true;
-    pauseGame();
-    ui.showFestival({ name: 'Mission Complete', emoji: '🏆', sub: 'Comhghairdeas! Your settlement thrives — the first steps are taken.' });
+  if (!levelObjectives.length) return;
+  let changed = false, all = true;
+  for (const o of levelObjectives) {
+    if (!o.done && o.check(game, campaign)) { o.done = true; changed = true; if (!campaign.doneObjectives.includes(o.text)) campaign.doneObjectives.push(o.text); }
+    if (!o.done) all = false;
   }
+  if (changed) { refreshObjectives(); saveCampaign(); }
+  if (!missionDone && all) { missionDone = true; completeLevel(); }
+}
+
+// A Zeus-style illuminated interstitial between chapters.
+let narrativeWired = false;
+function showNarrative(nx) {
+  if (!nx) { advanceLevel(); return; }
+  const $ = (id) => document.getElementById(id);
+  $('narr-banner').style.background = nx.motif || 'linear-gradient(160deg,#2a3a1e,#4a6b2e)';
+  $('narr-emoji').textContent = nx.emoji || '🌿';
+  $('narr-title').textContent = nx.title || '';
+  $('narr-ga').textContent = nx.ga || '';
+  $('narr-body').innerHTML = (nx.body || []).map((p) => `<p>${p}</p>`).join('');
+  if (!narrativeWired) { $('narr-continue').addEventListener('click', () => { $('narrative-screen').classList.add('hidden'); advanceLevel(); }); narrativeWired = true; }
+  $('narrative-screen').classList.remove('hidden');
 }
 
 window.addEventListener('resize', () => {
@@ -955,7 +1002,7 @@ window.addEventListener('resize', () => {
 });
 
 window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
-  _dbg: { foundColony, collectColonyTribute, isColony },
+  _dbg: { foundColony, collectColonyTribute, isColony, showNarrative, completeLevel, loadLevel, levelById },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
     const v = new THREE.Vector3(w.x, 0.1, w.z).project(camera);

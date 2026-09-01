@@ -172,11 +172,15 @@ export class UI {
     this.tabsEl.firstChild.classList.add('active');
   }
 
+  setLevel(n) { this.level = n; if (this._curCat) this._renderList(this._curCat); }
   _renderList(catId) {
+    this._curCat = catId;
     const cat = CATEGORIES.find((c) => c.id === catId);
     this.listEl.innerHTML = '';
     for (const key of cat.items) {
       const def = SPECIAL_ITEMS[key] || BUILDINGS[key];
+      if (def.unlockLevel && (this.level || 1) < def.unlockLevel) continue; // locked until its level
+
       const b = document.createElement('button');
       b.className = 'build-btn';
       b.dataset.key = key;

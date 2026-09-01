@@ -13,7 +13,7 @@ export const BUILDINGS = {
     desc: 'Clean water for the settlement. Its water-carrier is paid from your treasury.' },
   altar: { label: 'Altar', sprite: 'altar', icon: '🗿', footprint: [1, 1], cost: 12, role: 'altar', upkeep: 3,
     desc: 'A standing-stone shrine. Its druid is kept by your treasury.' },
-  homestead: { label: 'Leader’s Homestead', sprite: 'roundhouse', icon: '🐄', footprint: [3, 3], cost: 30, role: 'homestead', unique: true, folk: 2,
+  homestead: { label: 'Leader’s Homestead', sprite: 'roundhouse', icon: '🐄', footprint: [3, 3], cost: 30, role: 'homestead', unique: true, folk: 2, unlockLevel: 2,
     desc: 'Your own ráth and the seat of your rule. Cattle — the true measure of a king — graze the open pasture around it and multiply. Wealth to send in tribute or trade for what Ériu cannot make, and the prize a raider drives off.' },
 };
 

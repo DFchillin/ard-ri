@@ -187,6 +187,19 @@ html, body {
 .codex-entry .cx-repr b { color: var(--gold); font-weight: 600; }
 .title-link { margin-top: 14px; background: none; border: none; color: var(--gold); font-family: var(--font-body); font-size: 14px; cursor: pointer; text-decoration: underline; opacity: 0.9; }
 
+/* Narrative interstitial between chapters (Zeus-style) */
+#narrative-screen { z-index: 60; background: rgba(4,8,10,0.86); }
+.narr-card { background: var(--panel); border: 1px solid var(--gold); border-radius: 14px; width: min(560px, 94vw); max-height: 92vh; overflow: auto; text-align: center; padding-bottom: 20px; }
+.narr-banner { height: 150px; border-radius: 13px 13px 0 0; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+.narr-banner::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 -40px 40px rgba(11,20,24,0.85); }
+.narr-banner span { font-size: 76px; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); position: relative; z-index: 1; }
+#narr-title { font-family: var(--font-title); color: var(--gold); font-weight: normal; font-size: 26px; margin: 14px 20px 2px; }
+.narr-ga { font-family: var(--font-display); opacity: 0.8; font-size: 14px; margin-bottom: 10px; }
+#narr-body { text-align: left; padding: 0 24px; }
+#narr-body p { font-size: 14.5px; line-height: 1.5; margin: 0 0 12px; opacity: 0.94; }
+#narr-body p:first-letter { font-family: var(--font-display); font-size: 1.6em; color: var(--gold); }
+.narr-card .continue-btn { width: auto; padding: 10px 30px; margin-top: 8px; }
+
 /* Manage Campaign modal + leader-name input */
 #kg-name-in, #manage-name {
   width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); color: var(--ink);
