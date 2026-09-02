@@ -8,6 +8,7 @@ import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNic
 const MAP = 20;
 const SUMMONABLE = ['cuchulainn', 'fionn', 'dagda', 'morrigan']; // heroes/gods that only answer a hosted, favoured muster
 const CLASH_DT = 0.55;
+const CORPSE_TTL = 1.3; // how long a fallen unit lies on the field playing its death frames before it is cleared
 const MOVE = 0.58;         // slower march so there's time to react and re-order
 const ATTACK_RANGE = 1.7;
 const AGGRO = 6;
@@ -60,7 +61,7 @@ export class Battle {
     this.active = false; this.phase = 'idle'; this.started = false;
     this.units = []; this.companies = []; this.buildings = []; this.selected = new Set();
     this.forming = null; this.placing = false; this.marquee = false;
-    this._clashAcc = 0; this._pointers = new Map();
+    this._clashAcc = 0; this._pointers = new Map(); this._dying = [];
     // Your war-band, kept in memory between battles: folk grow tiers by surviving
     // wins, and fall in defeat. (Later this is derived from the settlement itself.)
     this.roster = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1 };
@@ -130,8 +131,10 @@ export class Battle {
     this.cfg = SCENARIOS[scenario] || SCENARIOS.defend;
     this.active = true; this.started = false; this.phase = 'muster';
     for (const u of this.units) this.unitGroup.remove(u.mesh);
+    for (const c of this._dying || []) this.unitGroup.remove(c.u.mesh);
     for (const b of this.buildings) { this.buildingGroup.remove(b.chip); this.buildingGroup.remove(b.bar); }
     this.units = []; this.companies = []; this.buildings = []; this.selected.clear();
+    this._dying = [];
     this.fallen = [];
     this._randomTerrain((Math.random() * 0x7fffffff) | 0); // a different field every fight
     for (const d of this.cfg.buildings || []) this._spawnBuilding(d);
@@ -278,6 +281,17 @@ export class Battle {
   _liveCompanies(team) { return this.companies.filter((c) => c.team === team && !c.routing && c.units.some((u) => !u.dead)); }
   _liveUnits(team) { return this.units.filter((u) => u.team === team && !u.dead && !u.company.routing); }
 
+  // A slain unit is logically gone at once (dead), but its sprite lingers to play
+  // its death frames. Sprites with a die() (the battle-art units) fall where they
+  // stand; piece/walker figures without one are cleared immediately as before.
+  _killVisual(u) {
+    if (u.ring) u.ring.visible = false;
+    if (u.bar) u.bar.visible = false;
+    const spr = u.mesh.userData.spr;
+    if (spr && spr.die) { spr.die(); this._dying.push({ u, ttl: CORPSE_TTL }); }
+    else this.unitGroup.remove(u.mesh);
+  }
+
   // ---------- sim ----------
   update(dt) {
     if (!this.active) return;
@@ -286,6 +300,11 @@ export class Battle {
     for (const c of this.companies) if (c.cryT > 0) c.cryT -= dt;
     for (const u of this.units) if (!u.dead) this._move(u, dt);
     for (const u of this.units) { const spr = u.mesh.userData.spr; if (spr && spr.animate && !u.dead) spr.animate(dt, !!u._moving); }
+    for (let i = this._dying.length - 1; i >= 0; i--) {
+      const c = this._dying[i]; const spr = c.u.mesh.userData.spr;
+      if (spr && spr.animate) spr.animate(dt, false);
+      if ((c.ttl -= dt) <= 0) { this.unitGroup.remove(c.u.mesh); this._dying.splice(i, 1); }
+    }
     this._clashAcc += dt;
     if (this._clashAcc >= CLASH_DT) { this._clashAcc -= CLASH_DT; this._clash(); this._checkEnd(); }
     if (this.selected.size) this._renderCommand();
@@ -361,7 +380,7 @@ export class Battle {
       if (t.hp <= 0) {
         t.dead = true;
         if (t.kind === 'building') { this.buildingGroup.remove(t.chip); this.buildingGroup.remove(t.bar); }
-        else { t.killed = true; this.unitGroup.remove(t.mesh); if (t.company.leader === t) took.set(t.company, (took.get(t.company) || 0) + t.hp0 * 2); } // a fallen leader shakes the company
+        else { t.killed = true; if (t.company.leader === t) took.set(t.company, (took.get(t.company) || 0) + t.hp0 * 2); this._killVisual(t); } // a fallen leader shakes the company
       }
     }
     // collective morale per company

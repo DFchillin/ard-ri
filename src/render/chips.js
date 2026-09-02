@@ -138,7 +138,9 @@ const STRIKE_DUR = 0.5;
 export function makeWarriorChip(art, h = 1.6) {
   const F = {};
   for (const d of DIRS) F[d] = {};
-  const frames = ['idle', 'step1', 'step2', 'windup', 'strike'];
+  // idle/walk/attack always exist; hurt/fall/dead are the death set — optional,
+  // and any that hasn't been drawn yet falls back to idle at read-time.
+  const frames = ['idle', 'step1', 'step2', 'windup', 'strike', 'hurt', 'fall', 'dead'];
   for (const d of DIRS) for (const f of frames) F[d][f] = tex(`assets/battle/${art}/${d}_${f}.png`);
   const first = F.s.idle;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: first, transparent: true, alphaTest: 0.14 }));
@@ -146,16 +148,20 @@ export function makeWarriorChip(art, h = 1.6) {
   s.scale.set(h * 0.75, h, 1);
   const fit = () => { const i = first.image; if (i && i.width) s.scale.set(h * (i.width / i.height), h, 1); };
   onReady(first, fit);
-  s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._strike = 0;
+  s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._strike = 0; s._dying = false; s._death = 0;
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
   s.strike = () => { if (s._strike <= 0) s._strike = STRIKE_DUR; };
+  s.die = () => { s._dying = true; s._death = 0; }; // hurt → fall → dead, then hold
   s.animate = (dt, moving) => {
     const fr = F[screenDir(s._dx, s._dz)] || F.s;
     let key;
-    if (s._strike > 0) { s._strike -= dt; key = s._strike > STRIKE_DUR * 0.45 ? 'windup' : 'strike'; }
+    if (s._dying) { s._death += dt; key = s._death < 0.22 ? 'hurt' : s._death < 0.55 ? 'fall' : 'dead'; }
+    else if (s._strike > 0) { s._strike -= dt; key = s._strike > STRIKE_DUR * 0.45 ? 'windup' : 'strike'; }
     else if (moving) { s._t += dt; if (s._t >= B_STEP) { s._t -= B_STEP; s._phase = (s._phase + 1) % 4; } key = B_WALK[s._phase]; }
     else key = 'idle';
-    if (s.material.map !== fr[key]) { s.material.map = fr[key]; s.material.needsUpdate = true; }
+    let m = fr[key];
+    if (!m || m._failed) m = fr.idle; // death art not drawn yet — stay on idle rather than blank
+    if (s.material.map !== m) { s.material.map = m; s.material.needsUpdate = true; }
   };
   return s;
 }
