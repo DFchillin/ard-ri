@@ -18,7 +18,7 @@ export class Walker {
     this.t = 0;
     this.done = false;
 
-    this.sprite = makeWalkerChip(type);
+    this.sprite = makeWalkerChip(type, this.person ? this.person.female : undefined);
     this.sprite.userData = { kind: 'walker', person: this.person, type };
     this._moveSpriteTo(this.cur, this.cur, 0);
     if (onTile) onTile(this.cur.x, this.cur.z);
@@ -88,7 +88,7 @@ export class Traveler {
     this.a = map.tileToWorld(startTile.x, startTile.z);
     this.b = map.tileToWorld(targetTile.x, targetTile.z);
     this.dist = Math.hypot(this.b.x - this.a.x, this.b.z - this.a.z) || 1;
-    this.sprite = makeWalkerChip(type);
+    this.sprite = makeWalkerChip(type, this.person ? this.person.female : undefined);
     this.sprite.userData = { kind: 'walker', person: this.person, type };
     this.sprite.position.set(this.a.x, 0.05, this.a.z);
     if (this.sprite.faceWorld) this.sprite.faceWorld(targetTile.x - startTile.x, targetTile.z - startTile.z);

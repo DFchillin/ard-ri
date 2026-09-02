@@ -78,6 +78,8 @@ const ui = new UI({
   onLedger: () => showLedger(),
   onAdvisors: () => showAdvisors(),
 });
+// Lets the build menu hide a unique building (the homestead) once one is raised.
+ui.builtCount = (role) => game.count(role);
 
 function showAdvisors() {
   const B = game.buildings;
@@ -158,7 +160,7 @@ const battle = new Battle({
     if (cattle) setCattle(campaign.cattle - cattle);
     ui.showFestival({ name: 'A Truce', emoji: '🕊️', sub: `You paid a bóruma of ${cattle} cattle and withdrew. No blood was shed this day — though the foe remembers your silver.` });
   },
-  onExit: () => ui.showTitle(),
+  onExit: () => { ui.showTitle(); refreshCampaignButton(); },
   onResolve: ({ won, roster, fallen, ransack }) => {
     campaign.ghosts = roster.ghost || 0;
     const r = { ...roster }; delete r.ghost; campaign.roster = r;
@@ -456,6 +458,12 @@ function buildCodex() {
 }
 function openCodex() { buildCodex(); document.getElementById('codex-screen').classList.remove('hidden'); }
 function leaderName() { return campaign.leader || 'a Rí'; }
+// The main campaign button reads "Continue as <leader>" once a reign is under way.
+function refreshCampaignButton() {
+  const btn = document.querySelector('.mission-btn[data-mission="1"]');
+  if (!btn) return;
+  btn.textContent = (campaign.leader && campaign.home) ? `⚔ Continue as ${campaign.leader}` : '⚔ Play the Campaign';
+}
 
 // --- Manage Campaign: rename, export/import a JSON save, restart ---
 let manageWired = false;
@@ -635,6 +643,7 @@ if (missionH) {
   missionH.addEventListener('click', () => { const on = document.getElementById('mission').classList.toggle('collapsed'); try { localStorage.setItem('ardri_mission_collapsed', on ? '1' : '0'); } catch (e) {} });
 }
 ui.showTitle(); // title screen; Mission One starts the game
+refreshCampaignButton();
 if (!campaign.home) openKingdomMap('choose', 'intro'); // first run: pick a home, then the opening tale drops you into the ráth
 
 // --- Placement preview ---
@@ -826,7 +835,7 @@ function personHtml(p) {
 function buildingHtml(inst) {
   const d = inst.def;
   let extra = '';
-  if (d.role === 'granary' || d.role === 'market') extra = `<p>Grain in store: ${inst.stock}</p>`;
+  if (d.role === 'granary' || d.role === 'market') extra = `<p>Harvest in store: ${inst.stock}</p>`;
   if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10 · Water: ${inst.water}/10 · Culture: ${inst.culture}/10</p>`;
   if (d.role === 'altar') extra = altarHtml();
   if (d.role === 'homestead') { const graze = game._grazing(inst); const cap = 20 + graze * 4; extra = `<p>Herd: 🐄 ${inst.herd} / ${cap} · Grazing land: ${graze} tiles</p><p class="dim">Leave open pasture around the ráth and the herd grows faster. Cattle is your wealth in the wider world — and what a raider carries off.</p><button id="trade-btn" class="continue-btn">🌍 Trade in the wider world</button>`; }
@@ -839,11 +848,12 @@ function pipelineNote(inst) {
   const warn = (t) => `<p class="pl-warn">⚠ ${t}</p>`;
   const flow = (t) => `<p class="pl-ok">→ ${t}</p>`;
   if (d.role === 'farm') {
-    const grow = inst.ripe ? 'Barley ripe — bringing the harvest in. ' : 'Barley growing… ';
-    if (!road) return warn(grow + 'No road — lay a road linking this field to a grain store.');
-    if (g.count('granary') === 0) return warn(grow + 'No grain store — build a Grain Store for the harvest to fill.');
+    const crop = d.produce === 'apples' ? 'Apples' : 'Barley';
+    const grow = inst.ripe ? `${crop} ripe — bringing the harvest in. ` : `${crop} growing… `;
+    if (!road) return warn(grow + 'No road — lay a road linking this plot to a grain store.');
+    if (g.count('granary') === 0) return warn(grow + 'No store — build a Grain Store for the harvest to fill.');
     if (g.folk < 4) return warn(grow + `Too few folk (${g.folk}/4) — four settlers are needed to bring a harvest in.`);
-    return flow(grow + 'A grain-carrier runs the barley to a grain store along the roads.');
+    return flow(grow + 'A carrier runs the harvest to a store, and markets sell it on to the dwellings.');
   }
   if (d.role === 'granary') return road ? flow('Fields fill it with grain; markets restock from it.') : warn('No road — carriers and markets cannot reach it. Lay a road.');
   if (d.role === 'market') {
@@ -859,10 +869,17 @@ function pipelineNote(inst) {
   if (d.role === 'altar') return road ? '' : warn('No road — the druid cannot walk to the dwellings to raise culture.');
   if (d.role === 'dwelling') {
     const miss = [];
-    if (inst.food <= 0) miss.push('food (from a market)');
-    if (inst.water <= 0) miss.push('water (from a well)');
-    if (miss.length) return warn('Wants ' + miss.join(' and ') + ', carried here along the roads.');
-    return flow('Fed and watered — the folk are content.');
+    if (inst.food <= 0) miss.push('food (a market-trader must reach it)');
+    if (inst.water <= 0) miss.push('water (a well’s carrier must reach it)');
+    if (miss.length) return warn('Going without ' + miss.join(' and ') + '.');
+    // Not in want — name the single visit that would help this household most.
+    const needs = [
+      { v: inst.food, msg: 'A passing market-trader would help the food here most.' },
+      { v: inst.water, msg: 'A water-carrier’s round would help this home most.' },
+      { v: inst.culture, msg: 'A druid’s visit would lift this home most.' },
+    ].filter((n) => n.v < 8).sort((a, b) => a.v - b.v);
+    if (needs.length) return flow(needs[0].msg);
+    return flow('Fed, watered and heartened — a happy home sends two to the muster.');
   }
   return '';
 }
@@ -940,7 +957,7 @@ function commitDemolish() {
   const r = game.demolish(pendingDemolish.x, pendingDemolish.z);
   if (r === 'road') { view.rebuildRoads(); view.rebuildCros(); }
   if (r === 'cros') view.rebuildCros();
-  if (r) { pushStats(); saveSettlement(); }
+  if (r) { pushStats(); saveSettlement(); ui.refreshBuildMenu(); } // a razed unique building returns to the menu
   cancelPending();
 }
 
@@ -977,6 +994,7 @@ function confirmBuild() {
   const f = footprint(tool, pendingBuild);
   if (game.place(tool, f)) {
     if (tool === 'homestead') { setCattle(campaign.cattle + 25); flashNotice('🐄 Your founding herd settles on the pasture — the wealth of a rí begins.'); } // cattle arrives with the homestead
+    if (BUILDINGS[tool].unique) ui.refreshBuildMenu(); // a one-per-settlement building leaves the menu once built
     pushStats(); saveSettlement(); cancelPending();
   }
 }
@@ -1133,7 +1151,7 @@ window.addEventListener('resize', () => {
 });
 
 window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
-  _dbg: { foundColony, collectColonyTribute, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock },
+  _dbg: { foundColony, collectColonyTribute, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
     const v = new THREE.Vector3(w.x, 0.1, w.z).project(camera);
