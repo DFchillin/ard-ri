@@ -147,6 +147,67 @@ Scatter props & gate (each transparent, base-centre anchored):
 
 ---
 
+## BATTLE UNITS — 8 directions × animated frames
+These are the ceremonial-battle sprites (a different, taller ¾ *character* view
+than the tiny top-down walkers). Each `art` key is a folder of frames the engine
+slices at runtime.
+
+Files: `assets/battle/<art>/<DIR>_<FRAME>.png`
+- `DIR` ∈ `s se e ne n nw w sw` (S faces the camera, N faces away).
+- `FRAME` currently in the engine: `idle`, `step1`, `step2`, `windup`, `strike`.
+  → walk cycle is `step1 · idle · step2 · idle`; an attack plays `windup → strike`.
+- **Death (new):** add `hurt`, `fall`, `dead`. *(These need a small engine change
+  to play — the art can be generated first; until then they sit unused and cost
+  nothing.)* `dead` is the frame a corpse rests on.
+
+**Art keys and who they are** (your existing sprites map straight on):
+| key | who | your sprite |
+|---|---|---|
+| `warrior` | Warrior / Fénnid (shared) | "A common Gaelic warrior" |
+| `curadh` | Curadh / Seasoned (shared) | "An elite Gaelic warrior" |
+| `cuchulainn` | Cú Chulainn (hero) | Cú Chulainn |
+| `fionn` | Fionn mac Cumhaill (hero) | Fionn mac Cumhaill |
+| `dagda` | An Dagda (god, ~2× tall) | The Dagda |
+| `morrigan` | An Mhórrígan (god, ~2× tall) | The Morrígan |
+| `fomor` / `fuath` | the menace & its brood (foes) | "an isometric armoured" figure |
+
+### The time-saving workflow (do NOT hand-prompt 40 frames)
+Pixellab is built for exactly this — lean on rotate + animate, not one-off prompts:
+1. **Approve ONE base pose** per character (the S-facing idle you already have).
+2. **Rotate** → generate the 8 directions from that single base (keeps identity).
+3. **Animate across the rotations** → feed the action prompt once; it produces the
+   frames for every facing. Do walk, then attack, then death as three passes.
+4. **Slice & name** into `assets/battle/<art>/<dir>_<frame>.png`. Missing frames
+   fall back to the nearest that loaded, so you can ship partial sets safely.
+   Death can share a single collapse across all facings if you want to save time —
+   a crumpling body reads loosely at this scale.
+
+### BATTLE STYLE ADDENDUM (prepend the top STYLE BLOCK, then add this)
+> Full-body character in a ¾ battlefield view, standing roughly head-to-toe in
+> frame, heroic readable silhouette, base-of-feet anchored to the bottom edge.
+> Iron-Age Gaelic: léine and brat (cloak) with a penannular brooch, leather and
+> bronze, lime-washed round shield, spear or sword; mail only on the great. Keep
+> the SAME character, palette, weapon and proportions across every direction and
+> every frame — only the pose and facing change. No baked ground shadow.
+
+### Action prompts (apply to every character)
+- **idle** > a settled ready stance, weight even, weapon lowered, shield up, a faint breathing sway.
+- **walk (step1/step2)** > a mid-stride advance, opposite frames of one walk cycle — spear/sword arm swinging, shield tracking.
+- **attack (windup → strike)** > windup: weapon drawn back, weight loaded onto the back foot, shield braced. strike: a full committed thrust/overhead cut, lunging onto the front foot, shield flung wide — the peak of the blow.
+- **death (hurt → fall → dead)** > hurt: snapped back by a blow, arms flailing, shield dropping. fall: buckling to the knees, weapon slipping from the grip. dead: collapsed prone on the ground, shield and weapon fallen beside — still.
+
+### Per-character base (only if you need to re-derive a base)
+Attach the approved sprite and say *"match this exactly."* Otherwise:
+- **warrior** > a common Gaelic fighter: undyed léine, a moss-green brat pinned at the shoulder, boiled-leather chest guard, a lime-washed round shield with a bronze boss, a leaf-blade spear, a simple leather cap. Weathered, lean, dependable.
+- **curadh** > an elite champion: a fine dyed tunic, a knee-length mail shirt, an ornamented round shield, a long sword, an engraved bronze belt and arm-rings, a proud bearded bearing. Richer than the common warrior, same palette.
+- **cuchulainn** > Cú Chulainn, a beardless dark-haired youth blazing with battle-fury: bronze scale over a red tunic, a crimson brat streaming, the great spear Gáe Bolg and a bossed round shield, a hero's light about the brow. Twice a mortal's presence.
+- **fionn** > Fionn mac Cumhaill, a tall fair-haired chieftain of the Fianna: hunting greens and browns, a heavy travelling cloak, a long spear and a hunting knife, calm and commanding. A leader men rally to.
+- **dagda** > An Dagda, the Good God: a stout grey-bearded giant, a green cloak too short for him, a colossal club/mace slung over the shoulder, a cauldron at the belt, bare shins and heavy boots. Draw ~2× a mortal's height, comic-heroic and immense.
+- **morrigan** > An Mhórrígan, the Phantom Queen: a tall pale death-goddess, long black gown, a ragged cloak of crow feathers, black hair on the wind, a spear or a crow perched near, an aura of dread. Spectral, desaturated, ~2× height.
+- **fomor / fuath** > a Fomorian foe: a hulking, mis-shapen sea-giant in scavenged plate and a horned helm, one baleful eye, grey-green corpse-flesh, a crude heavy weapon. Menacing, asymmetric, clearly not of the Gael. *(fuath = a smaller water-fiend of the same brood.)*
+
+---
+
 ## Palette anchors (already in the build)
 If the tool takes hex, match the *mood* not the flat colour — these are the
 placeholder chip colours: dwelling `#c98a3a`, field `#8ea63a`, granary `#b0894a`,
