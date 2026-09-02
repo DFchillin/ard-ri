@@ -14,7 +14,7 @@ export const KINGDOMS = [
   { id: 'mide',      en: 'Mide',      ga: 'the middle kingdom', color: '#6fc3ce', pts: '505,305 610,298 648,430 515,458 495,345', label: [560, 378], seat: 'An Mhí, the centre' },
   { id: 'laigin',    en: 'Laigin',    ga: 'the Leinstermen', color: '#90b566', pts: '648,300 762,325 786,530 668,600 632,445', label: [706, 445], seat: 'Laighin, the east' },
   { id: 'tuadmumu',  en: 'Tuadmumu',  ga: 'Dál gCais · Thomond', color: '#6d8fce', pts: '405,435 505,458 525,565 435,598 360,510', label: [445, 512], seat: 'the lower Shannon' },
-  { id: 'desmumu',   en: 'Desmumu',   ga: 'Eóganacht · Desmond', color: '#d16a58', pts: '315,560 525,565 668,605 555,722 360,700', label: [460, 640], seat: 'Munster, the far south' },
+  { id: 'desmumu',   en: 'Desmumu',   ga: 'Eóganacht · Desmond', color: '#d16a58', pts: '290,560 525,565 668,605 560,725 380,745 295,655', label: [440, 655], seat: 'Munster, Kerry and the far south' },
 ];
 
 export const NEIGHBOURS = {

@@ -265,12 +265,28 @@ function placeMenace() {
   let cx = 16, cz = 14;
   if (game.buildings.length) { let sx = 0, sz = 0; for (const b of game.buildings) { sx += b.x; sz += b.z; } cx = Math.round(sx / game.buildings.length) + 5; cz = Math.round(sz / game.buildings.length) - 1; }
   game.spawnMenace(cx, cz, 4, 4);
-  flashNotice('☠️ A Fomorian giant strides out of the mist — its blight spreads, and nothing may be built where it treads.');
+  flashNotice('☠️ A Fomorian giant strides out of the mist. Tap the giant when your war-band is ready to march on it.');
 }
 function warbandSize() { return campaign.roster ? Object.values(campaign.roster).reduce((a, b) => a + b, 0) : 0; }
-function updateMenaceButton() {
-  const btn = document.getElementById('menace-btn'); if (!btn) return;
-  btn.classList.toggle('hidden', !(campaign.level === 3 && game.hasMenace() && !battle.active));
+function updateMenaceButton() {} // the menace is now met by tapping it, not a HUD button
+// Tap the Fomor to consider marching on it.
+function menaceHtml() {
+  const wb = warbandSize();
+  return `<h3>The Fomor</h3><div class="role">an Fomhórach · the menace</div>` +
+    `<p>A Fomorian giant lays waste to this ground. Nothing may be built where it treads, and its blight creeps outward with every turn of the year.</p>` +
+    `<p class="dim">Your war-band numbers ${wb}. You need at least four to march.</p>` +
+    `<button id="menace-march" class="continue-btn"${wb >= 4 ? '' : ' disabled'}>⚔ March on the Menace</button>`;
+}
+function openMenacePrompt() {
+  if (!game.hasMenace()) return;
+  ui.showInspect(menaceHtml(), false);
+  const btn = document.getElementById('menace-march');
+  if (btn) btn.addEventListener('click', () => { ui.hideInspect(); enterBattle('menace'); });
+}
+function menaceHitAt(e) {
+  if (!game.menace || !game.menace.creature) return false;
+  setNdc(e);
+  return raycaster.intersectObject(game.menace.creature, true).length > 0;
 }
 function refreshObjectives() { ui.setObjectives(levelObjectives); }
 function completeLevel() {
@@ -578,11 +594,6 @@ const codexBtn = document.getElementById('codex-open');
 if (codexBtn) codexBtn.addEventListener('click', openCodex);
 const manageBtn = document.getElementById('manage-open');
 if (manageBtn) manageBtn.addEventListener('click', openManage);
-const menaceBtn = document.getElementById('menace-btn');
-if (menaceBtn) menaceBtn.addEventListener('click', () => {
-  if (warbandSize() < 4) { flashNotice('⚔ Gather a war-band of at least four before you march on the menace.'); return; }
-  enterBattle('menace');
-});
 // Mission checklist collapses on a tap of its heading, so it never crowds the fabs.
 const missionH = document.querySelector('#mission h4');
 if (missionH) {
@@ -785,7 +796,41 @@ function buildingHtml(inst) {
   if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10 · Water: ${inst.water}/10 · Culture: ${inst.culture}/10</p>`;
   if (d.role === 'altar') extra = altarHtml();
   if (d.role === 'homestead') { const graze = game._grazing(inst); const cap = 20 + graze * 4; extra = `<p>Herd: 🐄 ${inst.herd} / ${cap} · Grazing land: ${graze} tiles</p><p class="dim">Leave open pasture around the ráth and the herd grows faster. Cattle is your wealth in the wider world — and what a raider carries off.</p><button id="trade-btn" class="continue-btn">🌍 Trade in the wider world</button>`; }
-  return `<h3>${d.label}</h3><div class="role">${d.role === 'homestead' ? 'Your seat' : 'Building'}</div><p>${d.desc}</p>${extra}`;
+  return `<h3>${d.label}</h3><div class="role">${d.role === 'homestead' ? 'Your seat' : 'Building'}</div><p>${d.desc}</p>${pipelineNote(inst)}${extra}`;
+}
+// Say plainly what a building needs to work — so the grain/water/culture
+// pipelines are never a mystery.
+function pipelineNote(inst) {
+  const d = inst.def, g = game, road = inst.connected;
+  const warn = (t) => `<p class="pl-warn">⚠ ${t}</p>`;
+  const flow = (t) => `<p class="pl-ok">→ ${t}</p>`;
+  if (d.role === 'farm') {
+    const grow = inst.ripe ? 'Barley ripe — bringing the harvest in. ' : 'Barley growing… ';
+    if (!road) return warn(grow + 'No road — lay a road linking this field to a grain store.');
+    if (g.count('granary') === 0) return warn(grow + 'No grain store — build a Grain Store for the harvest to fill.');
+    if (g.folk < 4) return warn(grow + `Too few folk (${g.folk}/4) — four settlers are needed to bring a harvest in.`);
+    return flow(grow + 'A grain-carrier runs the barley to a grain store along the roads.');
+  }
+  if (d.role === 'granary') return road ? flow('Fields fill it with grain; markets restock from it.') : warn('No road — carriers and markets cannot reach it. Lay a road.');
+  if (d.role === 'market') {
+    if (!road) return warn('No road — cannot reach a grain store. Lay a road.');
+    if (!g.anyStock('granary')) return warn('No stocked grain store on the roads yet — a field must fill a store first.');
+    return flow('Restocks from a grain store and feeds the dwellings on its route.');
+  }
+  if (d.role === 'well') {
+    if (!road) return warn('No road — the water-carrier cannot reach the dwellings.');
+    if (g.broke) return warn('Treasury empty — the water-carrier goes unpaid.');
+    return flow('Sends a water-carrier to the dwellings along the roads.');
+  }
+  if (d.role === 'altar') return road ? '' : warn('No road — the druid cannot walk to the dwellings to raise culture.');
+  if (d.role === 'dwelling') {
+    const miss = [];
+    if (inst.food <= 0) miss.push('food (from a market)');
+    if (inst.water <= 0) miss.push('water (from a well)');
+    if (miss.length) return warn('Wants ' + miss.join(' and ') + ', carried here along the roads.');
+    return flow('Fed and watered — the folk are content.');
+  }
+  return '';
 }
 // An altar is also a place to pray to the war-dead — the roll of the fallen,
 // and the rite that calls one back to the muster as a ghost warrior.
@@ -812,6 +857,7 @@ function terrainHtml(tile) {
 }
 function inspectAt(e) {
   setNdc(e);
+  if (menaceHitAt(e)) { openMenacePrompt(); return; }
   const wh = raycaster.intersectObjects(game.walkerGroup.children, true)[0];
   if (wh) {
     let o = wh.object;
@@ -866,7 +912,7 @@ function commitDemolish() {
 
 // --- Input: build / road-paint / demolish / inspect + pan + pinch ---
 const pointers = new Map();
-let painting = false, demolishing = false, panLast = null, pinchDist = 0;
+let painting = false, demolishing = false, panLast = null, pinchDist = 0, tapStart = null;
 let pendingBuild = null, movingBuild = false;
 let pendingRoad = null, drawingRoad = false;
 let pendingDemolish = null;
@@ -954,6 +1000,7 @@ canvas.addEventListener('pointerdown', (e) => {
     if (BUILDINGS[tool]) { movingBuild = true; showGhostAt(tileUnderPointer(e)); return; }
   }
   panLast = { x: e.clientX, y: e.clientY }; // no build tool, or right-drag → pan
+  if (e.button !== 2 && !tool) tapStart = { x: e.clientX, y: e.clientY }; // a plain tap in roam mode may hit the menace
 });
 
 canvas.addEventListener('pointermove', (e) => {
@@ -976,6 +1023,8 @@ function endPointer(e) {
   if (battle.active) { battle.pointerUp(e); return; }
   pointers.delete(e.pointerId);
   if (pointers.size < 2) pinchDist = 0;
+  if (tapStart && game.hasMenace() && Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) < 8 && menaceHitAt(e)) { tapStart = null; openMenacePrompt(); return; }
+  tapStart = null;
   if (pointers.size === 0) {
     painting = false; demolishing = false; panLast = null; movingBuild = false;
     if (drawingRoad) {

@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js?v=CBUST';
 import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeMenaceCreature, setChipActive } from '../render/chips.js?v=CBUST';
 import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
-import { emitterFor } from '../render/effects.js?v=CBUST';
+import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
 
-const FX_TOP = { dwelling: 2.4, farm: 0.9, market: 1.8 }; // effect ceiling per role
+const FX_TOP = { dwelling: 2.4, farm: 0.9, market: 1.8, homestead: 2.8 }; // effect ceiling per role
 import { Walker, Traveler } from './walkers.js?v=CBUST';
 import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=CBUST';
 import { randomName } from '../data/names.js?v=CBUST';
@@ -212,7 +212,12 @@ export class Game {
     const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile);
     const c = this._center(f);
     chip.position.set(c.x, 0, c.z);
-    if (def.role === 'homestead') { const s = chip.userData && chip.userData.spr; if (s) s.material.color.setHex(0xf0dca8); inst.herdGroup = new THREE.Group(); chip.add(inst.herdGroup); }
+    if (def.role === 'homestead') {
+      const s = chip.userData && chip.userData.spr; if (s) s.material.color.setHex(0xf0dca8);
+      inst.herdGroup = new THREE.Group(); chip.add(inst.herdGroup);
+      const graze = new Emitter('graze', { w: HERD_RADIUS * 2, h: HERD_RADIUS * 2, tile: this.map.tile, topY: 0.9 }); // green glitter over the grazing fields
+      graze.setActive(true); chip.add(graze.group); inst.fx2 = graze;
+    }
     const alert = makeAlertMarker();
     alert.position.set(0, 2.7, 0);
     alert.visible = false;
@@ -251,7 +256,7 @@ export class Game {
   load(snap) {
     if (!snap) return;
     this.clearMenace();
-    for (const b of this.buildings.slice()) { this.buildingGroup.remove(b.sprite); if (b.fx) b.fx.dispose(); }
+    for (const b of this.buildings.slice()) { this.buildingGroup.remove(b.sprite); if (b.fx) b.fx.dispose(); if (b.fx2) b.fx2.dispose(); }
     this.buildings = [];
     for (const w of this.walkers.slice()) this.walkerGroup.remove(w.sprite);
     this.walkers = [];
@@ -296,6 +301,7 @@ export class Game {
         }
       this.buildingGroup.remove(inst.sprite);
       if (inst.fx) inst.fx.dispose();
+      if (inst.fx2) inst.fx2.dispose();
       this.buildings = this.buildings.filter((b) => b !== inst);
       if (inst.pop) this.folk = Math.max(0, this.folk - inst.pop);
       if (refund) this.silver += Math.floor(inst.def.cost / 2);
@@ -510,7 +516,7 @@ export class Game {
 
   // Ambient particle effects — real time, so they drift even while paused.
   updateFx(dt) {
-    for (const b of this.buildings) if (b.fx) b.fx.update(dt);
+    for (const b of this.buildings) { if (b.fx) b.fx.update(dt); if (b.fx2) b.fx2.update(dt); }
     if (this.menace) this._moveMenaceCreature(dt);
   }
 
