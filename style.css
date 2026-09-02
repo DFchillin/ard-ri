@@ -527,7 +527,7 @@ table.ledger .neg { color: #e08a6a; }
   margin: 10px 0 28px;
 }
 .mission-menu { display: flex; flex-direction: column; gap: 10px; align-items: center; }
-.mission-btn {
+.mission-btn, .menu-btn {
   width: min(320px, 84vw);
   padding: 14px 18px;
   background: #223b30;
@@ -536,9 +536,13 @@ table.ledger .neg { color: #e08a6a; }
   border-radius: 12px;
   font-family: var(--font-display);
   font-size: 16px;
+  cursor: pointer;
 }
-.mission-btn:not(.locked):hover { background: var(--gold); color: #1c130a; border-color: var(--gold); }
+.mission-btn:not(.locked):hover, .menu-btn:hover { background: var(--gold); color: #1c130a; border-color: var(--gold); }
 .mission-btn.locked { opacity: 0.4; cursor: default; }
+/* The two sandbox entries sit smaller and quieter below the three main buttons. */
+.sandbox-row { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+.menu-btn.small { width: auto; flex: 1 1 auto; max-width: 160px; padding: 8px 12px; font-size: 13px; background: rgba(34,59,48,0.6); border-color: var(--border); opacity: 0.82; }
 
 /* Mobile: build panel becomes a persistent slide-in drawer */
 @media (max-width: 900px) {

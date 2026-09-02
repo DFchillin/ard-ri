@@ -6,6 +6,7 @@ import { makeBuildingChip, makeWalkerChip, makeWarriorChip } from '../render/chi
 import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNickname, UPSKILL, EMPLOYEES } from './units.js?v=CBUST';
 
 const MAP = 20;
+const SUMMONABLE = ['cuchulainn', 'fionn', 'dagda', 'morrigan']; // heroes/gods that only answer a hosted, favoured muster
 const CLASH_DT = 0.55;
 const MOVE = 0.58;         // slower march so there's time to react and re-order
 const ATTACK_RANGE = 1.7;
@@ -62,7 +63,7 @@ export class Battle {
     this._clashAcc = 0; this._pointers = new Map();
     // Your war-band, kept in memory between battles: folk grow tiers by surviving
     // wins, and fall in defeat. (Later this is derived from the settlement itself.)
-    this.roster = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 };
+    this.roster = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1 };
     this.employeeDebt = 0; // city folk lost, awaiting replacement
 
     this.scene = new THREE.Scene();
@@ -499,11 +500,18 @@ export class Battle {
   }
 
   setLivery(pair) { if (Array.isArray(pair) && pair.length === 2) LIVERY.player = pair.map((c) => typeof c === 'string' ? parseInt(c.replace('#', ''), 16) : c); }
-  // Adopt the campaign's persistent war-band, plus any ghost warriors prayed
-  // back at the altars, so the muster reflects what you actually hold.
-  loadWarband({ roster, ghosts } = {}) {
+  // Adopt the campaign's persistent war-band, plus any ghosts prayed back. Heroes
+  // and gods are not owned outright — a hosted one only *may* answer this muster:
+  // one chance in four, rising to near-certain if a shrine stands in the ráth.
+  loadWarband({ roster, ghosts, hosted, shrines } = {}) {
     if (roster) this.roster = Object.assign({}, roster);
     this.roster.ghost = ghosts || 0;
+    this.summoned = [];
+    const chance = shrines > 0 ? 0.85 : 0.25;
+    for (const h of SUMMONABLE) {
+      delete this.roster[h]; // never freely available
+      if (hosted && hosted[h] && Math.random() < chance) { this.roster[h] = 1; this.summoned.push(h); }
+    }
   }
   rotate(d) { rotateIsoCamera(this.camera, d); }
   zoom(f) { zoomIsoCamera(this.camera, f, this.aspect); }
@@ -545,9 +553,9 @@ export class Battle {
   _renderMuster() {
     const roster = document.getElementById('bs-roster'); roster.innerHTML = '';
     const inForming = (k) => this.forming.types.filter((x) => x === k).length;
-    const order = ['villager', 'water', 'grain', 'deaglan', 'druid', 'warrior', 'seasoned', 'curadh', 'cuchulainn', 'fionn', 'dagda', 'morrigan'];
-    if (this.pool.ghost > 0) order.push('ghost'); // only show the returned dead if you hold any
+    const order = ['villager', 'water', 'grain', 'deaglan', 'druid', 'warrior', 'seasoned', 'curadh', 'ghost', 'cuchulainn', 'fionn', 'dagda', 'morrigan'];
     for (const key of order) {
+      if (!((this.pool[key] || 0) > 0 || inForming(key) > 0)) continue; // only what you have a right to muster
       const t = UNIT_TYPES[key]; const left = (this.pool[key] || 0) - inForming(key);
       const b = document.createElement('button'); b.className = 'bs-unit cat-' + t.cat;
       b.innerHTML = `<b>${t.label} <span class="bs-left">${left}</span></b><small>${t.ga}</small>`; b.title = t.ga;

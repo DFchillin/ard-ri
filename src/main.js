@@ -234,7 +234,7 @@ function collectColonyTribute() {
 
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
 const CAMPAIGN_KEY = 'ardri_campaign';
-const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 };
+const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1 }; // heroes/gods are not owned — they are hosted and summoned
 let campaign = Object.assign({ leader: null, home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 0, mapSeed: _mapSeed, settlement: null, level: 1, doneObjectives: [] }, _savedCampaign);
 if (!campaign.roster) campaign.roster = { ...DEFAULT_ROSTER };
 if (!campaign.fallen) campaign.fallen = [];
@@ -243,6 +243,7 @@ if (!campaign.doneObjectives) campaign.doneObjectives = [];
 if (!campaign.goods) campaign.goods = {};
 if (!campaign.hosted) campaign.hosted = {};
 if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won by raiding further afield
+for (const h of ['cuchulainn', 'fionn', 'dagda', 'morrigan']) delete campaign.roster[h]; // heroes/gods are summoned, not owned — clean any legacy grant
 if (campaign.mapSeed == null) campaign.mapSeed = _mapSeed;
 function saveCampaign() { try { localStorage.setItem(CAMPAIGN_KEY, JSON.stringify(campaign)); } catch (e) {} }
 function saveSettlement() { campaign.settlement = game.snapshot(); campaign.cattle = game.cattle; saveCampaign(); }
@@ -312,7 +313,23 @@ saveCampaign();
 
 // A small Gaelic name-bank so the war-dead are remembered by name, not tally.
 const DEAD_NAMES = ['Bran', 'Oisín', 'Fergus', 'Niamh', 'Sadhbh', 'Cormac', 'Éimhear', 'Diarmuid', 'Lugh', 'Aoife', 'Conall', 'Gráinne', 'Naoise', 'Fiacha', 'Deirdre', 'Ruairí'];
-function enterBattle(scenario) { battle.loadWarband(campaign); battle.enter(scenario); }
+function enterBattle(scenario) {
+  battle.loadWarband({ roster: campaign.roster, ghosts: campaign.ghosts, hosted: campaign.hosted, shrines: game.count('altar') });
+  battle.enter(scenario);
+  announceSummons(battle.summoned || []); // heroes/gods that answered this muster
+}
+// Legends that answered the horn — announced as they take the field.
+const SUMMON_LORE = {
+  cuchulainn: { emoji: '🐕', name: 'Cú Chulainn', line: 'The Hound of Ulster answers your muster! Alone he held the ford against all Connacht in the Táin, and in his ríastrad — the warp-spasm — no host of mortals could stand before him.' },
+  fionn: { emoji: '🦌', name: 'Fionn mac Cumhaill', line: 'Fionn, lord of the Fianna, takes the field! He tasted the Salmon of Knowledge and won the wisdom of the world, and led the greatest war-band Ériu has known.' },
+  dagda: { emoji: '🍲', name: 'An Dagda', line: 'The Good God strides to your side! He bears the club that slays with one end and revives with the other, and the cauldron that never runs empty. The earth answers his tread.' },
+  morrigan: { emoji: '🐦‍⬛', name: 'An Mhórrígan', line: 'The Phantom Queen descends! Crow of the slaughter, she chooses who lives and who falls — and where she flies, the courage of your foes breaks.' },
+};
+function announceSummons(list) {
+  const q = list.slice();
+  const next = () => { const h = q.shift(); if (!h) return; const s = SUMMON_LORE[h]; ui.showFestival({ name: `${s.name} Joins the Fight!`, emoji: s.emoji, sub: s.line, onDone: next }); };
+  next();
+}
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const kg = { built: false, mode: 'choose', sel: null, regions: {} };
@@ -366,9 +383,9 @@ function selectKingdom(id) {
   if (kg.mode !== 'war') { document.getElementById('kg-seat').textContent = `Seat of ${k.seat}.`; act.textContent = `Begin in ${k.en} ▸`; return; }
   const far = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(id);
   document.getElementById('kg-seat').textContent = far
-    ? `Far across the water — win here and plant a colony in ${k.seat}, a new Dál that renders tribute home.`
+    ? `Further afield — march on ${k.seat}, and win to plant a colony there, a new Dál that renders tribute home.`
     : `A cattle-raid on ${k.seat}. Drive off their herd.`;
-  act.textContent = far ? `Sail against ${k.en} 🏴` : `Raid ${k.en} ⚔`;
+  act.textContent = far ? `March on ${k.en} 🏴` : `Raid ${k.en} ⚔`;
 }
 function openKingdomMap(mode, then) {
   buildKingdomMap();
@@ -506,10 +523,11 @@ function renderTrade() {
       btn.addEventListener('click', () => {
         if (!canHost(campaign.goods, key)) return;
         for (const [gk, n] of Object.entries(h.req)) campaign.goods[gk] -= n;
-        campaign.hosted[key] = true;
-        campaign.roster[key] = (campaign.roster[key] || 0) + 1; // now musters with your war-band
+        campaign.hosted[key] = true; // you now hold the *right* to summon them
+        if (campaign.roster[key]) delete campaign.roster[key]; // clean any stale grant
         saveCampaign(); renderTrade();
-        ui.showFestival({ name: `${t.label} Hosted`, emoji: '🌟', sub: `You have raised ${h.title}. ${t.label} will answer your muster in the battles to come.` });
+        const hasShrine = game.count('altar') > 0;
+        ui.showFestival({ name: `${t.label} Hosted`, emoji: '🌟', sub: `You have raised ${h.title}. ${t.label} may answer your muster — about one time in four, or four times in five if a shrine stands in your ráth. ${hasShrine ? 'Your shrine keeps their favour.' : 'Raise a shrine to keep their favour.'}` });
       });
       row.appendChild(btn);
     }
@@ -589,7 +607,14 @@ pushStats();
 updateDate();
 ui.setCompass(cameraDirLabel(camera));
 const mapFab = document.getElementById('map-fab');
-if (mapFab) mapFab.addEventListener('click', () => openKingdomMap(campaign.home ? 'war' : 'choose'));
+if (mapFab) mapFab.addEventListener('click', () => {
+  if (!campaign.home) { openKingdomMap('choose'); return; }
+  if (!raidsUnlocked()) { flashNotice('🗺 Your túath is not yet strong enough to send a raid abroad. Grow it and throw back the menace first, and the wider world is yours.'); return; }
+  openKingdomMap('war');
+});
+// Raiding and colonies open only once the settlement has proved itself by
+// weathering First Steps, the culture of Level 2, and casting out the menace.
+function raidsUnlocked() { return !!campaign._menaceRepelled || campaign.level > 3; }
 const codexBtn = document.getElementById('codex-open');
 if (codexBtn) codexBtn.addEventListener('click', openCodex);
 const manageBtn = document.getElementById('manage-open');
