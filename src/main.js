@@ -164,6 +164,7 @@ const battle = new Battle({
     const r = { ...roster }; delete r.ghost; campaign.roster = r;
     for (const f of fallen) campaign.fallen.push({ type: f.type, name: DEAD_NAMES[(Math.random() * DEAD_NAMES.length) | 0], season: curSeason });
     if (won && battle.scenario === 'attack') {
+      campaign.raidsWon = (campaign.raidsWon || 0) + 1; // a won foray abroad advances the map-era chapters
       setCattle(campaign.cattle + 8 + ((Math.random() * 8) | 0)); // plunder driven home from a won raid
       if (Math.random() < 0.5) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; campaign._looted = gk; } // and sometimes foreign spoils
       if (campaign._raidFar && campaign.target && !isColony(campaign.target)) { const k = foundColony(campaign.target); if (k) { campaign._newColony = k.en; campaign._colonyWin = true; } }
@@ -243,6 +244,7 @@ if (!campaign.doneObjectives) campaign.doneObjectives = [];
 if (!campaign.goods) campaign.goods = {};
 if (!campaign.hosted) campaign.hosted = {};
 if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won by raiding further afield
+if (campaign.raidsWon == null) campaign.raidsWon = 0; // won raids drive the map-era chapter unlocks (levels 4+)
 for (const h of ['cuchulainn', 'fionn', 'dagda', 'morrigan']) delete campaign.roster[h]; // heroes/gods are summoned, not owned — clean any legacy grant
 if (campaign.mapSeed == null) campaign.mapSeed = _mapSeed;
 function saveCampaign() { try { localStorage.setItem(CAMPAIGN_KEY, JSON.stringify(campaign)); } catch (e) {} }
@@ -296,9 +298,16 @@ function completeLevel() {
   ui.showFestival({ name: 'Chapter Complete', emoji: '🏆', sub: `${lvl.title} — the folk prosper under ${leaderName()}.`, onDone: () => showNarrative(lvl.next) });
 }
 function advanceLevel() {
-  if (campaign.level < LEVELS.length) { campaign.level += 1; campaign.doneObjectives = []; missionDone = false; saveCampaign(); loadLevel(); }
+  if (campaign.level < LEVELS.length) { campaign.level += 1; campaign.doneObjectives = []; missionDone = false; applyUnlock(levelById(campaign.level)); saveCampaign(); loadLevel(); }
   else { campaign.won = true; saveCampaign(); }
   resumeGame();
+}
+// Each map-era chapter brings home a new craft: a buildable (gated by unlockLevel
+// in the build menu), a granted muster unit, or both — announced as it lands.
+function applyUnlock(lvl) {
+  const u = lvl && lvl.unlock; if (!u) return;
+  if (u.grantUnit) campaign.roster[u.grantUnit.key] = (campaign.roster[u.grantUnit.key] || 0) + u.grantUnit.n;
+  if (u.note) flashNotice(u.note);
 }
 battle.setLivery(campaign.livery);
 // Restore a standing ráth if one was saved on this device.
@@ -1124,7 +1133,7 @@ window.addEventListener('resize', () => {
 });
 
 window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
-  _dbg: { foundColony, collectColonyTribute, isColony, showNarrative, completeLevel, loadLevel, levelById },
+  _dbg: { foundColony, collectColonyTribute, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
     const v = new THREE.Vector3(w.x, 0.1, w.z).project(camera);

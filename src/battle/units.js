@@ -16,6 +16,8 @@ export const UNIT_TYPES = {
   warrior:      { label: 'Warrior',        ga: 'laoch',             cat: 'warrior', rank: 2, atk: 2.0, hp: 5, build: 0.6, speed: 3.2, morale: 66, aura: 0, battle: { art: 'warrior', h: 1.5 }, piece: { color: 0xb0763a, tall: 0.9 } },
   seasoned:     { label: 'Seasoned Warrior', ga: 'óglach',          cat: 'seasoned', rank: 3, atk: 2.7, hp: 8, build: 0.9, speed: 2.8, morale: 80, aura: 0, battle: { art: 'curadh', h: 1.6 }, piece: { color: 0x4a6fae, tall: 1.05 } },
   curadh:       { label: 'Curadh',         ga: 'champion',          cat: 'special', rank: 4, atk: 4.4, hp: 16, build: 1.3, speed: 3.2, morale: 90, aura: 12, battle: { art: 'curadh', h: 1.8 }, piece: { color: 0xe0c060, tall: 1.2 } },
+  // --- the Fian: landless skirmishers won by renown abroad, fleet and fierce ---
+  fennid:       { label: 'Fénnid',         ga: 'warrior of the Fian', cat: 'warrior', rank: 2, atk: 2.3, hp: 5, build: 0.5, speed: 4.4, morale: 74, aura: 0, battle: { art: 'warrior', h: 1.5 }, piece: { color: 0x3a7a4a, tall: 0.95 } },
   // --- summoned heroes of the Fianna & the Red Branch: twice a mortal's height ---
   cuchulainn:   { label: 'Cú Chulainn',    ga: 'the Hound of Ulster', cat: 'hero', rank: 5, atk: 6.5, hp: 24, build: 1.8, speed: 3.4, morale: 96, aura: 14, battle: { art: 'cuchulainn', h: 2.9, tiles: 1 }, piece: { color: 0xe8a030, tall: 1.35 } },
   fionn:        { label: 'Fionn mac Cumhaill', ga: 'lord of the Fianna', cat: 'hero', rank: 5, atk: 5.2, hp: 22, build: 1.6, speed: 3.2, morale: 95, aura: 22, battle: { art: 'fionn', h: 2.9, tiles: 1 }, piece: { color: 0xe8c86b, tall: 1.35 } },
@@ -31,7 +33,7 @@ export const UNIT_TYPES = {
 
 // Promotion path: a regular who survives a won battle may grow into a warrior,
 // a warrior into a seasoned óglach — about three wins to climb a tier.
-export const UPSKILL = { villager: 'warrior', water: 'warrior', grain: 'warrior', deaglan: 'warrior', druid: 'warrior', warrior: 'seasoned' };
+export const UPSKILL = { villager: 'warrior', water: 'warrior', grain: 'warrior', deaglan: 'warrior', druid: 'warrior', fennid: 'seasoned', warrior: 'seasoned' };
 // City-paid folk: if they fall they take two seasons to replace.
 export const EMPLOYEES = ['water', 'grain', 'druid'];
 

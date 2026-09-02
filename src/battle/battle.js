@@ -553,7 +553,7 @@ export class Battle {
   _renderMuster() {
     const roster = document.getElementById('bs-roster'); roster.innerHTML = '';
     const inForming = (k) => this.forming.types.filter((x) => x === k).length;
-    const order = ['villager', 'water', 'grain', 'deaglan', 'druid', 'warrior', 'seasoned', 'curadh', 'ghost', 'cuchulainn', 'fionn', 'dagda', 'morrigan'];
+    const order = ['villager', 'water', 'grain', 'deaglan', 'druid', 'fennid', 'warrior', 'seasoned', 'curadh', 'ghost', 'cuchulainn', 'fionn', 'dagda', 'morrigan'];
     for (const key of order) {
       if (!((this.pool[key] || 0) > 0 || inForming(key) > 0)) continue; // only what you have a right to muster
       const t = UNIT_TYPES[key]; const left = (this.pool[key] || 0) - inForming(key);
