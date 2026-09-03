@@ -171,7 +171,9 @@ export class UI {
       b.addEventListener('click', () => {
         [...this.tabsEl.children].forEach((c) => c.classList.toggle('active', c === b));
         this._renderList(cat.id);
-        if (cat.items.length && this.activeTool !== cat.items[0]) this.selectTool(cat.items[0]); // arm the first item on tab change
+        const first = cat.items.find((k) => !this._itemHidden(k)); // arm the first VISIBLE item — never a gated/hidden one
+        if (first) { if (this.activeTool !== first) this.selectTool(first); }
+        else if (this.activeTool) this.selectTool(this.activeTool); // nothing to build here → disarm
       });
       this.tabsEl.appendChild(b);
     }
@@ -180,15 +182,23 @@ export class UI {
 
   setLevel(n) { this.level = n; if (this._curCat) this._renderList(this._curCat); }
   refreshBuildMenu() { if (this._curCat) this._renderList(this._curCat); }
+  // Whether a build item is hidden right now — locked by level, or a unique
+  // building already raised. The single source of truth for both the rendered
+  // list and which item a tab arms, so an invisible item is never armable.
+  _itemHidden(key) {
+    const def = SPECIAL_ITEMS[key] || BUILDINGS[key];
+    if (!def) return true;
+    if (def.unlockLevel && (this.level || 1) < def.unlockLevel) return true;
+    if (def.unique && this.builtCount && this.builtCount(def.role) > 0) return true;
+    return false;
+  }
   _renderList(catId) {
     this._curCat = catId;
     const cat = CATEGORIES.find((c) => c.id === catId);
     this.listEl.innerHTML = '';
     for (const key of cat.items) {
+      if (this._itemHidden(key)) continue;
       const def = SPECIAL_ITEMS[key] || BUILDINGS[key];
-      if (def.unlockLevel && (this.level || 1) < def.unlockLevel) continue; // locked until its level
-      if (def.unique && this.builtCount && this.builtCount(def.role) > 0) continue; // one to a settlement — hide once built
-
       const b = document.createElement('button');
       b.className = 'build-btn';
       b.dataset.key = key;
