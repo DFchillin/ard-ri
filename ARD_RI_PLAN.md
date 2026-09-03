@@ -204,3 +204,43 @@ everything else is content on top.
 - Christian transition as a later tone option? (deferred; pagan-mythic for now)
 - Sandbox-first, campaign later? (assumed yes)
 - Final title (Ard Rí / Ráth / Danu / …).
+
+---
+
+## 10. Asset pipeline (Pixellab) & build-out phases
+
+Art is generated in Pixellab (desktop MCP; the web session's network can't
+reach it) and committed as raw exports, then imported into the engine layout.
+
+**Character zips** (`assets/walkers/pxlai-Sprites/*.zip`) — Pixellab structure:
+`Idle/rotations/<dir>.png` (8 idle facings) + `Idle/animations/<name>_walk/<dir>/frame_00X.png`.
+Walk anims cover only the 4 diagonal facings; the 4 cardinals fall back to their
+own idle frame (correct facing).
+
+Import with `tools/import_sprites.py` (deterministic, re-runnable):
+- walkers → `assets/walkers/<role>/<dir>_{stand,step1,step2}.png`
+- deities → `assets/battle/<art>/<dir>_{idle,step1,step2}.png` (idle+walk; attack/death later)
+
+Role map: townsman/woman→villager(_f), Water_carrier→water_carrier(_f),
+Farm_hand→grain_carrier(_f), Trader→market_trader(_f), Druid→druid(_f).
+Deities: Brigid→brigid, Lugh→lugh, Manannán→manannan, Nuada→nuada.
+Held (no engine role yet): Storehouse_worker, Town_guard.
+
+**Building sheets** (`assets/buildings/*4f.png`) — one row per building, 4
+prosperity states across (Founded→Settled→Working→Thriving):
+- `essentials4f`: field, raised grain store, orchard, market/hall, training ring
+- `militaryhouses4f`: training ground, smithy, longhouse, stone house, hill-fort house
+- `culture4f`, `herohalls4f`: culture (bard circle / nemeton / sacred oak / community fire) and hero-hosting halls — ID at slice time
+
+### Phases
+1. **Character import** (done) — new walker art + deity battle art in place.
+2. **Building slice + 4 states** — cut rows to `<name>_s1..s4.png`; extend
+   `makeBuildingChip` to read 4 prosperity frames (fallback to empty/full).
+3. **New gameplay systems** — Smithy (produces), Training Ground (trains
+   warriors at home), dwelling tiers (longhouse/stone/hill-fort as upgrades),
+   and wiring the four new gods into the summon roster + lore.
+
+### Also queued
+- Battle **death animation** frames (engine support already shipped).
+- Desktop **drag-to-lay a row of buildings** (like roads), "Build ×N ✓".
+- Colonies → standing / High-King metagame; more chapters & narrative.
