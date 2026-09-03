@@ -138,11 +138,17 @@ export class UI {
 
   showTitle() { if (this.titleScreen) this.titleScreen.classList.remove('hidden'); }
   hideTitle() { if (this.titleScreen) this.titleScreen.classList.add('hidden'); }
-  showPlaceConfirm({ road = false, label = '', alt = true, raze = false } = {}) {
-    if (this.placeDo) this.placeDo.textContent = raze ? 'Raze ✓' : 'Build ✓';
+  showPlaceConfirm({ road = false, label = '', alt = true, raze = false, count = null, cost = null } = {}) {
+    // A dragged building row passes a count: the button shows "Build ×N ✓" and
+    // the label the running cost. count 0 → nothing valid under the drag.
+    const rowMode = count !== null;
+    if (this.placeDo) {
+      this.placeDo.textContent = raze ? 'Raze ✓' : rowMode && count !== 1 ? `Build ×${count} ✓` : 'Build ✓';
+      this.placeDo.classList.toggle('disabled', rowMode && count === 0);
+    }
     if (this.placeLabel) {
-      this.placeLabel.textContent = raze ? 'Remove this?' : label;
-      this.placeLabel.classList.toggle('hidden', !(road || raze));
+      this.placeLabel.textContent = raze ? 'Remove this?' : rowMode ? (count ? `🪙${cost}` : 'Nothing fits here') : label;
+      this.placeLabel.classList.toggle('hidden', !(road || raze || rowMode));
     }
     if (this.placeAlt) this.placeAlt.classList.toggle('hidden', !road || !alt);
     if (this.placeConfirm) this.placeConfirm.classList.remove('hidden');

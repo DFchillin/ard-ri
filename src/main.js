@@ -678,6 +678,54 @@ const GHOST_H = 1.4;
 // Road path ghost — flat tiles traced out while dragging, before you commit.
 const roadGhost = new THREE.Group();
 scene.add(roadGhost);
+// Building-row ghost — drag a non-unique building like a road to lay a whole
+// terrace at once, each footprint boxed green (placeable) / amber (can't pay) /
+// red (blocked). A zero-length drag is just one building — today's single tap.
+const rowGhost = new THREE.Group();
+scene.add(rowGhost);
+const ROW_MAX = 40;
+function clearRowGhost() { rowGhost.children.forEach((m) => { m.geometry.dispose(); m.material.dispose(); }); rowGhost.clear(); }
+function addRowBox(f, color) {
+  const cx = f.x * map.tile - map.half + (f.w * map.tile) / 2;
+  const cz = f.z * map.tile - map.half + (f.h * map.tile) / 2;
+  const box = new THREE.Mesh(new THREE.BoxGeometry(f.w * map.tile, GHOST_H, f.h * map.tile),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28, depthWrite: false }));
+  box.position.set(cx, GHOST_H / 2, cz);
+  box.add(new THREE.LineSegments(new THREE.EdgesGeometry(box.geometry),
+    new THREE.LineBasicMaterial({ color: color === 0xff5555 ? 0xffbbaa : 0xffffff })));
+  rowGhost.add(box);
+}
+// Footprints stepped edge-to-edge from the start tile toward the drag tile along
+// the dominant axis (horizontal if the drag is mostly sideways, else vertical).
+function computeBuildRow(start, end) {
+  const [w, h] = BUILDINGS[tool].footprint;
+  const dx = end.x - start.x, dz = end.z - start.z;
+  const along = Math.abs(dx) >= Math.abs(dz);
+  const step = along ? w : h;
+  const span = Math.abs(along ? dx : dz);
+  const dir = Math.sign(along ? dx : dz) || 1;
+  const n = Math.min(ROW_MAX, Math.floor(span / step) + 1);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = along ? { x: start.x + dir * i * step, z: start.z } : { x: start.x, z: start.z + dir * i * step };
+    out.push(footprint(tool, t));
+  }
+  return out;
+}
+function showBuildRow(start, end) {
+  clearRowGhost(); ghostBox.visible = false; preview.visible = false;
+  const def = BUILDINGS[tool];
+  const afford = Math.floor(game.silver / def.cost);
+  const valid = [];
+  for (const f of computeBuildRow(start, end)) {
+    const placeable = map.canPlace(f.x, f.z, f.w, f.h);
+    const canPay = valid.length < afford;
+    addRowBox(f, !placeable ? 0xff5555 : canPay ? 0x66ff66 : 0xe0b83a);
+    if (placeable && canPay) valid.push(f);
+  }
+  pendingBuildRow = valid;
+  ui.showPlaceConfirm({ count: valid.length, cost: valid.length * def.cost });
+}
 function clearRoadGhost() {
   roadGhost.children.forEach((m) => { m.geometry.dispose(); m.material.dispose(); });
   roadGhost.clear();
@@ -970,6 +1018,7 @@ function commitDemolish() {
 const pointers = new Map();
 let painting = false, demolishing = false, panLast = null, pinchDist = 0, tapStart = null;
 let pendingBuild = null, movingBuild = false;
+let buildRowStart = null, pendingBuildRow = null;
 let pendingRoad = null, drawingRoad = false;
 let pendingDemolish = null;
 let roadStart = null, roadEnd = null, drawnPath = [];
@@ -995,6 +1044,17 @@ function showGhostAt(t) {
 function confirmBuild() {
   if (pendingRoad) { commitRoad(); return; }
   if (pendingDemolish) { commitDemolish(); return; }
+  // A dragged row of one or more of the same building.
+  if (pendingBuildRow && BUILDINGS[tool]) {
+    let n = 0;
+    for (const f of pendingBuildRow) if (game.place(tool, f)) n++;
+    if (n) {
+      if (n > 1) flashNotice(`🏗 Raised ${n} × ${BUILDINGS[tool].label}.`);
+      pushStats(); saveSettlement();
+    }
+    cancelPending();
+    return;
+  }
   if (!pendingBuild || !BUILDINGS[tool]) return;
   const f = footprint(tool, pendingBuild);
   if (game.place(tool, f)) {
@@ -1005,6 +1065,9 @@ function confirmBuild() {
 }
 function cancelPending() {
   pendingBuild = null;
+  buildRowStart = null;
+  pendingBuildRow = null;
+  clearRowGhost();
   movingBuild = false;
   pendingRoad = null;
   pendingDemolish = null;
@@ -1054,7 +1117,13 @@ canvas.addEventListener('pointerdown', (e) => {
     if (tool === 'demolish') { showDemolishGhost(tileUnderPointer(e)); return; }
     if (tool === 'road') { const t = tileUnderPointer(e); if (t) { roadStart = t; roadEnd = t; drawnPath = [{ x: t.x, z: t.z }]; drawingRoad = true; pendingRoad = drawnPath; showRoadGhost(); } return; }
     if (tool === 'cros') { const t = tileUnderPointer(e); if (t && game.toggleCros(t.x, t.z)) { view.rebuildCros(); saveSettlement(); } return; }
-    if (BUILDINGS[tool]) { movingBuild = true; showGhostAt(tileUnderPointer(e)); return; }
+    if (BUILDINGS[tool]) {
+      movingBuild = true;
+      const t = tileUnderPointer(e);
+      if (BUILDINGS[tool].unique) { showGhostAt(t); }              // one-per-settlement: single ghost, drag to reposition
+      else { buildRowStart = t; if (t) showBuildRow(t, t); }        // else: drag from here to lay a row (a tap = one)
+      return;
+    }
   }
   panLast = { x: e.clientX, y: e.clientY }; // no build tool, or right-drag → pan
   if (e.button !== 2 && !tool) tapStart = { x: e.clientX, y: e.clientY }; // a plain tap in roam mode may hit the menace
@@ -1070,8 +1139,13 @@ canvas.addEventListener('pointermove', (e) => {
     if (t && (t.x !== roadEnd.x || t.z !== roadEnd.z)) { roadEnd = t; extendDrawn(t); pendingRoad = drawnPath; showRoadGhost(); }
     return;
   }
-  if (movingBuild && BUILDINGS[tool]) { const t = tileUnderPointer(e); if (t) showGhostAt(t); return; }
-  if (pendingBuild || pendingRoad || pendingDemolish) return; // ghost locked awaiting confirm
+  if (movingBuild && BUILDINGS[tool]) {
+    const t = tileUnderPointer(e); if (!t) return;
+    if (BUILDINGS[tool].unique) showGhostAt(t);                    // reposition the single ghost
+    else showBuildRow(buildRowStart || t, t);                      // extend the row toward the drag tile
+    return;
+  }
+  if (pendingBuild || pendingBuildRow || pendingRoad || pendingDemolish) return; // ghost locked awaiting confirm
   updatePreview(e);
 });
 
@@ -1156,7 +1230,8 @@ window.addEventListener('resize', () => {
 });
 
 window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
-  _dbg: { foundColony, collectColonyTribute, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml },
+  _dbg: { foundColony, collectColonyTribute, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
+    layRow: (key, sx, sz, ex, ez) => { const before = game.buildings.length; tool = key; showBuildRow({ x: sx, z: sz }, { x: ex, z: ez }); const shown = pendingBuildRow ? pendingBuildRow.length : 0; confirmBuild(); return { shown, placed: game.buildings.length - before }; } },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
     const v = new THREE.Vector3(w.x, 0.1, w.z).project(camera);
