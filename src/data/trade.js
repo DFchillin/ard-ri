@@ -16,9 +16,13 @@ export const HOSTING = {
   fionn:      { req: { wine: 2, salt: 1 },   title: 'a Fian feast that never runs dry' },
   morrigan:   { req: { iron: 2, gold: 1 },   title: 'weapons and gold for the war-goddess' },
   dagda:      { req: { gold: 2, salt: 1 },   title: 'gold and salt for the Good God’s cauldron' },
+  lugh:       { req: { gold: 2, marble: 1 }, title: 'a bright hall of every art for Lámhfhada' },
+  nuada:      { req: { iron: 2, marble: 1 }, title: 'a king’s hall and a silver arm re-forged' },
+  manannan:   { req: { salt: 2, wine: 1 },   title: 'sea-salt and wine for the lord of the waves' },
+  brigid:     { req: { iron: 1, gold: 1 },   title: 'a forge-fire and a poet’s feast for the bright one' },
 };
 
-export const HOST_ORDER = ['curadh', 'cuchulainn', 'fionn', 'morrigan', 'dagda'];
+export const HOST_ORDER = ['curadh', 'cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'morrigan', 'dagda'];
 
 // Can the given goods bag meet a requirement?
 export function canHost(goods, key) {

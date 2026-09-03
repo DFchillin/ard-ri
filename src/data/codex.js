@@ -31,6 +31,16 @@ export const CODEX = [
     ],
   },
   {
+    title: 'The Túatha Dé',
+    blurb: 'The old gods of Ériu who take mortal size to walk among a war-band. Host them with foreign goods; a shrine makes them far likelier to answer.',
+    entries: [
+      { icon: '☀️', name: 'Lugh Lámhfhada', ga: 'master of every art', repr: 'a hero-sized figure', lore: 'Samildánach, skilled in all things; his sling put out Balor’s eye at Mag Tuired. The deadliest fighter of the Túatha Dé.' },
+      { icon: '⚔️', name: 'Nuada Airgetlám', ga: 'the silver-armed king', repr: 'a hero-sized figure', lore: 'First king of the Túatha Dé, who bore the Sword of Light. Hard to fell and a leader men rally to.' },
+      { icon: '🌊', name: 'Manannán mac Lir', ga: 'lord of the sea', repr: 'a hero-sized figure', lore: 'God of the sea and the mists of the Otherworld. His presence unnerves the foe and steels his own.' },
+      { icon: '🔥', name: 'Brigid', ga: 'the bright goddess', repr: 'a hero-sized figure', lore: 'Of the forge, the healing well and the poet’s fire. No great warrior, but her flame keeps a war-band’s courage from breaking.' },
+    ],
+  },
+  {
     title: 'Summoned Gods',
     blurb: 'The Túatha Dé themselves — giants who stand across four squares of the field.',
     entries: [

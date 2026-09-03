@@ -247,7 +247,7 @@ if (!campaign.goods) campaign.goods = {};
 if (!campaign.hosted) campaign.hosted = {};
 if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won by raiding further afield
 if (campaign.raidsWon == null) campaign.raidsWon = 0; // won raids drive the map-era chapter unlocks (levels 4+)
-for (const h of ['cuchulainn', 'fionn', 'dagda', 'morrigan']) delete campaign.roster[h]; // heroes/gods are summoned, not owned — clean any legacy grant
+for (const h of ['cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan']) delete campaign.roster[h]; // heroes/gods are summoned, not owned — clean any legacy grant
 if (campaign.mapSeed == null) campaign.mapSeed = _mapSeed;
 function saveCampaign() { try { localStorage.setItem(CAMPAIGN_KEY, JSON.stringify(campaign)); } catch (e) {} }
 function saveSettlement() { campaign.settlement = game.snapshot(); campaign.cattle = game.cattle; saveCampaign(); }
@@ -335,6 +335,10 @@ const SUMMON_LORE = {
   fionn: { emoji: '🦌', name: 'Fionn mac Cumhaill', line: 'Fionn, lord of the Fianna, takes the field! He tasted the Salmon of Knowledge and won the wisdom of the world, and led the greatest war-band Ériu has known.' },
   dagda: { emoji: '🍲', name: 'An Dagda', line: 'The Good God strides to your side! He bears the club that slays with one end and revives with the other, and the cauldron that never runs empty. The earth answers his tread.' },
   morrigan: { emoji: '🐦‍⬛', name: 'An Mhórrígan', line: 'The Phantom Queen descends! Crow of the slaughter, she chooses who lives and who falls — and where she flies, the courage of your foes breaks.' },
+  lugh: { emoji: '☀️', name: 'Lugh Lámhfhada', line: 'Lugh of the Long Arm takes the field! Samildánach, master of every art, whose sling-stone put out the deadly eye of Balor and broke the Fomorians at Mag Tuired. None on the field is his equal.' },
+  nuada: { emoji: '⚔️', name: 'Nuada Airgetlám', line: 'Nuada of the Silver Arm answers your muster! First king of the Túatha Dé, who gave up his throne for a wound and bore the Sword of Light — the Claíomh Solais, from which none escape.' },
+  manannan: { emoji: '🌊', name: 'Manannán mac Lir', line: 'The lord of the sea rides in on his mane of waves! He cloaks his own in mist and shakes the courage of the foe, and bears Fragarach, the Answerer, that no armour can turn.' },
+  brigid: { emoji: '🔥', name: 'Brigid', line: 'The bright goddess comes — of the forge, the healing well and the poet’s fire. Her flame heartens your war-band and will not let their courage gutter out.' },
 };
 function announceSummons(list) {
   const q = list.slice();
@@ -533,7 +537,8 @@ function renderTrade() {
     const t = UNIT_TYPES[key]; const h = HOSTING[key];
     const row = document.createElement('div'); row.className = 'trade-row';
     const hosted = campaign.hosted[key];
-    row.innerHTML = `<div class="tr-ico">${key === 'dagda' || key === 'morrigan' ? '⚡' : key === 'curadh' ? '🏆' : '🦸'}</div><div class="tr-main"><div class="tr-name">${t.label} <span class="cx-ga">${t.ga}</span></div><div class="tr-sub">${h.title} · needs ${reqText(key)}</div></div>`;
+    const godKeys = ['dagda', 'morrigan', 'lugh', 'nuada', 'manannan', 'brigid'];
+    row.innerHTML = `<div class="tr-ico">${godKeys.includes(key) ? '⚡' : key === 'curadh' ? '🏆' : '🦸'}</div><div class="tr-main"><div class="tr-name">${t.label} <span class="cx-ga">${t.ga}</span></div><div class="tr-sub">${h.title} · needs ${reqText(key)}</div></div>`;
     if (hosted) { row.classList.add('hosted'); const d = document.createElement('div'); d.className = 'tr-done'; d.textContent = 'Hosted ✓'; row.appendChild(d); }
     else {
       const btn = document.createElement('button'); btn.textContent = 'Host ▸'; btn.disabled = !canHost(campaign.goods, key);

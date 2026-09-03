@@ -21,6 +21,11 @@ export const UNIT_TYPES = {
   // --- summoned heroes of the Fianna & the Red Branch: twice a mortal's height ---
   cuchulainn:   { label: 'Cú Chulainn',    ga: 'the Hound of Ulster', cat: 'hero', rank: 5, atk: 6.5, hp: 24, build: 1.8, speed: 3.4, morale: 96, aura: 14, battle: { art: 'cuchulainn', h: 2.9, tiles: 1 }, piece: { color: 0xe8a030, tall: 1.35 } },
   fionn:        { label: 'Fionn mac Cumhaill', ga: 'lord of the Fianna', cat: 'hero', rank: 5, atk: 5.2, hp: 22, build: 1.6, speed: 3.2, morale: 95, aura: 22, battle: { art: 'fionn', h: 2.9, tiles: 1 }, piece: { color: 0xe8c86b, tall: 1.35 } },
+  // --- the Túatha Dé who take mortal size on the field: warrior-gods of the old race ---
+  lugh:         { label: 'Lugh Lámhfhada',  ga: 'master of every art',  cat: 'hero', rank: 5, atk: 6.8, hp: 22, build: 1.7, speed: 3.6, morale: 96, aura: 16, battle: { art: 'lugh', h: 2.9, tiles: 1 }, piece: { color: 0xf0d060, tall: 1.35 } },
+  nuada:        { label: 'Nuada Airgetlám', ga: 'the silver-armed king', cat: 'hero', rank: 5, atk: 5.6, hp: 26, build: 1.8, speed: 3.0, morale: 96, aura: 20, battle: { art: 'nuada', h: 2.9, tiles: 1 }, piece: { color: 0xd8dce6, tall: 1.35 } },
+  manannan:     { label: 'Manannán mac Lir', ga: 'lord of the sea',     cat: 'hero', rank: 5, atk: 5.0, hp: 22, build: 1.6, speed: 3.4, morale: 98, aura: 24, battle: { art: 'manannan', h: 2.9, tiles: 1 }, piece: { color: 0x4a90b0, tall: 1.35 } },
+  brigid:       { label: 'Brigid',          ga: 'the bright goddess',   cat: 'hero', rank: 5, atk: 3.6, hp: 20, build: 1.4, speed: 3.2, morale: 100, aura: 26, battle: { art: 'brigid', h: 2.9, tiles: 1 }, piece: { color: 0xe8a848, tall: 1.35 } },
   // --- summoned gods of the Túatha Dé: giants that stand across four squares ---
   dagda:        { label: 'An Dagda',       ga: 'the Good God',      cat: 'god', rank: 6, atk: 9.0, hp: 40, build: 3.4, speed: 2.8, morale: 100, aura: 24, battle: { art: 'dagda', h: 3.8, tiles: 2 }, piece: { color: 0xf2ead6, tall: 1.7 } },
   morrigan:     { label: 'An Mhórríon',    ga: 'phantom queen of war', cat: 'god', rank: 6, atk: 8.0, hp: 32, build: 2.4, speed: 3.4, morale: 100, aura: 24, battle: { art: 'morrigan', h: 3.5, tiles: 2 }, piece: { color: 0xc86a8a, tall: 1.6 } },

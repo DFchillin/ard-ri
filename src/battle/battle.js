@@ -6,7 +6,7 @@ import { makeBuildingChip, makeWalkerChip, makeWarriorChip } from '../render/chi
 import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNickname, UPSKILL, EMPLOYEES } from './units.js?v=CBUST';
 
 const MAP = 20;
-const SUMMONABLE = ['cuchulainn', 'fionn', 'dagda', 'morrigan']; // heroes/gods that only answer a hosted, favoured muster
+const SUMMONABLE = ['cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan']; // heroes/gods that only answer a hosted, favoured muster
 const CLASH_DT = 0.55;
 const CORPSE_TTL = 1.3; // how long a fallen unit lies on the field playing its death frames before it is cleared
 const MOVE = 0.58;         // slower march so there's time to react and re-order
@@ -31,7 +31,7 @@ const SCENARIOS = {
       { role: 'dwelling', x: 13, z: 15, w: 2, h: 2, hp: 24, team: 'player' },
       { role: 'granary', x: 9, z: 16, w: 2, h: 2, hp: 34, team: 'player' },
     ],
-    availability: { villager: 8, water: 4, grain: 4, deaglan: 1, druid: 3, seasoned: 6, curadh: 2, cuchulainn: 1, fionn: 1, dagda: 1, morrigan: 1 },
+    availability: { villager: 8, water: 4, grain: 4, deaglan: 1, druid: 3, seasoned: 6, curadh: 2, cuchulainn: 1, fionn: 1, lugh: 1, nuada: 1, manannan: 1, brigid: 1, dagda: 1, morrigan: 1 },
     enemyCompanies: [
       { name: ['Fomhóraigh', 'the Fomorians'], formation: 'line', types: ['seasoned', 'seasoned', 'seasoned', 'seasoned', 'villager', 'villager'], x: 10, z: 2 },
       { name: ['Lucht Mara', 'the sea-host'], formation: 'wedge', types: ['villager', 'villager', 'villager', 'villager', 'seasoned'], x: 5, z: 2 },
@@ -572,7 +572,7 @@ export class Battle {
   _renderMuster() {
     const roster = document.getElementById('bs-roster'); roster.innerHTML = '';
     const inForming = (k) => this.forming.types.filter((x) => x === k).length;
-    const order = ['villager', 'water', 'grain', 'deaglan', 'druid', 'fennid', 'warrior', 'seasoned', 'curadh', 'ghost', 'cuchulainn', 'fionn', 'dagda', 'morrigan'];
+    const order = ['villager', 'water', 'grain', 'deaglan', 'druid', 'fennid', 'warrior', 'seasoned', 'curadh', 'ghost', 'cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan'];
     for (const key of order) {
       if (!((this.pool[key] || 0) > 0 || inForming(key) > 0)) continue; // only what you have a right to muster
       const t = UNIT_TYPES[key]; const left = (this.pool[key] || 0) - inForming(key);
