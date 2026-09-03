@@ -6,6 +6,14 @@ what's actually in the game today, not the wishlist.
 
 A designed, shareable version of this brief is published as an Artifact.
 
+**Pipelines & projection.** Buildings/tiles come from ChatGPT image-gen;
+characters come from Pixellab. The game renders a **2:1 dimetric** ground
+(tile diamond twice as wide as tall — set in `src/iso_camera.js`, ISO_Y). So
+every building and ground tile MUST be drawn 2:1 (as the style block below
+says); a true-isometric (1.73:1) building will sit at the wrong angle on the
+grid. Characters are upright billboards with no ground plane, so their angle
+is forgiving.
+
 **Counts:** 6 buildings × 2 states · 5 walkers × 8 directions · 5 ground tiles ·
 2 scatter props + gate.
 
