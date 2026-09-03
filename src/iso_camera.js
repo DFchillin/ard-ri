@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 
 // Four isometric vantage corners; rotating steps through them (90° each).
+// y = √3/2 gives a 2:1 dimetric ground (tile diamond twice as wide as tall),
+// matching the Pixellab building and character art. (y = 1 would be true iso,
+// a 1.73:1 grid that sits at a different angle than the art.)
+const ISO_Y = 0.866;
 const CORNERS = [
-  [1, 1, 1], [-1, 1, 1], [-1, 1, -1], [1, 1, -1],
+  [1, ISO_Y, 1], [-1, ISO_Y, 1], [-1, ISO_Y, -1], [1, ISO_Y, -1],
 ];
 const LABELS = ['N', 'E', 'S', 'W'];
 const R = 80;
