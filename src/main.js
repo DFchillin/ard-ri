@@ -902,12 +902,27 @@ function pipelineNote(inst) {
   const warn = (t) => `<p class="pl-warn">⚠ ${t}</p>`;
   const flow = (t) => `<p class="pl-ok">→ ${t}</p>`;
   if (d.role === 'farm') {
-    const crop = d.produce === 'apples' ? 'Apples' : 'Barley';
-    const grow = inst.ripe ? `${crop} ripe — bringing the harvest in. ` : `${crop} growing… `;
-    if (!road) return warn(grow + 'No road — lay a road linking this plot to a grain store.');
-    if (g.count('granary') === 0) return warn(grow + 'No store — build a Grain Store for the harvest to fill.');
-    if (g.folk < 4) return warn(grow + `Too few folk (${g.folk}/4) — four settlers are needed to bring a harvest in.`);
-    return flow(grow + 'A carrier runs the harvest to a store, and markets sell it on to the dwellings.');
+    const crop = d.produce === 'apples' ? 'apples' : 'barley';
+    const total = inst.yieldTotal || (d.load || 4) * (inst.harvests || 2);
+    const load = d.load || 4;
+    const hasStore = g.count('granary') > 0;
+    const line = (head) =>
+      `<p><b>${head}</b></p>` +
+      `<p class="dim">Each ripe crop gives <b>${total} ${crop}</b> — ${inst.harvests || 2} cart-loads of ${load}, run by a grain-carrier to your nearest grain store. Markets then sell it on to feed the dwellings.</p>`;
+    if (inst.ripe) {
+      const left = inst.harvestsLeft || 0;
+      const status = `🌾 Ripe — harvesting now. ${left} cart-load${left === 1 ? '' : 's'} of ${crop} (~${left * load}) still to bring in.`;
+      if (!road) return warn(`${crop[0].toUpperCase() + crop.slice(1)} is ripe but there is no road — lay one to a grain store or the harvest rots.`) + line('Harvest');
+      if (!hasStore) return warn('Ripe, but no grain store to carry it to — build a Grain Store.') + line('Harvest');
+      if (g.folk < 4) return warn(status + ` But too few folk (${g.folk}/4) to carry it — the harvest waits.`) + line('Harvest');
+      return flow(status) + line('Harvest');
+    }
+    const pct = inst.growMax ? Math.min(99, Math.round((inst.grown / inst.growMax) * 100)) : 0;
+    const head = `${crop[0].toUpperCase() + crop.slice(1)} growing — ${pct}% to harvest.`;
+    if (!road) return warn(head + ' ⚠ No road yet — link this plot to a grain store before it ripens.') + line('Next harvest');
+    if (!hasStore) return warn(head + ' ⚠ No grain store yet — build one to receive the harvest.') + line('Next harvest');
+    if (g.folk < 4) return warn(head + ` ⚠ Needs 4 folk to harvest (you have ${g.folk}).`) + line('Next harvest');
+    return flow(head) + line('Next harvest');
   }
   if (d.role === 'granary') return road ? flow('Fields fill it with grain; markets restock from it.') : warn('No road — carriers and markets cannot reach it. Lay a road.');
   if (d.role === 'market') {

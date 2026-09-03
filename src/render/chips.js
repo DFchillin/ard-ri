@@ -55,7 +55,7 @@ export function makeCowToken() {
 // two (empty/full); those with `states: 4` in their def swap between four
 // prosperity frames (_s1.._s4) as they thrive. opts: { art, states }.
 export function makeBuildingChip(role, w, h, ts, opts = {}) {
-  const { art, states = 2 } = opts;
+  const { art, states = 2, scale = 1 } = opts;
   const g = new THREE.Group();
   const frames = [];
   if (art && states >= 3) {
@@ -65,7 +65,7 @@ export function makeBuildingChip(role, w, h, ts, opts = {}) {
     if (base) frames.push(tex(`assets/buildings/${base}_empty.png`), tex(`assets/buildings/${base}_full.png`));
   }
   if (frames.length) {
-    const worldW = (w + h) * ts * DIAG_FILL; // size to the iso footprint's diagonal span
+    const worldW = (w + h) * ts * DIAG_FILL * scale; // size to the iso footprint's diagonal span, with a per-building nudge
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: frames[0], transparent: true, alphaTest: 0.12 }));
     spr.center.set(0.5, 0);
     fitWidth(spr, frames[0], worldW);

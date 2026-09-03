@@ -4,7 +4,7 @@ import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeMe
 import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
 
-const FX_TOP = { dwelling: 2.4, farm: 0.9, market: 1.8, homestead: 2.8 }; // effect ceiling per role
+const FX_TOP = { dwelling: 1.15, farm: 0.7, market: 1.15, homestead: 1.6 }; // where hearth-smoke leaves the roof — tuned to the ~1.25-tile-tall building art
 import { Walker, Traveler } from './walkers.js?v=CBUST';
 import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=CBUST';
 import { randomName } from '../data/names.js?v=CBUST';
@@ -206,10 +206,11 @@ export class Game {
     const def = BUILDINGS[key];
     const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, water: 0, culture: 0, timer: 0,
       pop: 0, cap: def.folk || 0, incoming: 0, distress: 0, active: false,
-      grown: 0, ripe: false, harvestsLeft: 0, connected: false, herd: def.role === 'homestead' ? 10 : 0 };
+      grown: 0, ripe: false, harvestsLeft: 0, connected: false, herd: def.role === 'homestead' ? 10 : 0,
+      growMax: FARM_GROW, harvests: FARM_HARVESTS, yieldTotal: (def.load || 0) * FARM_HARVESTS }; // for the field inspect readout
     this.map.place(f.x, f.z, f.w, f.h, inst);
 
-    const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile, { art: def.art, states: def.states });
+    const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile, { art: def.art, states: def.states, scale: def.scale });
     const c = this._center(f);
     chip.position.set(c.x, 0, c.z);
     if (def.role === 'homestead') {
