@@ -724,6 +724,7 @@ function showBuildRow(start, end) {
     if (placeable && canPay) valid.push(f);
   }
   pendingBuildRow = valid;
+  pendingRow = { start: { x: start.x, z: start.z }, end: { x: end.x, z: end.z } }; // remembered so the whole row can be dragged to reposition
   ui.showPlaceConfirm({ count: valid.length, cost: valid.length * def.cost });
 }
 function clearRoadGhost() {
@@ -1019,6 +1020,7 @@ const pointers = new Map();
 let painting = false, demolishing = false, panLast = null, pinchDist = 0, tapStart = null;
 let pendingBuild = null, movingBuild = false;
 let buildRowStart = null, pendingBuildRow = null;
+let pendingRow = null, movingRow = false, rowGrab = null, rowOrigin = null;
 let pendingRoad = null, drawingRoad = false;
 let pendingDemolish = null;
 let roadStart = null, roadEnd = null, drawnPath = [];
@@ -1067,6 +1069,8 @@ function cancelPending() {
   pendingBuild = null;
   buildRowStart = null;
   pendingBuildRow = null;
+  pendingRow = null;
+  movingRow = false; rowGrab = null; rowOrigin = null;
   clearRowGhost();
   movingBuild = false;
   pendingRoad = null;
@@ -1118,10 +1122,14 @@ canvas.addEventListener('pointerdown', (e) => {
     if (tool === 'road') { const t = tileUnderPointer(e); if (t) { roadStart = t; roadEnd = t; drawnPath = [{ x: t.x, z: t.z }]; drawingRoad = true; pendingRoad = drawnPath; showRoadGhost(); } return; }
     if (tool === 'cros') { const t = tileUnderPointer(e); if (t && game.toggleCros(t.x, t.z)) { view.rebuildCros(); saveSettlement(); } return; }
     if (BUILDINGS[tool]) {
-      movingBuild = true;
       const t = tileUnderPointer(e);
-      if (BUILDINGS[tool].unique) { showGhostAt(t); }              // one-per-settlement: single ghost, drag to reposition
-      else { buildRowStart = t; if (t) showBuildRow(t, t); }        // else: drag from here to lay a row (a tap = one)
+      if (pendingRow && !BUILDINGS[tool].unique) {                   // a row is laid out — grab it and slide the whole thing
+        movingRow = true; rowGrab = t; rowOrigin = pendingRow;
+      } else {
+        movingBuild = true;
+        if (BUILDINGS[tool].unique) { showGhostAt(t); }             // one-per-settlement: single ghost, drag to reposition
+        else { buildRowStart = t; if (t) showBuildRow(t, t); }       // else: drag from here to lay a row (a tap = one)
+      }
       return;
     }
   }
@@ -1137,6 +1145,12 @@ canvas.addEventListener('pointermove', (e) => {
   if (drawingRoad && tool === 'road') {
     const t = tileUnderPointer(e);
     if (t && (t.x !== roadEnd.x || t.z !== roadEnd.z)) { roadEnd = t; extendDrawn(t); pendingRoad = drawnPath; showRoadGhost(); }
+    return;
+  }
+  if (movingRow && rowOrigin) {                                    // slide the whole laid-out row by the drag delta
+    const t = tileUnderPointer(e); if (!t || !rowGrab) return;
+    const dx = t.x - rowGrab.x, dz = t.z - rowGrab.z;
+    showBuildRow({ x: rowOrigin.start.x + dx, z: rowOrigin.start.z + dz }, { x: rowOrigin.end.x + dx, z: rowOrigin.end.z + dz });
     return;
   }
   if (movingBuild && BUILDINGS[tool]) {
@@ -1158,6 +1172,7 @@ function endPointer(e) {
   tapStart = null;
   if (pointers.size === 0) {
     painting = false; demolishing = false; panLast = null; movingBuild = false;
+    movingRow = false; rowGrab = null; rowOrigin = null; // row stays laid out (pendingRow) for another slide or a Build
     if (drawingRoad) {
       drawingRoad = false;
       if (drawnPath.length) {
