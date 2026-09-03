@@ -93,6 +93,9 @@ const WALKER_COLOR = {
   water_carrier: 0x6fb0e0, druid: 0xb07ad0,
 };
 
+const WALKER_H = 1.3;   // world height every walker renders at, whatever the art's pixel size
+const WALK_FRAMES = 6;  // walk poses per facing (cardinals repeat their idle)
+const WALK_FPS = 0.11;  // seconds per walk frame
 export function makeWalkerChip(type, female) {
   const role = WALK_FILE[type] || 'villager';
   // Half the folk are women — every role has a matching female sprite set in a
@@ -101,31 +104,35 @@ export function makeWalkerChip(type, female) {
   const useF = female === undefined ? Math.random() < 0.5 : !!female;
   const base = useF ? role + '_f' : role;
   const T = {};
-  for (const d of DIRS) T[d] = ['step1', 'step2', 'stand'].map((f) => tex(`assets/walkers/${base}/${d}_${f}.png`));
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.s[2], transparent: true, alphaTest: 0.12 }));
+  for (const d of DIRS) T[d] = { stand: tex(`assets/walkers/${base}/${d}_stand.png`),
+    walk: Array.from({ length: WALK_FRAMES }, (_, i) => tex(`assets/walkers/${base}/${d}_walk${i}.png`)) };
+  const first = T.s.stand;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: first, transparent: true, alphaTest: 0.12 }));
   s.center.set(0.5, 0);
-  s.scale.set(0.55, 0.95, 1); // sensible default before the art loads
-  sizeSprite(s, T.s[2], 1.5);
+  s.scale.set(0.7, WALKER_H, 1); // sensible default before the art loads
+  // Size to a fixed world height so the figure reads at a consistent size no
+  // matter what resolution the frame was authored at (aspect from the art).
+  onReady(first, () => { const i = first.image; if (i && i.width) s.scale.set(WALKER_H * (i.width / i.height), WALKER_H, 1); });
   // Safety net: if the art can't load, show a plain coloured figure, never nothing.
   tex(`assets/walkers/${base}/s_stand.png`, () => {
     s._failed = true;
     s.material.map = null;
     s.material.color.set(WALKER_COLOR[type] || 0xffffff);
     s.material.needsUpdate = true;
-    s.scale.set(0.5, 0.9, 1);
+    s.scale.set(0.6, WALKER_H, 1);
   });
   // animation state on dedicated props — walkers overwrite userData for inspect
   s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0;
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
   s.animate = (dt, moving) => {
     if (s._failed) return; // fallback colour figure — nothing to swap
-    const frames = T[screenDir(s._dx, s._dz)] || T.s;
+    const fr = T[screenDir(s._dx, s._dz)] || T.s;
     if (moving) {
       s._t += dt;
-      if (s._t >= STEP_TIME) { s._t -= STEP_TIME; s._phase = (s._phase + 1) % 4; }
-      s.material.map = frames[WALK_CYCLE[s._phase]];
+      if (s._t >= WALK_FPS) { s._t -= WALK_FPS; s._phase = (s._phase + 1) % fr.walk.length; }
+      s.material.map = fr.walk[s._phase] || fr.stand;
     } else {
-      s.material.map = frames[2];
+      s.material.map = fr.stand;
     }
   };
   return s;

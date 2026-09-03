@@ -1229,7 +1229,7 @@ window.addEventListener('resize', () => {
   battle.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera, battle, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
+window.ardri = { game, map, view, sim, cal, camera, battle, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
   _dbg: { foundColony, collectColonyTribute, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
     layRow: (key, sx, sz, ex, ez) => { const before = game.buildings.length; tool = key; showBuildRow({ x: sx, z: sz }, { x: ex, z: ez }); const shown = pendingBuildRow ? pendingBuildRow.length : 0; confirmBuild(); return { shown, placed: game.buildings.length - before }; } },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
