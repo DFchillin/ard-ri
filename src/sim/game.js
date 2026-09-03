@@ -312,7 +312,8 @@ export class Game {
   }
 
   _spawn(entry, opts) {
-    const person = { name: randomName(), ...personFor(opts.type) };
+    const female = Math.random() < 0.5;
+    const person = { name: randomName(female), female, ...personFor(opts.type) };
     const w = new Walker(this.map, entry, { ...opts, person });
     w.source = opts.source || null;
     this.walkers.push(w);
@@ -410,7 +411,8 @@ export class Game {
     );
     if (!home) return;
     home.incoming += 1;
-    const person = { name: randomName(), ...personFor('villager') };
+    const female = Math.random() < 0.5;
+    const person = { name: randomName(female), female, ...personFor('villager') };
     const tr = new Traveler(this.map, this.entrance, { x: home.x, z: home.z }, {
       type: 'villager', speed: 2.4, person,
       onArrive: () => {
@@ -426,7 +428,8 @@ export class Game {
   _emigrate(home) {
     home.pop = Math.max(0, home.pop - 1);
     this.folk = Math.max(0, this.folk - 1);
-    const person = { name: randomName(), ...personFor('villager') };
+    const female = Math.random() < 0.5;
+    const person = { name: randomName(female), female, ...personFor('villager') };
     const tr = new Traveler(this.map, { x: home.x, z: home.z }, this.entrance, { type: 'villager', speed: 2.4, person });
     this.walkers.push(tr);
     this.walkerGroup.add(tr.sprite);

@@ -173,6 +173,7 @@ export class UI {
   }
 
   setLevel(n) { this.level = n; if (this._curCat) this._renderList(this._curCat); }
+  refreshBuildMenu() { if (this._curCat) this._renderList(this._curCat); }
   _renderList(catId) {
     this._curCat = catId;
     const cat = CATEGORIES.find((c) => c.id === catId);
@@ -180,6 +181,7 @@ export class UI {
     for (const key of cat.items) {
       const def = SPECIAL_ITEMS[key] || BUILDINGS[key];
       if (def.unlockLevel && (this.level || 1) < def.unlockLevel) continue; // locked until its level
+      if (def.unique && this.builtCount && this.builtCount(def.role) > 0) continue; // one to a settlement — hide once built
 
       const b = document.createElement('button');
       b.className = 'build-btn';

@@ -93,11 +93,13 @@ const WALKER_COLOR = {
   water_carrier: 0x6fb0e0, druid: 0xb07ad0,
 };
 
-export function makeWalkerChip(type) {
+export function makeWalkerChip(type, female) {
   const role = WALK_FILE[type] || 'villager';
   // Half the folk are women — every role has a matching female sprite set in a
   // <role>_f folder, so the streets read as families, not a town of one gender.
-  const base = Math.random() < 0.5 ? role + '_f' : role;
+  // `female` ties the sprite to the person's name; omit it for a random pick.
+  const useF = female === undefined ? Math.random() < 0.5 : !!female;
+  const base = useF ? role + '_f' : role;
   const T = {};
   for (const d of DIRS) T[d] = ['step1', 'step2', 'stand'].map((f) => tex(`assets/walkers/${base}/${d}_${f}.png`));
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.s[2], transparent: true, alphaTest: 0.12 }));
