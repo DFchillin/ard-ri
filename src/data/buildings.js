@@ -1,17 +1,17 @@
 // Placeable buildings. footprint is [width, height] in tiles. role drives the
 // economy logic in game.js. icon/desc feed the build menu and inspect popup.
 export const BUILDINGS = {
-  roundhouse: { label: 'Dwelling', sprite: 'roundhouse', icon: '🛖', footprint: [2, 2], cost: 20, role: 'dwelling', folk: 4,
+  roundhouse: { label: 'Dwelling', sprite: 'roundhouse', art: 'roundhouse', states: 4, icon: '🛖', footprint: [2, 2], cost: 20, role: 'dwelling', folk: 4,
     desc: 'A ráth — a round wattle-and-daub home. Draws folk when fed and watered.' },
-  field: { label: 'Field', sprite: 'fields', icon: '🌾', footprint: [2, 2], cost: 15, role: 'farm', produce: 'barley', rate: 5, load: 4,
+  field: { label: 'Field', sprite: 'fields', art: 'field', states: 4, icon: '🌾', footprint: [2, 2], cost: 15, role: 'farm', produce: 'barley', rate: 5, load: 4,
     desc: 'Barley for bread and ale. Sends a grain-carrier to a nearby store.' },
-  orchard: { label: 'Orchard', sprite: 'fields', icon: '🍎', footprint: [2, 2], cost: 18, role: 'farm', produce: 'apples', rate: 5, load: 4, unlockLevel: 4,
+  orchard: { label: 'Orchard', sprite: 'fields', art: 'orchard', states: 4, icon: '🍎', footprint: [2, 2], cost: 18, role: 'farm', produce: 'apples', rate: 5, load: 4, unlockLevel: 4,
     desc: 'An úllghort of apple-trees, grown from grafting-shoots won on your raids. A second harvest — its pickers run the fruit to a nearby store, like a field.' },
   granary: { label: 'Grain Store', sprite: 'grain_store', icon: '🏚️', footprint: [2, 2], cost: 18, role: 'granary',
     desc: 'Holds the harvest. Markets draw grain from here along the roads.' },
   sciobolmor: { label: 'Great Granary', sprite: 'grain_store', icon: '🏛️', footprint: [2, 2], cost: 26, role: 'granary', unlockLevel: 6,
     desc: 'A sciobol mór of dressed stone, learned from foreign masons. Holds the harvest against the longest winter or siege.' },
-  market: { label: 'Market', sprite: 'market', icon: '🏪', footprint: [2, 2], cost: 16, role: 'market',
+  market: { label: 'Market', sprite: 'market', art: 'market', states: 4, icon: '🏪', footprint: [2, 2], cost: 16, role: 'market',
     desc: 'Restocks from road-connected stores and feeds the dwellings on its route.' },
   aonach: { label: 'Fair-green', sprite: 'market', icon: '🎪', footprint: [2, 2], cost: 22, role: 'market', unlockLevel: 7,
     desc: 'An aonach — the great fair-green where the whole túath gathers to trade. Restocks from your stores and feeds the dwellings on its route.' },

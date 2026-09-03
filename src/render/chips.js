@@ -51,33 +51,47 @@ export function makeCowToken() {
 
 // A building is a Group holding one billboard sprite (so the alert marker can be
 // a child without being scaled by the sprite). Two textures — empty / full.
-export function makeBuildingChip(role, w, h, ts) {
-  const base = ROLE_FILE[role];
+// A building chip is a billboard with a set of state frames. Most buildings have
+// two (empty/full); those with `states: 4` in their def swap between four
+// prosperity frames (_s1.._s4) as they thrive. opts: { art, states }.
+export function makeBuildingChip(role, w, h, ts, opts = {}) {
+  const { art, states = 2 } = opts;
   const g = new THREE.Group();
-  if (base) {
-    const emptyT = tex('assets/buildings/' + base + '_empty.png');
-    const fullT = tex('assets/buildings/' + base + '_full.png');
+  const frames = [];
+  if (art && states >= 3) {
+    for (let i = 1; i <= states; i++) frames.push(tex(`assets/buildings/${art}_s${i}.png`));
+  } else {
+    const base = art || ROLE_FILE[role];
+    if (base) frames.push(tex(`assets/buildings/${base}_empty.png`), tex(`assets/buildings/${base}_full.png`));
+  }
+  if (frames.length) {
     const worldW = (w + h) * ts * DIAG_FILL; // size to the iso footprint's diagonal span
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: emptyT, transparent: true, alphaTest: 0.12 }));
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: frames[0], transparent: true, alphaTest: 0.12 }));
     spr.center.set(0.5, 0);
-    fitWidth(spr, emptyT, worldW);
+    fitWidth(spr, frames[0], worldW);
     g.add(spr);
-    g.userData = { spr, emptyT, fullT, worldW, active: false };
+    g.userData = { spr, frames, worldW, state: 0 };
   } else {
     g.add(fallbackBody(FALLBACK[role] || { color: 0x999999, h: 1 }, w, h, ts));
   }
   return g;
 }
 
-export function setChipActive(chip, active) {
+// frac 0..1 → picks the nearest state frame (0=empty/bare, 1=full/thriving).
+export function setChipState(chip, frac) {
   const u = chip.userData;
-  if (!u || !u.spr) return; // fallback chips just stay put
-  const t = active ? u.fullT : u.emptyT;
-  if (u.spr.material.map === t) return;
+  if (!u || !u.spr || !u.frames) return; // fallback chips just stay put
+  const n = u.frames.length;
+  const idx = Math.max(0, Math.min(n - 1, Math.round(frac * (n - 1))));
+  if (u.state === idx) return;
+  u.state = idx;
+  const t = u.frames[idx];
   u.spr.material.map = t;
   u.spr.material.needsUpdate = true;
   fitWidth(u.spr, t, u.worldW);
 }
+// Back-compat: full when active, empty when not.
+export function setChipActive(chip, active) { setChipState(chip, active ? 1 : 0); }
 
 function fallbackBody(spec, w, h, ts) {
   const body = new THREE.Mesh(

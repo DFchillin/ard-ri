@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js?v=CBUST';
-import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeMenaceCreature, setChipActive } from '../render/chips.js?v=CBUST';
+import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeMenaceCreature, setChipActive, setChipState } from '../render/chips.js?v=CBUST';
 import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
 
@@ -209,7 +209,7 @@ export class Game {
       grown: 0, ripe: false, harvestsLeft: 0, connected: false, herd: def.role === 'homestead' ? 10 : 0 };
     this.map.place(f.x, f.z, f.w, f.h, inst);
 
-    const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile);
+    const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile, { art: def.art, states: def.states });
     const c = this._center(f);
     chip.position.set(c.x, 0, c.z);
     if (def.role === 'homestead') {
@@ -337,11 +337,28 @@ export class Game {
         : b.def.role === 'farm' ? b.ripe
         : b.def.role === 'homestead' ? true
         : connected;
-      if (active !== b.active) { b.active = active; setChipActive(b.sprite, active); if (b.fx) b.fx.setActive(active); }
+      if (active !== b.active) { b.active = active; if (b.fx) b.fx.setActive(active); }
+      // Buildings with four prosperity frames grade smoothly; the rest just
+      // swap empty↔full on `active`.
+      setChipState(b.sprite, (b.def.states >= 3) ? this._prosperity(b) : (active ? 1 : 0));
       this._tickBuilding(b);
     }
   }
 
+  // How thriving a building looks, 0..1, mapped onto its four prosperity frames.
+  _prosperity(b) {
+    switch (b.def.role) {
+      case 'dwelling': // bare → occupied → fed → cultured-and-full
+        if (b.pop <= 0) return 0;
+        return Math.min(1, 0.34 + (b.pop / Math.max(1, b.cap)) * 0.22 + (b.food / HOUSE_CAP) * 0.22 + (b.culture / HOUSE_CAP) * 0.22);
+      case 'farm': // growing through the season, then the ripe harvest
+        return b.ripe ? 1 : Math.min(0.66, (b.grown / FARM_GROW) * 0.66);
+      case 'market': // busier the more it holds
+        return b.connected ? Math.min(1, 0.34 + (b.stock / MARKET_CAP) * 0.66) : 0;
+      default:
+        return b.active ? 1 : 0;
+    }
+  }
   _tickBuilding(b) {
     switch (b.def.role) {
       case 'farm': {
