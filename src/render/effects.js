@@ -27,6 +27,8 @@ const CFG = {
   graze:  { n: 30, color: 0x9cff72, size: 0.3,  op: 0.72, vy: 0.34, drift: 0.04, life: 2.8, grow: 1.0, rise: true },
 };
 
+const FX_DENSITY = 0.75; // a quarter fewer particles across all smoke/glitter effects
+
 export class Emitter {
   constructor(kind, { w = 1, h = 1, tile = 1, topY = 2 } = {}) {
     const cfg = (this.cfg = CFG[kind]);
@@ -35,7 +37,8 @@ export class Emitter {
     this.spanZ = h * tile * 0.42;
     this.topY = topY;
     this.parts = [];
-    for (let i = 0; i < cfg.n; i++) {
+    const n = Math.max(1, Math.round(cfg.n * FX_DENSITY));
+    for (let i = 0; i < n; i++) {
       const mat = new THREE.SpriteMaterial({
         map: DOT, color: cfg.color, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false,
