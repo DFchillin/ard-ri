@@ -5,7 +5,7 @@ export const BUILDINGS = {
     desc: 'A ráth — a round wattle-and-daub home. Draws folk when fed and watered.' },
   field: { label: 'Field', sprite: 'fields', art: 'field', states: 4, icon: '🌾', footprint: [2, 2], cost: 15, role: 'farm', produce: 'barley', rate: 5, load: 4,
     desc: 'Barley for bread and ale. Sends a grain-carrier to a nearby store.' },
-  orchard: { label: 'Orchard', sprite: 'fields', art: 'orchard', states: 4, icon: '🍎', footprint: [2, 2], cost: 18, role: 'farm', produce: 'apples', rate: 5, load: 4, unlockLevel: 4,
+  orchard: { label: 'Orchard', sprite: 'fields', art: 'orchard', states: 4, drawW: 3.2, icon: '🍎', footprint: [2, 2], cost: 18, role: 'farm', produce: 'apples', rate: 5, load: 4, unlockLevel: 4,
     desc: 'An úllghort of apple-trees, grown from grafting-shoots won on your raids. A second harvest — its pickers run the fruit to a nearby store, like a field.' },
   granary: { label: 'Grain Store', sprite: 'grain_store', scale: 0.6, icon: '🏚️', footprint: [2, 2], cost: 18, role: 'granary',
     desc: 'Holds the harvest. Markets draw grain from here along the roads.' },
@@ -19,8 +19,14 @@ export const BUILDINGS = {
     desc: 'Clean water for the settlement. Its water-carrier is paid from your treasury.' },
   altar: { label: 'Shrine', sprite: 'altar', scale: 0.78, icon: '🗿', footprint: [1, 1], cost: 12, role: 'altar', upkeep: 3,
     desc: 'A standing-stone shrine to the old powers. Its druid is kept by your treasury, and a hero is far likelier to answer a túath that keeps one.' },
-  gallan: { label: 'Gallán', sprite: 'altar', art: 'gallan', states: 4, icon: '🪨', footprint: [2, 2], cost: 16, role: 'gallan', unlockLevel: 3,
+  gallan: { label: 'Gallán', sprite: 'altar', art: 'gallan', states: 4, drawW: 3.3, icon: '🪨', footprint: [3, 3], cost: 16, role: 'gallan', unlockLevel: 3,
     desc: 'A gallán — a great carved standing-stone. Dedicate one of your warriors to keep vigil at it: while they stand watch they cannot take the field, but the old powers look far kinder on your muster, and a hosted hero or god is likelier to answer the horn.' },
+  hurling_field: { label: 'Hurling Field', sprite: 'market', art: 'hurling_field', states: 4, drawW: 4.0, icon: '🏑', footprint: [4, 4], cost: 24, role: 'culture', unlockLevel: 3,
+    desc: 'A faiche iomána — the hurling green. Young folk match camán and sliotar here, and the whole túath turns out to roar them on. Sends players onto the roads to lift the spirits of the streets they pass.' },
+  feast_hall: { label: 'Feast Hall', sprite: 'longhouse', art: 'feast_hall', states: 4, drawW: 4.0, icon: '🍺', footprint: [4, 4], cost: 30, role: 'culture', unlockLevel: 3,
+    desc: 'A bruíon — the great feasting-hall, hung with banners and loud with ale and story. Its poets and revellers walk the roads and lift the culture of every home they pass.' },
+  nemeton: { label: 'Stone Circle', sprite: 'altar', art: 'nemeton', states: 4, drawW: 3.5, icon: '🌀', footprint: [3, 3], cost: 22, role: 'culture', unlockLevel: 3,
+    desc: 'A neimheadh — a ring of carved stones, sacred ground where the túath gathers for the great feasts of the year. Its druids walk the roads and raise the culture of the streets around it.' },
   homestead: { label: 'Leader’s Homestead', sprite: 'roundhouse', art: 'longhouse', states: 4, icon: '🐄', footprint: [3, 3], cost: 30, role: 'homestead', unique: true, folk: 2, unlockLevel: 2,
     desc: 'Your own ráth and the seat of your rule. Cattle — the true measure of a king — graze the open pasture around it and multiply. Wealth to send in tribute or trade for what Ériu cannot make, and the prize a raider drives off.' },
 };
@@ -31,6 +37,7 @@ export const CATEGORIES = [
   { id: 'homes', icon: '🏠', label: 'Homes', items: ['homestead', 'roundhouse'] },
   { id: 'farming', icon: '🌾', label: 'Farming', items: ['field', 'orchard', 'granary', 'sciobolmor'] },
   { id: 'services', icon: '🏛️', label: 'Services', items: ['market', 'aonach', 'well', 'altar'] },
+  { id: 'culture', icon: '🎶', label: 'Culture', items: ['feast_hall', 'hurling_field', 'nemeton', 'gallan'] },
 ];
 
 export const ROAD_ITEM = { key: 'road', label: 'Road', icon: '🛣️', cost: 0,

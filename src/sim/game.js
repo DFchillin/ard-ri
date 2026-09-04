@@ -225,7 +225,7 @@ export class Game {
       growMax: FARM_GROW, harvests: FARM_HARVESTS, yieldTotal: (def.load || 0) * FARM_HARVESTS }; // for the field inspect readout
     this.map.place(f.x, f.z, f.w, f.h, inst);
 
-    const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile, { art: def.art, states: def.states, scale: def.scale });
+    const chip = makeBuildingChip(def.role, f.w, f.h, this.map.tile, { art: def.art, states: def.states, scale: def.scale, drawW: def.drawW });
     const c = this._center(f);
     chip.position.set(c.x, 0, c.z);
     if (def.role === 'homestead') {
@@ -373,6 +373,8 @@ export class Game {
         return b.connected ? Math.min(1, 0.34 + (b.stock / MARKET_CAP) * 0.66) : 0;
       case 'gallan': // a bare stone → tended ground → a warden keeps vigil and the stone is lit
         return b.warden ? 1 : 0.3;
+      case 'culture': // a venue comes alive once it is on the roads and folk can reach it
+        return b.connected ? 1 : 0.3;
       default:
         return b.active ? 1 : 0;
     }
@@ -412,6 +414,15 @@ export class Game {
         // A shrine keeps druids on the roads (paid from the treasury, like a well),
         // and every dwelling they pass gains culture. Two druids at a time.
         if (!this.broke && this.folk > 0 && this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 3) {
+          b.timer = 0; this._sendDruid(b);
+        }
+        break;
+      }
+      case 'culture': {
+        // A culture venue — feast hall, hurling field, stone-circle — sends folk out
+        // along the roads (storytellers, revellers, players) who lift the culture of
+        // every dwelling they pass, just as a shrine's druid does.
+        if (this.folk > 0 && this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 3) {
           b.timer = 0; this._sendDruid(b);
         }
         break;

@@ -946,6 +946,7 @@ function pipelineNote(inst) {
     return flow('Sends a water-carrier to the dwellings along the roads.');
   }
   if (d.role === 'altar') return road ? '' : warn('No road — the druid cannot walk to the dwellings to raise culture.');
+  if (d.role === 'culture') return road ? flow('Sends folk along the roads to lift the culture of the dwellings they pass.') : warn('No road — its folk cannot reach the dwellings to raise culture.');
   if (d.role === 'dwelling') {
     const miss = [];
     if (inst.food <= 0) miss.push('food (a market-trader must reach it)');
