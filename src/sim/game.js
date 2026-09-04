@@ -6,6 +6,18 @@ import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
 
 const FX_TOP = { dwelling: 1.15, farm: 0.7, market: 1.15, homestead: 1.6 }; // where hearth-smoke leaves the roof — tuned to the ~1.25-tile-tall building art
 import { Walker, Traveler } from './walkers.js?v=CBUST';
+
+// A soft round pip that floats up from a building when a walker delivers to it,
+// so the invisible food/water/culture transfer can be seen. Colour = what arrived.
+const PIP_COLOR = { food: 0xe8c86b, water: 0x6fb0e0, culture: 0xb07ad0 };
+const PIP_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 32;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(16, 16, 1, 16, 16, 15);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.55, 'rgba(255,255,255,0.8)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.beginPath(); x.arc(16, 16, 15, 0, Math.PI * 2); x.fill();
+  const t = new THREE.CanvasTexture(c); return t;
+})();
 import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=CBUST';
 import { randomName } from '../data/names.js?v=CBUST';
 import { personFor } from '../data/phrases.js?v=CBUST';
@@ -35,7 +47,9 @@ export class Game {
     this.buildingGroup = new THREE.Group();
     this.walkerGroup = new THREE.Group();
     this.menaceGroup = new THREE.Group();
-    scene.add(this.buildingGroup, this.walkerGroup, this.menaceGroup);
+    this.floatieGroup = new THREE.Group();
+    scene.add(this.buildingGroup, this.walkerGroup, this.menaceGroup, this.floatieGroup);
+    this._floaties = [];
     this.menace = null;
 
     this.buildings = [];
@@ -481,7 +495,7 @@ export class Game {
       type: 'water_carrier', label: 'W', steps: 24, speed: 2.6, source: well,
       onTile: (x, z) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.water < HOUSE_CAP) inst.water = Math.min(HOUSE_CAP, inst.water + 5);
+          if (inst.def.role === 'dwelling' && inst.water < HOUSE_CAP) { inst.water = Math.min(HOUSE_CAP, inst.water + 5); this._pop(inst, 'water'); }
         }
       },
     });
@@ -495,7 +509,7 @@ export class Game {
       type: 'druid', label: 'D', steps: 26, speed: 2.2, source: altar,
       onTile: (x, z) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) inst.culture = Math.min(HOUSE_CAP, inst.culture + 5);
+          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) { inst.culture = Math.min(HOUSE_CAP, inst.culture + 5); this._pop(inst, 'culture'); }
         }
       },
     });
@@ -529,15 +543,37 @@ export class Game {
           if (inst.def.role === 'dwelling' && market.stock > 0 && inst.food < HOUSE_CAP) {
             inst.food = Math.min(HOUSE_CAP, inst.food + 5);
             market.stock -= 1;
+            this._pop(inst, 'food');
           }
         }
       },
     });
   }
 
+  // A pip floats up from a building when a walker just delivered to it. Throttled
+  // per building (a busy round shows a steady drip, not a burst).
+  _pop(inst, kind) {
+    if (!inst.sprite || (inst._popCd || 0) > 0) return;
+    inst._popCd = 0.55;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: PIP_TEX, color: PIP_COLOR[kind] || 0xffffff,
+      transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
+    s.center.set(0.5, 0.5); s.scale.set(0.4, 0.4, 1);
+    const p = inst.sprite.position;
+    s.position.set(p.x + (Math.random() - 0.5) * 0.4, 1.2, p.z + (Math.random() - 0.5) * 0.4);
+    this.floatieGroup.add(s);
+    this._floaties.push({ s, age: 0, life: 1.1 });
+  }
+
   // Ambient particle effects — real time, so they drift even while paused.
   updateFx(dt) {
-    for (const b of this.buildings) { if (b.fx) b.fx.update(dt); if (b.fx2) b.fx2.update(dt); }
+    for (const b of this.buildings) { if (b.fx) b.fx.update(dt); if (b.fx2) b.fx2.update(dt); if (b._popCd > 0) b._popCd -= dt; }
+    for (let i = this._floaties.length - 1; i >= 0; i--) {
+      const f = this._floaties[i]; f.age += dt;
+      const t = f.age / f.life;
+      f.s.position.y += dt * 0.9;
+      f.s.material.opacity = 0.9 * (1 - t);
+      if (t >= 1) { this.floatieGroup.remove(f.s); f.s.material.dispose(); this._floaties.splice(i, 1); }
+    }
     if (this.menace) this._moveMenaceCreature(dt);
   }
 
