@@ -8,7 +8,23 @@ import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNic
 const MAP = 20;
 const SUMMONABLE = ['cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan']; // heroes/gods that only answer a hosted, favoured muster
 const CLASH_DT = 0.55;
-const CORPSE_TTL = 1.3; // how long a fallen unit lies on the field playing its death frames before it is cleared
+// Death is a render-side effect, not drawn art: the slain figure dissolves —
+// fading and burning from pale to red to ash — while a short burst of dark
+// smoke and red embers lifts off it. No hurt/fall/dead frames are needed.
+const DEATH_DUR = 0.9;   // how long the dissolve + smoke plays before the mesh is cleared
+const EMBER_MAX = 140;   // hard cap on live death particles (a rout can slay many at once)
+
+function softDot() {
+  const c = document.createElement('canvas'); c.width = c.height = 48;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(24, 24, 0, 24, 24, 24);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.45, 'rgba(255,255,255,0.6)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.beginPath(); g.arc(24, 24, 24, 0, Math.PI * 2); g.fill();
+  return new THREE.CanvasTexture(c);
+}
+const EMBER_DOT = softDot();
 // Combat modifiers that make formation and numbers matter:
 const FOCUS_BONUS = 0.25;   // each extra attacker on the same foe adds 25% to the blow (2 = x1.25, 3 = x1.5 …)
 const FOCUS_CAP = 2.0;      // capped at x2 (a pile-on has diminishing returns)
@@ -86,6 +102,7 @@ export class Battle {
     this.pickPlane = this.view.pickPlane;
     this.unitGroup = new THREE.Group(); this.scene.add(this.unitGroup);
     this.buildingGroup = new THREE.Group(); this.scene.add(this.buildingGroup);
+    this.fxGroup = new THREE.Group(); this.scene.add(this.fxGroup); this._embers = [];
     this.raycaster = new THREE.Raycaster();
     this._dom();
   }
@@ -137,6 +154,8 @@ export class Battle {
     this.active = true; this.started = false; this.phase = 'muster';
     for (const u of this.units) this.unitGroup.remove(u.mesh);
     for (const c of this._dying || []) this.unitGroup.remove(c.u.mesh);
+    for (const e of this._embers || []) { this.fxGroup.remove(e.s); e.s.material.dispose(); }
+    this._embers = [];
     for (const b of this.buildings) { this.buildingGroup.remove(b.chip); this.buildingGroup.remove(b.bar); }
     this.units = []; this.companies = []; this.buildings = []; this.selected.clear();
     this._dying = [];
@@ -286,15 +305,57 @@ export class Battle {
   _liveCompanies(team) { return this.companies.filter((c) => c.team === team && !c.routing && c.units.some((u) => !u.dead)); }
   _liveUnits(team) { return this.units.filter((u) => u.team === team && !u.dead && !u.company.routing); }
 
-  // A slain unit is logically gone at once (dead), but its sprite lingers to play
-  // its death frames. Sprites with a die() (the battle-art units) fall where they
-  // stand; piece/walker figures without one are cleared immediately as before.
+  // A slain unit is logically gone at once (dead) but its sprite lingers to play
+  // the render-side death: the figure dissolves (fading, burning pale→red→ash and
+  // sinking) while a burst of dark smoke and red embers lifts off it. Works for
+  // every unit — warrior art and walker figures alike — so no death frames are
+  // needed. Piece figures (no sprite) still just wink out.
   _killVisual(u) {
     if (u.ring) u.ring.visible = false;
     if (u.bar) u.bar.visible = false;
     const spr = u.mesh.userData.spr;
-    if (spr && spr.die) { spr.die(); this._dying.push({ u, ttl: CORPSE_TTL }); }
+    this._deathBurst(u.pos.x, u.pos.z, spr ? spr.scale.y || 1.2 : 1);
+    if (spr) { spr.material.transparent = true; this._dying.push({ u, spr, ttl: DEATH_DUR, dur: DEATH_DUR, op0: spr.material.opacity == null ? 1 : spr.material.opacity }); }
     else this.unitGroup.remove(u.mesh);
+  }
+
+  // A short-lived puff at a death: mostly dark smoke (normal blend, so black
+  // reads) with a few hot red embers (additive glow). Capped so a mass rout
+  // can't flood the field with particles.
+  _deathBurst(x, z, tall) {
+    const y0 = tall * 0.4;
+    for (let i = 0; i < 8; i++) {
+      if (this._embers.length >= EMBER_MAX) break;
+      const red = i % 3 === 0;
+      const mat = new THREE.SpriteMaterial({
+        map: EMBER_DOT, color: red ? 0xff5326 : 0x14100f,
+        transparent: true, opacity: 0, depthWrite: false,
+        blending: red ? THREE.AdditiveBlending : THREE.NormalBlending,
+      });
+      const s = new THREE.Sprite(mat);
+      const a = Math.random() * Math.PI * 2, r = Math.random() * 0.18;
+      s.position.set(x + Math.cos(a) * r, y0 + Math.random() * 0.25, z + Math.sin(a) * r);
+      this.fxGroup.add(s);
+      this._embers.push({
+        s, age: 0, life: red ? 0.5 + Math.random() * 0.3 : 0.75 + Math.random() * 0.5,
+        vx: Math.cos(a) * 0.18, vz: Math.sin(a) * 0.18,
+        vy: (red ? 1.15 : 0.55) * (0.7 + Math.random() * 0.6),
+        sz: (red ? 0.15 : 0.34) * (0.7 + Math.random() * 0.7),
+        grow: red ? 1.1 : 2.1, op: red ? 0.95 : 0.62,
+      });
+    }
+  }
+
+  _updateEmbers(dt) {
+    for (let i = this._embers.length - 1; i >= 0; i--) {
+      const e = this._embers[i]; e.age += dt;
+      if (e.age >= e.life) { this.fxGroup.remove(e.s); e.s.material.dispose(); this._embers.splice(i, 1); continue; }
+      e.s.position.x += e.vx * dt; e.s.position.y += e.vy * dt; e.s.position.z += e.vz * dt;
+      e.vy *= (1 - 0.55 * dt); // the rise slows as the puff cools
+      const t = e.age / e.life;
+      e.s.material.opacity = Math.sin(Math.PI * t) * e.op;
+      e.s.scale.setScalar(e.sz * (1 + (e.grow - 1) * t));
+    }
   }
 
   // ---------- sim ----------
@@ -306,10 +367,17 @@ export class Battle {
     for (const u of this.units) if (!u.dead) this._move(u, dt);
     for (const u of this.units) { const spr = u.mesh.userData.spr; if (spr && spr.animate && !u.dead) spr.animate(dt, !!u._moving); }
     for (let i = this._dying.length - 1; i >= 0; i--) {
-      const c = this._dying[i]; const spr = c.u.mesh.userData.spr;
-      if (spr && spr.animate) spr.animate(dt, false);
-      if ((c.ttl -= dt) <= 0) { this.unitGroup.remove(c.u.mesh); this._dying.splice(i, 1); }
+      const c = this._dying[i]; const spr = c.spr;
+      c.ttl -= dt;
+      if (spr && spr.material) {
+        const t = Math.min(1, 1 - Math.max(0, c.ttl) / c.dur); // 0 → 1 over the death
+        spr.material.opacity = c.op0 * (1 - t) * (1 - t);       // ease-out fade to nothing
+        spr.material.color.setRGB(1, Math.max(0.14, 1 - t * 1.7), Math.max(0.08, 1 - t * 2.3)); // pale → red → ash
+        spr.position.y = -t * 0.16;                              // crumble into the ground
+      }
+      if (c.ttl <= 0) { this.unitGroup.remove(c.u.mesh); this._dying.splice(i, 1); }
     }
+    this._updateEmbers(dt);
     this._clashAcc += dt;
     if (this._clashAcc >= CLASH_DT) { this._clashAcc -= CLASH_DT; this._clash(); this._checkEnd(); }
     if (this.selected.size) this._renderCommand();
