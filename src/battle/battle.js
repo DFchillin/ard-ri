@@ -9,6 +9,11 @@ const MAP = 20;
 const SUMMONABLE = ['cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan']; // heroes/gods that only answer a hosted, favoured muster
 const CLASH_DT = 0.55;
 const CORPSE_TTL = 1.3; // how long a fallen unit lies on the field playing its death frames before it is cleared
+// Combat modifiers that make formation and numbers matter:
+const FOCUS_BONUS = 0.25;   // each extra attacker on the same foe adds 25% to the blow (2 = x1.25, 3 = x1.5 …)
+const FOCUS_CAP = 2.0;      // capped at x2 (a pile-on has diminishing returns)
+const RESERVE_DEF = 0.08;   // each un-engaged company-mate shields the engaged: incoming damage x 1/(1+0.08·reserves)
+const RESERVE_MAX = 5;      // reserves counted toward that shield
 const MOVE = 0.58;         // slower march so there's time to react and re-order
 const ATTACK_RANGE = 1.7;
 const AGGRO = 6;
@@ -365,6 +370,8 @@ export class Battle {
     }
     // gather blows: nearest enemy unit in reach, else an adjacent enemy building
     const dmg = new Map(); const add = (t, n) => dmg.set(t, (dmg.get(t) || 0) + n);
+    const attackers = new Map();               // how many struck each foe (focus-fire bonus)
+    const engaged = new Set();                 // units that landed a blow this clash
     const took = new Map();
     for (const u of [...F, ...E]) {
       const foes = u.team === 'player' ? E : F;
@@ -372,9 +379,24 @@ export class Battle {
       for (const o of foes) { const d = dist2(u.pos, o.pos); if (d < td) { td = d; tgt = o; } }
       if (!tgt) for (const b of this.buildings) if (!b.dead && b.team !== u.team &&
         Math.abs(u.pos.x - b.pos.x) <= b.w / 2 + ATTACK_RANGE - 0.4 && Math.abs(u.pos.z - b.pos.z) <= b.h / 2 + ATTACK_RANGE - 0.4) { tgt = b; break; }
-      if (tgt) { add(tgt, this._dmgTo(u, tgt)); const spr = u.mesh.userData.spr; if (spr && spr.strike) { spr.strike(); if (spr.faceWorld) spr.faceWorld(tgt.pos.x - u.pos.x, tgt.pos.z - u.pos.z); } }
+      if (tgt) {
+        add(tgt, this._dmgTo(u, tgt));
+        attackers.set(tgt, (attackers.get(tgt) || 0) + 1);
+        engaged.add(u);
+        const spr = u.mesh.userData.spr; if (spr && spr.strike) { spr.strike(); if (spr.faceWorld) spr.faceWorld(tgt.pos.x - u.pos.x, tgt.pos.z - u.pos.z); }
+      }
     }
-    for (const [t, n] of dmg) {
+    // reserves: alive company-mates who did NOT strike this clash shield the engaged.
+    const reserves = new Map();
+    for (const c of this.companies) {
+      if (c.routing) continue;
+      let r = 0; for (const u of c.units) if (!u.dead && !engaged.has(u)) r++;
+      reserves.set(c, Math.min(RESERVE_MAX, r));
+    }
+    for (const [t, raw] of dmg) {
+      const focus = Math.min(FOCUS_CAP, 1 + FOCUS_BONUS * Math.max(0, (attackers.get(t) || 1) - 1));
+      const shield = t.kind === 'unit' ? 1 / (1 + RESERVE_DEF * (reserves.get(t.company) || 0)) : 1;
+      const n = raw * focus * shield;
       t.hp -= n;
       if (t.kind === 'unit') took.set(t.company, (took.get(t.company) || 0) + n);
       if (t.hp <= 0) {
