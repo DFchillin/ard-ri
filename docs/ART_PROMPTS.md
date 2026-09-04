@@ -220,3 +220,41 @@ Attach the approved sprite and say *"match this exactly."* Otherwise:
 If the tool takes hex, match the *mood* not the flat colour — these are the
 placeholder chip colours: dwelling `#c98a3a`, field `#8ea63a`, granary `#b0894a`,
 market `#a8663a`, well `#5a8aa0`, altar `#7a6a9a` · gold `#e8c96b` · woad `#2c6b76`.
+
+## BUILDING REDO — corrective batch (2:1, footprint-sized)
+
+Some early buildings were drawn near-square or over-scaled in their cell, so
+they render too big or at the wrong angle. Regenerate these four to the rule
+below; the rest of the sheets are fine.
+
+### THE SCALE RULE (add to every building prompt)
+> Draw in **2:1 dimetric** (tile diamond twice as wide as tall). Size the
+> building so its **ground base exactly fills its footprint** — a 2×2 building
+> sits on a ground diamond two tiles across; a 1×1 on a single tile. Keep the
+> structure **no taller than ~1.3× its footprint width** (low and grounded, not
+> a tower). Leave an **even, small ground margin** all around so the sprite
+> trims to clean transparent edges. If a row of 4 states, hold **identical
+> scale, footprint and base position** across all four — only prosperity changes.
+> Transparent background, no separate ground tile, no text.
+
+### Grain store — Sciobol (2×2, 4 states)
+> A raised Gaelic grain-store on stone staddle-mushrooms with a small ladder,
+> low and wide, thatched. States: bare with doors open · a few sacks · full,
+> sacks and baskets stacked, tidy · a stone-based, well-kept store with a
+> weather-porch. Keep it low — a store, not a tower.
+
+### Well — Tobar (1×1, 2 states OR 4)
+> A round drystone well with a low timber winch and a small shingle roof,
+> compact, sitting on a single tile. Still (bucket resting) → in use (rope
+> lowered, wet stones, a filled pail). Small and low.
+
+### Shrine — Scrín (1×1, 2 states OR 4)
+> A single standing-stone carved with ogham and spirals, a low offering-bowl at
+> its foot, on a single grassy tile. Dormant (bare grey stone) → venerated
+> (greenery, a lit bowl, tied cloth, a faint gold glow). Low and simple.
+
+### Field — Gort (2×2, 4 states) — REDO
+> A tilled barley plot bordered by a low woven fence, wider than deep. The
+> **lean-to / store hut must be small** — a modest corner shelter, not a house
+> (the old one was far too large). States: bare furrows → green shoots →
+> tall ripe gold → gold with a hand-cart. Keep the plot flat and the shelter tiny.
