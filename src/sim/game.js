@@ -221,6 +221,7 @@ export class Game {
     const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, water: 0, culture: 0, timer: 0,
       pop: 0, cap: def.folk || 0, incoming: 0, distress: 0, active: false,
       grown: 0, ripe: false, harvestsLeft: 0, connected: false, herd: def.role === 'homestead' ? 10 : 0,
+      warden: null, // a gallán may have a warrior dedicated to stand vigil (raises muster favour)
       growMax: FARM_GROW, harvests: FARM_HARVESTS, yieldTotal: (def.load || 0) * FARM_HARVESTS }; // for the field inspect readout
     this.map.place(f.x, f.z, f.w, f.h, inst);
 
@@ -264,7 +265,7 @@ export class Game {
     }
     const buildings = this.buildings.map((b) => ({ key: b.key, x: b.x, z: b.z,
       pop: b.pop, stock: b.stock, food: b.food, water: b.water, culture: b.culture, herd: b.herd,
-      grown: b.grown, ripe: b.ripe, harvestsLeft: b.harvestsLeft }));
+      grown: b.grown, ripe: b.ripe, harvestsLeft: b.harvestsLeft, warden: b.warden || null }));
     const menace = this.menace ? { x: this.menace.x, z: this.menace.z, w: this.menace.w, h: this.menace.h } : null;
     return { silver: this.silver, cattle: this.cattle, folk: this.folk, buildings, roads, cros, menace };
   }
@@ -289,7 +290,7 @@ export class Game {
       if (!this.map.canPlace(b.x, b.z, w, h)) continue;
       const inst = this._spawnBuilding(b.key, { x: b.x, z: b.z, w, h });
       Object.assign(inst, { pop: b.pop || 0, stock: b.stock || 0, food: b.food || 0, water: b.water || 0, culture: b.culture || 0,
-        grown: b.grown || 0, ripe: !!b.ripe, harvestsLeft: b.harvestsLeft || 0 });
+        grown: b.grown || 0, ripe: !!b.ripe, harvestsLeft: b.harvestsLeft || 0, warden: b.warden || null });
       if (def.role === 'homestead') { inst.herd = b.herd || 10; this._updateHerd(inst); }
     }
     if (snap.menace) this.spawnMenace(snap.menace.x, snap.menace.z, snap.menace.w, snap.menace.h);
@@ -346,7 +347,7 @@ export class Game {
     for (const b of this.buildings) {
       const connected = !!entryRoadTile(this.map, b);
       b.connected = connected;
-      if (b.alert) b.alert.visible = !connected && b.def.role !== 'homestead'; // the homestead needs no road
+      if (b.alert) b.alert.visible = !connected && b.def.role !== 'homestead' && b.def.role !== 'gallan'; // homestead and standing-stone need no road
       // dwellings rise when occupied; a field only shows its golden crop when ripe; else road-connected
       const active = b.def.role === 'dwelling' ? b.pop > 0
         : b.def.role === 'farm' ? b.ripe
@@ -370,6 +371,8 @@ export class Game {
         return b.ripe ? 1 : Math.min(0.66, (b.grown / FARM_GROW) * 0.66);
       case 'market': // busier the more it holds
         return b.connected ? Math.min(1, 0.34 + (b.stock / MARKET_CAP) * 0.66) : 0;
+      case 'gallan': // a bare stone → tended ground → a warden keeps vigil and the stone is lit
+        return b.warden ? 1 : 0.3;
       default:
         return b.active ? 1 : 0;
     }

@@ -324,8 +324,17 @@ saveCampaign();
 
 // A small Gaelic name-bank so the war-dead are remembered by name, not tally.
 const DEAD_NAMES = ['Bran', 'Oisín', 'Fergus', 'Niamh', 'Sadhbh', 'Cormac', 'Éimhear', 'Diarmuid', 'Lugh', 'Aoife', 'Conall', 'Gráinne', 'Naoise', 'Fiacha', 'Deirdre', 'Ruairí'];
+// A warden's caliber decides how much the old powers are swayed — dedicate your
+// best and a hosted hero or god is likelier to answer the horn.
+const WARDEN_FAVOUR = { warrior: 0.12, seasoned: 0.20, curadh: 0.30 };
+const WARDEN_RANKS = ['curadh', 'seasoned', 'warrior']; // offered best-first
+function musterFavour() {
+  let f = game.count('altar') > 0 ? 0.85 : 0.25; // a shrine already makes it near-certain
+  for (const b of game.buildings) if (b.def.role === 'gallan' && b.warden) f += WARDEN_FAVOUR[b.warden] || 0.12;
+  return Math.min(0.97, f);
+}
 function enterBattle(scenario) {
-  battle.loadWarband({ roster: campaign.roster, ghosts: campaign.ghosts, hosted: campaign.hosted, shrines: game.count('altar') });
+  battle.loadWarband({ roster: campaign.roster, ghosts: campaign.ghosts, hosted: campaign.hosted, favour: musterFavour() });
   battle.enter(scenario);
   announceSummons(battle.summoned || []); // heroes/gods that answered this muster
 }
@@ -892,6 +901,7 @@ function buildingHtml(inst) {
   if (d.role === 'granary' || d.role === 'market') extra = `<p>Harvest in store: ${inst.stock}</p>`;
   if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10 · Water: ${inst.water}/10 · Culture: ${inst.culture}/10</p>`;
   if (d.role === 'altar') extra = altarHtml();
+  if (d.role === 'gallan') extra = gallanHtml(inst);
   if (d.role === 'homestead') { const graze = game._grazing(inst); const cap = 20 + graze * 4; extra = `<p>Herd: 🐄 ${inst.herd} / ${cap} · Grazing land: ${graze} tiles</p><p class="dim">Leave open pasture around the ráth and the herd grows faster. Cattle is your wealth in the wider world — and what a raider carries off.</p><button id="trade-btn" class="continue-btn">🌍 Trade in the wider world</button>`; }
   return `<h3>${d.label}</h3><div class="role">${d.role === 'homestead' ? 'Your seat' : 'Building'}</div><p>${d.desc}</p>${pipelineNote(inst)}${extra}`;
 }
@@ -971,6 +981,45 @@ function prayAtAltar() {
   wireAltar();
 }
 function wireAltar() { const b = document.getElementById('pray-btn'); if (b) b.addEventListener('click', prayAtAltar); }
+// A gallán where a warrior may stand vigil — committing them out of the muster
+// in exchange for the old powers' favour when you summon.
+function gallanHtml(inst) {
+  const cur = inst.warden;
+  if (cur) {
+    const fav = Math.round((WARDEN_FAVOUR[cur] || 0.12) * 100);
+    const name = UNIT_TYPES[cur] ? UNIT_TYPES[cur].label : cur;
+    return `<div class="altar-dead"><div class="role">The vigil</div>` +
+      `<p class="pl-ok">→ A ${name} keeps vigil at the stone — <b>+${fav}%</b> to your muster favour. They will not answer the horn while they watch.</p>` +
+      `<button id="gallan-clear" class="continue-btn">Recall the warden</button></div>`;
+  }
+  const free = WARDEN_RANKS.filter((t) => (campaign.roster[t] || 0) > 0);
+  if (!free.length) {
+    return `<div class="altar-dead"><div class="role">The vigil</div>` +
+      `<p class="dim">No warriors free to keep the vigil. Win or muster some, then dedicate one here.</p></div>`;
+  }
+  return `<div class="altar-dead"><div class="role">The vigil</div>` +
+    `<p class="dim">Dedicate a warrior to stand watch. A warden cannot also fight — but the old powers favour a túath that keeps its champions at the stones.</p>` +
+    free.map((t) => `<button class="gallan-pick continue-btn" data-t="${t}">Set ${UNIT_TYPES[t].label} — +${Math.round(WARDEN_FAVOUR[t] * 100)}% (${campaign.roster[t]} free)</button>`).join('') +
+    `</div>`;
+}
+function refreshGallan(inst) { const body = document.getElementById('inspect-body'); if (body) { body.innerHTML = buildingHtml(inst); wireGallan(inst); } }
+function wireGallan(inst) {
+  const clr = document.getElementById('gallan-clear');
+  if (clr) clr.addEventListener('click', () => { clearWarden(inst); refreshGallan(inst); });
+  document.querySelectorAll('.gallan-pick').forEach((b) => b.addEventListener('click', () => { assignWarden(inst, b.dataset.t); refreshGallan(inst); }));
+}
+function assignWarden(inst, t) {
+  if (inst.warden || (campaign.roster[t] || 0) <= 0) return;
+  campaign.roster[t] -= 1;
+  inst.warden = t;
+  pushStats(); saveSettlement();
+}
+function clearWarden(inst) {
+  if (!inst.warden) return;
+  campaign.roster[inst.warden] = (campaign.roster[inst.warden] || 0) + 1;
+  inst.warden = null;
+  pushStats(); saveSettlement();
+}
 function terrainHtml(tile) {
   const info = TERRAIN_INFO[tile.terrain];
   return `<h3>${info.name}</h3><div class="role">Terrain</div><p>${info.desc}</p>`;
@@ -1000,6 +1049,7 @@ function inspectAt(e) {
   }
   ui.showInspect(buildingHtml(inst), false);
   if (inst.def.role === 'altar') wireAltar();
+  if (inst.def.role === 'gallan') wireGallan(inst);
   if (inst.def.role === 'homestead') { const tb = document.getElementById('trade-btn'); if (tb) tb.addEventListener('click', openTrade); }
 }
 // Demolish, like build, is confirmed: mark the target red, then "Raze ✓".
@@ -1023,6 +1073,8 @@ function showDemolishGhost(t) {
 }
 function commitDemolish() {
   if (!pendingDemolish) return;
+  const occ = map.get(pendingDemolish.x, pendingDemolish.z);
+  if (occ && occ.occupant && occ.occupant.warden) clearWarden(occ.occupant); // a razed gallán frees its warden back to the war-band
   const r = game.demolish(pendingDemolish.x, pendingDemolish.z);
   if (r === 'road') { view.rebuildRoads(); view.rebuildCros(); }
   if (r === 'cros') view.rebuildCros();

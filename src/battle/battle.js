@@ -612,11 +612,15 @@ export class Battle {
   // Adopt the campaign's persistent war-band, plus any ghosts prayed back. Heroes
   // and gods are not owned outright — a hosted one only *may* answer this muster:
   // one chance in four, rising to near-certain if a shrine stands in the ráth.
-  loadWarband({ roster, ghosts, hosted, shrines } = {}) {
+  loadWarband({ roster, ghosts, hosted, shrines, favour } = {}) {
     if (roster) this.roster = Object.assign({}, roster);
     this.roster.ghost = ghosts || 0;
     this.summoned = [];
-    const chance = shrines > 0 ? 0.85 : 0.25;
+    // Favour is the odds a hosted hero/god answers: a shrine makes it near-certain,
+    // a gallán with a warden on vigil pushes it higher still. Fall back to the old
+    // shrine-only rule when a caller passes no computed favour.
+    const chance = favour != null ? favour : (shrines > 0 ? 0.85 : 0.25);
+    this.musterFavour = chance;
     for (const h of SUMMONABLE) {
       delete this.roster[h]; // never freely available
       if (hosted && hosted[h] && Math.random() < chance) { this.roster[h] = 1; this.summoned.push(h); }
