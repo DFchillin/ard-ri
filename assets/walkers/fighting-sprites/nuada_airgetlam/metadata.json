@@ -1,0 +1,177 @@
+{
+  "group_id": "5a49dd07-172b-431a-9a8c-c9aaff4d40ec",
+  "states": [
+    {
+      "character": {
+        "id": "049ec7c0-ccd4-4522-a8a4-e02247ed163b",
+        "name": "Idle",
+        "prompt": "Nuada Airgetl\u00e1m, first king of the Tuatha D\u00e9 Danann with a silver arm. A tall grizzled older warrior-king with long grey-streaked hair and a short beard, battle-scarred and stern. Regal but weathered bronze-age Gaelic dress in dark tones: a deep crimson and dark green wool l\u00e9ine and heavy cloak with dark woven Celtic borders, a large tarnished gold brooch, a thick twisted gold torc. His right forearm and hand are a dull articulated silver prosthetic. Carries a long bronze-and-silver sword. Detailed, grounded and imposing, rendered in dark painterly pixel art. No bright flat colours, no revealing armour, no modern clothing, no medieval plate armour.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-09-02T11:32:44.670438+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Nuada_walk": {
+            "west": [
+              "Idle/animations/Nuada_walk/west/frame_000.png",
+              "Idle/animations/Nuada_walk/west/frame_001.png",
+              "Idle/animations/Nuada_walk/west/frame_002.png",
+              "Idle/animations/Nuada_walk/west/frame_003.png",
+              "Idle/animations/Nuada_walk/west/frame_004.png",
+              "Idle/animations/Nuada_walk/west/frame_005.png"
+            ],
+            "south": [
+              "Idle/animations/Nuada_walk/south/frame_000.png",
+              "Idle/animations/Nuada_walk/south/frame_001.png",
+              "Idle/animations/Nuada_walk/south/frame_002.png",
+              "Idle/animations/Nuada_walk/south/frame_003.png",
+              "Idle/animations/Nuada_walk/south/frame_004.png",
+              "Idle/animations/Nuada_walk/south/frame_005.png"
+            ],
+            "south-west": [
+              "Idle/animations/Nuada_walk/south-west/frame_000.png",
+              "Idle/animations/Nuada_walk/south-west/frame_001.png",
+              "Idle/animations/Nuada_walk/south-west/frame_002.png",
+              "Idle/animations/Nuada_walk/south-west/frame_003.png",
+              "Idle/animations/Nuada_walk/south-west/frame_004.png",
+              "Idle/animations/Nuada_walk/south-west/frame_005.png"
+            ],
+            "north-east": [
+              "Idle/animations/Nuada_walk/north-east/frame_000.png",
+              "Idle/animations/Nuada_walk/north-east/frame_001.png",
+              "Idle/animations/Nuada_walk/north-east/frame_002.png",
+              "Idle/animations/Nuada_walk/north-east/frame_003.png",
+              "Idle/animations/Nuada_walk/north-east/frame_004.png",
+              "Idle/animations/Nuada_walk/north-east/frame_005.png"
+            ],
+            "south-east": [
+              "Idle/animations/Nuada_walk/south-east/frame_000.png",
+              "Idle/animations/Nuada_walk/south-east/frame_001.png",
+              "Idle/animations/Nuada_walk/south-east/frame_002.png",
+              "Idle/animations/Nuada_walk/south-east/frame_003.png",
+              "Idle/animations/Nuada_walk/south-east/frame_004.png",
+              "Idle/animations/Nuada_walk/south-east/frame_005.png"
+            ],
+            "north": [
+              "Idle/animations/Nuada_walk/north/frame_000.png",
+              "Idle/animations/Nuada_walk/north/frame_001.png",
+              "Idle/animations/Nuada_walk/north/frame_002.png",
+              "Idle/animations/Nuada_walk/north/frame_003.png",
+              "Idle/animations/Nuada_walk/north/frame_004.png",
+              "Idle/animations/Nuada_walk/north/frame_005.png"
+            ],
+            "east": [
+              "Idle/animations/Nuada_walk/east/frame_000.png",
+              "Idle/animations/Nuada_walk/east/frame_001.png",
+              "Idle/animations/Nuada_walk/east/frame_002.png",
+              "Idle/animations/Nuada_walk/east/frame_003.png",
+              "Idle/animations/Nuada_walk/east/frame_004.png",
+              "Idle/animations/Nuada_walk/east/frame_005.png"
+            ],
+            "north-west": [
+              "Idle/animations/Nuada_walk/north-west/frame_000.png",
+              "Idle/animations/Nuada_walk/north-west/frame_001.png",
+              "Idle/animations/Nuada_walk/north-west/frame_002.png",
+              "Idle/animations/Nuada_walk/north-west/frame_003.png",
+              "Idle/animations/Nuada_walk/north-west/frame_004.png",
+              "Idle/animations/Nuada_walk/north-west/frame_005.png"
+            ]
+          },
+          "Attacking_with_sword": {
+            "north-west": [
+              "Idle/animations/Attacking_with_sword/north-west/frame_000.png",
+              "Idle/animations/Attacking_with_sword/north-west/frame_001.png",
+              "Idle/animations/Attacking_with_sword/north-west/frame_002.png",
+              "Idle/animations/Attacking_with_sword/north-west/frame_003.png",
+              "Idle/animations/Attacking_with_sword/north-west/frame_004.png",
+              "Idle/animations/Attacking_with_sword/north-west/frame_005.png",
+              "Idle/animations/Attacking_with_sword/north-west/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Attacking_with_sword/south/frame_000.png",
+              "Idle/animations/Attacking_with_sword/south/frame_001.png",
+              "Idle/animations/Attacking_with_sword/south/frame_002.png",
+              "Idle/animations/Attacking_with_sword/south/frame_003.png",
+              "Idle/animations/Attacking_with_sword/south/frame_004.png",
+              "Idle/animations/Attacking_with_sword/south/frame_005.png",
+              "Idle/animations/Attacking_with_sword/south/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Attacking_with_sword/south-east/frame_000.png",
+              "Idle/animations/Attacking_with_sword/south-east/frame_001.png",
+              "Idle/animations/Attacking_with_sword/south-east/frame_002.png",
+              "Idle/animations/Attacking_with_sword/south-east/frame_003.png",
+              "Idle/animations/Attacking_with_sword/south-east/frame_004.png",
+              "Idle/animations/Attacking_with_sword/south-east/frame_005.png",
+              "Idle/animations/Attacking_with_sword/south-east/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Attacking_with_sword/east/frame_000.png",
+              "Idle/animations/Attacking_with_sword/east/frame_001.png",
+              "Idle/animations/Attacking_with_sword/east/frame_002.png",
+              "Idle/animations/Attacking_with_sword/east/frame_003.png",
+              "Idle/animations/Attacking_with_sword/east/frame_004.png",
+              "Idle/animations/Attacking_with_sword/east/frame_005.png",
+              "Idle/animations/Attacking_with_sword/east/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Attacking_with_sword/south-west/frame_000.png",
+              "Idle/animations/Attacking_with_sword/south-west/frame_001.png",
+              "Idle/animations/Attacking_with_sword/south-west/frame_002.png",
+              "Idle/animations/Attacking_with_sword/south-west/frame_003.png",
+              "Idle/animations/Attacking_with_sword/south-west/frame_004.png",
+              "Idle/animations/Attacking_with_sword/south-west/frame_005.png",
+              "Idle/animations/Attacking_with_sword/south-west/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Attacking_with_sword/north/frame_000.png",
+              "Idle/animations/Attacking_with_sword/north/frame_001.png",
+              "Idle/animations/Attacking_with_sword/north/frame_002.png",
+              "Idle/animations/Attacking_with_sword/north/frame_003.png",
+              "Idle/animations/Attacking_with_sword/north/frame_004.png",
+              "Idle/animations/Attacking_with_sword/north/frame_005.png",
+              "Idle/animations/Attacking_with_sword/north/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Attacking_with_sword/north-east/frame_000.png",
+              "Idle/animations/Attacking_with_sword/north-east/frame_001.png",
+              "Idle/animations/Attacking_with_sword/north-east/frame_002.png",
+              "Idle/animations/Attacking_with_sword/north-east/frame_003.png",
+              "Idle/animations/Attacking_with_sword/north-east/frame_004.png",
+              "Idle/animations/Attacking_with_sword/north-east/frame_005.png",
+              "Idle/animations/Attacking_with_sword/north-east/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Attacking_with_sword/west/frame_000.png",
+              "Idle/animations/Attacking_with_sword/west/frame_001.png",
+              "Idle/animations/Attacking_with_sword/west/frame_002.png",
+              "Idle/animations/Attacking_with_sword/west/frame_003.png",
+              "Idle/animations/Attacking_with_sword/west/frame_004.png",
+              "Idle/animations/Attacking_with_sword/west/frame_005.png",
+              "Idle/animations/Attacking_with_sword/west/frame_006.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-09-04T12:29:54.990572"
+}

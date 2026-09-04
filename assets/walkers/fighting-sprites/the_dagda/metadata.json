@@ -1,0 +1,177 @@
+{
+  "group_id": "e5dffeae-8af2-4933-b722-579e47489034",
+  "states": [
+    {
+      "character": {
+        "id": "66d0f870-8b2c-462b-a665-97096e62a003",
+        "name": "Idle",
+        "prompt": "The Dagda, great father-god of Irish mythology. Enormous broad-shouldered older man, considerably heavier and more physically imposing than ordinary humans. Huge flowing white-grey beard and long hair, warm expressive but formidable face. Heavy dark moss-green wool robe and cloak over earthy brown garments, large ancient bronze torc and simple Celtic ornament. Carries an enormous rough-hewn magical club, clearly oversized and capable of killing with one end and restoring life with the other. A small dark bronze cauldron or cauldron charm accompanies him as a recognisable symbol. Subtle warm golden supernatural glow, restrained rather than flashy. Ancient, earthy, powerful and slightly eccentric rather than regal.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-08-31T12:45:29.308299+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "walk": {
+            "north": [
+              "Idle/animations/walk/north/frame_000.png",
+              "Idle/animations/walk/north/frame_001.png",
+              "Idle/animations/walk/north/frame_002.png",
+              "Idle/animations/walk/north/frame_003.png",
+              "Idle/animations/walk/north/frame_004.png",
+              "Idle/animations/walk/north/frame_005.png"
+            ],
+            "south-west": [
+              "Idle/animations/walk/south-west/frame_000.png",
+              "Idle/animations/walk/south-west/frame_001.png",
+              "Idle/animations/walk/south-west/frame_002.png",
+              "Idle/animations/walk/south-west/frame_003.png",
+              "Idle/animations/walk/south-west/frame_004.png",
+              "Idle/animations/walk/south-west/frame_005.png"
+            ],
+            "north-west": [
+              "Idle/animations/walk/north-west/frame_000.png",
+              "Idle/animations/walk/north-west/frame_001.png",
+              "Idle/animations/walk/north-west/frame_002.png",
+              "Idle/animations/walk/north-west/frame_003.png",
+              "Idle/animations/walk/north-west/frame_004.png",
+              "Idle/animations/walk/north-west/frame_005.png"
+            ],
+            "south": [
+              "Idle/animations/walk/south/frame_000.png",
+              "Idle/animations/walk/south/frame_001.png",
+              "Idle/animations/walk/south/frame_002.png",
+              "Idle/animations/walk/south/frame_003.png",
+              "Idle/animations/walk/south/frame_004.png",
+              "Idle/animations/walk/south/frame_005.png"
+            ],
+            "south-east": [
+              "Idle/animations/walk/south-east/frame_000.png",
+              "Idle/animations/walk/south-east/frame_001.png",
+              "Idle/animations/walk/south-east/frame_002.png",
+              "Idle/animations/walk/south-east/frame_003.png",
+              "Idle/animations/walk/south-east/frame_004.png",
+              "Idle/animations/walk/south-east/frame_005.png"
+            ],
+            "west": [
+              "Idle/animations/walk/west/frame_000.png",
+              "Idle/animations/walk/west/frame_001.png",
+              "Idle/animations/walk/west/frame_002.png",
+              "Idle/animations/walk/west/frame_003.png",
+              "Idle/animations/walk/west/frame_004.png",
+              "Idle/animations/walk/west/frame_005.png"
+            ],
+            "north-east": [
+              "Idle/animations/walk/north-east/frame_000.png",
+              "Idle/animations/walk/north-east/frame_001.png",
+              "Idle/animations/walk/north-east/frame_002.png",
+              "Idle/animations/walk/north-east/frame_003.png",
+              "Idle/animations/walk/north-east/frame_004.png",
+              "Idle/animations/walk/north-east/frame_005.png"
+            ],
+            "east": [
+              "Idle/animations/walk/east/frame_000.png",
+              "Idle/animations/walk/east/frame_001.png",
+              "Idle/animations/walk/east/frame_002.png",
+              "Idle/animations/walk/east/frame_003.png",
+              "Idle/animations/walk/east/frame_004.png",
+              "Idle/animations/walk/east/frame_005.png"
+            ]
+          },
+          "Attacking_with_club": {
+            "north-east": [
+              "Idle/animations/Attacking_with_club/north-east/frame_000.png",
+              "Idle/animations/Attacking_with_club/north-east/frame_001.png",
+              "Idle/animations/Attacking_with_club/north-east/frame_002.png",
+              "Idle/animations/Attacking_with_club/north-east/frame_003.png",
+              "Idle/animations/Attacking_with_club/north-east/frame_004.png",
+              "Idle/animations/Attacking_with_club/north-east/frame_005.png",
+              "Idle/animations/Attacking_with_club/north-east/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Attacking_with_club/south/frame_000.png",
+              "Idle/animations/Attacking_with_club/south/frame_001.png",
+              "Idle/animations/Attacking_with_club/south/frame_002.png",
+              "Idle/animations/Attacking_with_club/south/frame_003.png",
+              "Idle/animations/Attacking_with_club/south/frame_004.png",
+              "Idle/animations/Attacking_with_club/south/frame_005.png",
+              "Idle/animations/Attacking_with_club/south/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Attacking_with_club/south-west/frame_000.png",
+              "Idle/animations/Attacking_with_club/south-west/frame_001.png",
+              "Idle/animations/Attacking_with_club/south-west/frame_002.png",
+              "Idle/animations/Attacking_with_club/south-west/frame_003.png",
+              "Idle/animations/Attacking_with_club/south-west/frame_004.png",
+              "Idle/animations/Attacking_with_club/south-west/frame_005.png",
+              "Idle/animations/Attacking_with_club/south-west/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Attacking_with_club/south-east/frame_000.png",
+              "Idle/animations/Attacking_with_club/south-east/frame_001.png",
+              "Idle/animations/Attacking_with_club/south-east/frame_002.png",
+              "Idle/animations/Attacking_with_club/south-east/frame_003.png",
+              "Idle/animations/Attacking_with_club/south-east/frame_004.png",
+              "Idle/animations/Attacking_with_club/south-east/frame_005.png",
+              "Idle/animations/Attacking_with_club/south-east/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Attacking_with_club/east/frame_000.png",
+              "Idle/animations/Attacking_with_club/east/frame_001.png",
+              "Idle/animations/Attacking_with_club/east/frame_002.png",
+              "Idle/animations/Attacking_with_club/east/frame_003.png",
+              "Idle/animations/Attacking_with_club/east/frame_004.png",
+              "Idle/animations/Attacking_with_club/east/frame_005.png",
+              "Idle/animations/Attacking_with_club/east/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Attacking_with_club/west/frame_000.png",
+              "Idle/animations/Attacking_with_club/west/frame_001.png",
+              "Idle/animations/Attacking_with_club/west/frame_002.png",
+              "Idle/animations/Attacking_with_club/west/frame_003.png",
+              "Idle/animations/Attacking_with_club/west/frame_004.png",
+              "Idle/animations/Attacking_with_club/west/frame_005.png",
+              "Idle/animations/Attacking_with_club/west/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Attacking_with_club/north-west/frame_000.png",
+              "Idle/animations/Attacking_with_club/north-west/frame_001.png",
+              "Idle/animations/Attacking_with_club/north-west/frame_002.png",
+              "Idle/animations/Attacking_with_club/north-west/frame_003.png",
+              "Idle/animations/Attacking_with_club/north-west/frame_004.png",
+              "Idle/animations/Attacking_with_club/north-west/frame_005.png",
+              "Idle/animations/Attacking_with_club/north-west/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Attacking_with_club/north/frame_000.png",
+              "Idle/animations/Attacking_with_club/north/frame_001.png",
+              "Idle/animations/Attacking_with_club/north/frame_002.png",
+              "Idle/animations/Attacking_with_club/north/frame_003.png",
+              "Idle/animations/Attacking_with_club/north/frame_004.png",
+              "Idle/animations/Attacking_with_club/north/frame_005.png",
+              "Idle/animations/Attacking_with_club/north/frame_006.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-09-04T12:29:59.752218"
+}

@@ -1,0 +1,177 @@
+{
+  "group_id": "df3a0d85-93d6-40ce-8b0e-03d441249cef",
+  "states": [
+    {
+      "character": {
+        "id": "1377acd4-1b88-4947-b802-46cba529b2da",
+        "name": "Idle",
+        "prompt": "Fionn mac Cumhaill, legendary leader of the Fianna. Tall mature Gaelic hunter-warrior with long fair-blond hair, full fair beard and calm commanding expression. Forest-green and warm brown wool clothing over a fine cream l\u00e9ine, weathered travelling cloak, leather hunting boots and belt, bronze torc and brooch. Armed with a long hunting spear. A small curved hunting horn hangs prominently from his belt. Appearance combines renowned warrior, hunter, poet and wilderness leader rather than king or heavily armoured soldier. Athletic but older and more composed than C\u00fa Chulainn.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-08-31T12:44:15.939313+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Attacking_with_spear": {
+            "west": [
+              "Idle/animations/Attacking_with_spear/west/frame_000.png",
+              "Idle/animations/Attacking_with_spear/west/frame_001.png",
+              "Idle/animations/Attacking_with_spear/west/frame_002.png",
+              "Idle/animations/Attacking_with_spear/west/frame_003.png",
+              "Idle/animations/Attacking_with_spear/west/frame_004.png",
+              "Idle/animations/Attacking_with_spear/west/frame_005.png",
+              "Idle/animations/Attacking_with_spear/west/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Attacking_with_spear/east/frame_000.png",
+              "Idle/animations/Attacking_with_spear/east/frame_001.png",
+              "Idle/animations/Attacking_with_spear/east/frame_002.png",
+              "Idle/animations/Attacking_with_spear/east/frame_003.png",
+              "Idle/animations/Attacking_with_spear/east/frame_004.png",
+              "Idle/animations/Attacking_with_spear/east/frame_005.png",
+              "Idle/animations/Attacking_with_spear/east/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Attacking_with_spear/north-east/frame_000.png",
+              "Idle/animations/Attacking_with_spear/north-east/frame_001.png",
+              "Idle/animations/Attacking_with_spear/north-east/frame_002.png",
+              "Idle/animations/Attacking_with_spear/north-east/frame_003.png",
+              "Idle/animations/Attacking_with_spear/north-east/frame_004.png",
+              "Idle/animations/Attacking_with_spear/north-east/frame_005.png",
+              "Idle/animations/Attacking_with_spear/north-east/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Attacking_with_spear/north/frame_000.png",
+              "Idle/animations/Attacking_with_spear/north/frame_001.png",
+              "Idle/animations/Attacking_with_spear/north/frame_002.png",
+              "Idle/animations/Attacking_with_spear/north/frame_003.png",
+              "Idle/animations/Attacking_with_spear/north/frame_004.png",
+              "Idle/animations/Attacking_with_spear/north/frame_005.png",
+              "Idle/animations/Attacking_with_spear/north/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Attacking_with_spear/south-west/frame_000.png",
+              "Idle/animations/Attacking_with_spear/south-west/frame_001.png",
+              "Idle/animations/Attacking_with_spear/south-west/frame_002.png",
+              "Idle/animations/Attacking_with_spear/south-west/frame_003.png",
+              "Idle/animations/Attacking_with_spear/south-west/frame_004.png",
+              "Idle/animations/Attacking_with_spear/south-west/frame_005.png",
+              "Idle/animations/Attacking_with_spear/south-west/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Attacking_with_spear/south/frame_000.png",
+              "Idle/animations/Attacking_with_spear/south/frame_001.png",
+              "Idle/animations/Attacking_with_spear/south/frame_002.png",
+              "Idle/animations/Attacking_with_spear/south/frame_003.png",
+              "Idle/animations/Attacking_with_spear/south/frame_004.png",
+              "Idle/animations/Attacking_with_spear/south/frame_005.png",
+              "Idle/animations/Attacking_with_spear/south/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Attacking_with_spear/north-west/frame_000.png",
+              "Idle/animations/Attacking_with_spear/north-west/frame_001.png",
+              "Idle/animations/Attacking_with_spear/north-west/frame_002.png",
+              "Idle/animations/Attacking_with_spear/north-west/frame_003.png",
+              "Idle/animations/Attacking_with_spear/north-west/frame_004.png",
+              "Idle/animations/Attacking_with_spear/north-west/frame_005.png",
+              "Idle/animations/Attacking_with_spear/north-west/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Attacking_with_spear/south-east/frame_000.png",
+              "Idle/animations/Attacking_with_spear/south-east/frame_001.png",
+              "Idle/animations/Attacking_with_spear/south-east/frame_002.png",
+              "Idle/animations/Attacking_with_spear/south-east/frame_003.png",
+              "Idle/animations/Attacking_with_spear/south-east/frame_004.png",
+              "Idle/animations/Attacking_with_spear/south-east/frame_005.png",
+              "Idle/animations/Attacking_with_spear/south-east/frame_006.png"
+            ]
+          },
+          "walk": {
+            "north": [
+              "Idle/animations/walk/north/frame_000.png",
+              "Idle/animations/walk/north/frame_001.png",
+              "Idle/animations/walk/north/frame_002.png",
+              "Idle/animations/walk/north/frame_003.png",
+              "Idle/animations/walk/north/frame_004.png",
+              "Idle/animations/walk/north/frame_005.png"
+            ],
+            "north-west": [
+              "Idle/animations/walk/north-west/frame_000.png",
+              "Idle/animations/walk/north-west/frame_001.png",
+              "Idle/animations/walk/north-west/frame_002.png",
+              "Idle/animations/walk/north-west/frame_003.png",
+              "Idle/animations/walk/north-west/frame_004.png",
+              "Idle/animations/walk/north-west/frame_005.png"
+            ],
+            "north-east": [
+              "Idle/animations/walk/north-east/frame_000.png",
+              "Idle/animations/walk/north-east/frame_001.png",
+              "Idle/animations/walk/north-east/frame_002.png",
+              "Idle/animations/walk/north-east/frame_003.png",
+              "Idle/animations/walk/north-east/frame_004.png",
+              "Idle/animations/walk/north-east/frame_005.png"
+            ],
+            "south": [
+              "Idle/animations/walk/south/frame_000.png",
+              "Idle/animations/walk/south/frame_001.png",
+              "Idle/animations/walk/south/frame_002.png",
+              "Idle/animations/walk/south/frame_003.png",
+              "Idle/animations/walk/south/frame_004.png",
+              "Idle/animations/walk/south/frame_005.png"
+            ],
+            "west": [
+              "Idle/animations/walk/west/frame_000.png",
+              "Idle/animations/walk/west/frame_001.png",
+              "Idle/animations/walk/west/frame_002.png",
+              "Idle/animations/walk/west/frame_003.png",
+              "Idle/animations/walk/west/frame_004.png",
+              "Idle/animations/walk/west/frame_005.png"
+            ],
+            "south-east": [
+              "Idle/animations/walk/south-east/frame_000.png",
+              "Idle/animations/walk/south-east/frame_001.png",
+              "Idle/animations/walk/south-east/frame_002.png",
+              "Idle/animations/walk/south-east/frame_003.png",
+              "Idle/animations/walk/south-east/frame_004.png",
+              "Idle/animations/walk/south-east/frame_005.png"
+            ],
+            "east": [
+              "Idle/animations/walk/east/frame_000.png",
+              "Idle/animations/walk/east/frame_001.png",
+              "Idle/animations/walk/east/frame_002.png",
+              "Idle/animations/walk/east/frame_003.png",
+              "Idle/animations/walk/east/frame_004.png",
+              "Idle/animations/walk/east/frame_005.png"
+            ],
+            "south-west": [
+              "Idle/animations/walk/south-west/frame_000.png",
+              "Idle/animations/walk/south-west/frame_001.png",
+              "Idle/animations/walk/south-west/frame_002.png",
+              "Idle/animations/walk/south-west/frame_003.png",
+              "Idle/animations/walk/south-west/frame_004.png",
+              "Idle/animations/walk/south-west/frame_005.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-09-04T12:30:10.728728"
+}

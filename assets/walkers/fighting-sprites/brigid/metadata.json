@@ -1,0 +1,177 @@
+{
+  "group_id": "b91a70f0-75c2-4b66-8b7c-c20533856b6f",
+  "states": [
+    {
+      "character": {
+        "id": "03b04698-e784-4bb3-af69-7fb7607abc0f",
+        "name": "Idle",
+        "prompt": "Brigid, Irish goddess of poetry, smithcraft and healing fire. A composed woman with long copper-red hair and a calm weathered face. Layered natural-dyed Gaelic wool in muted earthy tones: a moss-green and dusty-cream l\u00e9ine and mantle with dark woven Celtic borders, fastened with a tarnished bronze brooch, a simple bronze torc. Cradles a small contained ember or flame in one hand; a smith's tongs at her belt. Only a subtle warm light, no glowing aura. Detailed, grounded and dignified, rendered in dark painterly pixel art. No bright flat colours, no revealing clothing, no modern clothing, no halo.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-09-02T11:32:34.119147+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Attacking_with_torch": {
+            "east": [
+              "Idle/animations/Attacking_with_torch/east/frame_000.png",
+              "Idle/animations/Attacking_with_torch/east/frame_001.png",
+              "Idle/animations/Attacking_with_torch/east/frame_002.png",
+              "Idle/animations/Attacking_with_torch/east/frame_003.png",
+              "Idle/animations/Attacking_with_torch/east/frame_004.png",
+              "Idle/animations/Attacking_with_torch/east/frame_005.png",
+              "Idle/animations/Attacking_with_torch/east/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Attacking_with_torch/west/frame_000.png",
+              "Idle/animations/Attacking_with_torch/west/frame_001.png",
+              "Idle/animations/Attacking_with_torch/west/frame_002.png",
+              "Idle/animations/Attacking_with_torch/west/frame_003.png",
+              "Idle/animations/Attacking_with_torch/west/frame_004.png",
+              "Idle/animations/Attacking_with_torch/west/frame_005.png",
+              "Idle/animations/Attacking_with_torch/west/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Attacking_with_torch/north-west/frame_000.png",
+              "Idle/animations/Attacking_with_torch/north-west/frame_001.png",
+              "Idle/animations/Attacking_with_torch/north-west/frame_002.png",
+              "Idle/animations/Attacking_with_torch/north-west/frame_003.png",
+              "Idle/animations/Attacking_with_torch/north-west/frame_004.png",
+              "Idle/animations/Attacking_with_torch/north-west/frame_005.png",
+              "Idle/animations/Attacking_with_torch/north-west/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Attacking_with_torch/north/frame_000.png",
+              "Idle/animations/Attacking_with_torch/north/frame_001.png",
+              "Idle/animations/Attacking_with_torch/north/frame_002.png",
+              "Idle/animations/Attacking_with_torch/north/frame_003.png",
+              "Idle/animations/Attacking_with_torch/north/frame_004.png",
+              "Idle/animations/Attacking_with_torch/north/frame_005.png",
+              "Idle/animations/Attacking_with_torch/north/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Attacking_with_torch/north-east/frame_000.png",
+              "Idle/animations/Attacking_with_torch/north-east/frame_001.png",
+              "Idle/animations/Attacking_with_torch/north-east/frame_002.png",
+              "Idle/animations/Attacking_with_torch/north-east/frame_003.png",
+              "Idle/animations/Attacking_with_torch/north-east/frame_004.png",
+              "Idle/animations/Attacking_with_torch/north-east/frame_005.png",
+              "Idle/animations/Attacking_with_torch/north-east/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Attacking_with_torch/south-west/frame_000.png",
+              "Idle/animations/Attacking_with_torch/south-west/frame_001.png",
+              "Idle/animations/Attacking_with_torch/south-west/frame_002.png",
+              "Idle/animations/Attacking_with_torch/south-west/frame_003.png",
+              "Idle/animations/Attacking_with_torch/south-west/frame_004.png",
+              "Idle/animations/Attacking_with_torch/south-west/frame_005.png",
+              "Idle/animations/Attacking_with_torch/south-west/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Attacking_with_torch/south-east/frame_000.png",
+              "Idle/animations/Attacking_with_torch/south-east/frame_001.png",
+              "Idle/animations/Attacking_with_torch/south-east/frame_002.png",
+              "Idle/animations/Attacking_with_torch/south-east/frame_003.png",
+              "Idle/animations/Attacking_with_torch/south-east/frame_004.png",
+              "Idle/animations/Attacking_with_torch/south-east/frame_005.png",
+              "Idle/animations/Attacking_with_torch/south-east/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Attacking_with_torch/south/frame_000.png",
+              "Idle/animations/Attacking_with_torch/south/frame_001.png",
+              "Idle/animations/Attacking_with_torch/south/frame_002.png",
+              "Idle/animations/Attacking_with_torch/south/frame_003.png",
+              "Idle/animations/Attacking_with_torch/south/frame_004.png",
+              "Idle/animations/Attacking_with_torch/south/frame_005.png",
+              "Idle/animations/Attacking_with_torch/south/frame_006.png"
+            ]
+          },
+          "Brigid_walk": {
+            "east": [
+              "Idle/animations/Brigid_walk/east/frame_000.png",
+              "Idle/animations/Brigid_walk/east/frame_001.png",
+              "Idle/animations/Brigid_walk/east/frame_002.png",
+              "Idle/animations/Brigid_walk/east/frame_003.png",
+              "Idle/animations/Brigid_walk/east/frame_004.png",
+              "Idle/animations/Brigid_walk/east/frame_005.png"
+            ],
+            "south-west": [
+              "Idle/animations/Brigid_walk/south-west/frame_000.png",
+              "Idle/animations/Brigid_walk/south-west/frame_001.png",
+              "Idle/animations/Brigid_walk/south-west/frame_002.png",
+              "Idle/animations/Brigid_walk/south-west/frame_003.png",
+              "Idle/animations/Brigid_walk/south-west/frame_004.png",
+              "Idle/animations/Brigid_walk/south-west/frame_005.png"
+            ],
+            "south": [
+              "Idle/animations/Brigid_walk/south/frame_000.png",
+              "Idle/animations/Brigid_walk/south/frame_001.png",
+              "Idle/animations/Brigid_walk/south/frame_002.png",
+              "Idle/animations/Brigid_walk/south/frame_003.png",
+              "Idle/animations/Brigid_walk/south/frame_004.png",
+              "Idle/animations/Brigid_walk/south/frame_005.png"
+            ],
+            "south-east": [
+              "Idle/animations/Brigid_walk/south-east/frame_000.png",
+              "Idle/animations/Brigid_walk/south-east/frame_001.png",
+              "Idle/animations/Brigid_walk/south-east/frame_002.png",
+              "Idle/animations/Brigid_walk/south-east/frame_003.png",
+              "Idle/animations/Brigid_walk/south-east/frame_004.png",
+              "Idle/animations/Brigid_walk/south-east/frame_005.png"
+            ],
+            "north": [
+              "Idle/animations/Brigid_walk/north/frame_000.png",
+              "Idle/animations/Brigid_walk/north/frame_001.png",
+              "Idle/animations/Brigid_walk/north/frame_002.png",
+              "Idle/animations/Brigid_walk/north/frame_003.png",
+              "Idle/animations/Brigid_walk/north/frame_004.png",
+              "Idle/animations/Brigid_walk/north/frame_005.png"
+            ],
+            "west": [
+              "Idle/animations/Brigid_walk/west/frame_000.png",
+              "Idle/animations/Brigid_walk/west/frame_001.png",
+              "Idle/animations/Brigid_walk/west/frame_002.png",
+              "Idle/animations/Brigid_walk/west/frame_003.png",
+              "Idle/animations/Brigid_walk/west/frame_004.png",
+              "Idle/animations/Brigid_walk/west/frame_005.png"
+            ],
+            "north-west": [
+              "Idle/animations/Brigid_walk/north-west/frame_000.png",
+              "Idle/animations/Brigid_walk/north-west/frame_001.png",
+              "Idle/animations/Brigid_walk/north-west/frame_002.png",
+              "Idle/animations/Brigid_walk/north-west/frame_003.png",
+              "Idle/animations/Brigid_walk/north-west/frame_004.png",
+              "Idle/animations/Brigid_walk/north-west/frame_005.png"
+            ],
+            "north-east": [
+              "Idle/animations/Brigid_walk/north-east/frame_000.png",
+              "Idle/animations/Brigid_walk/north-east/frame_001.png",
+              "Idle/animations/Brigid_walk/north-east/frame_002.png",
+              "Idle/animations/Brigid_walk/north-east/frame_003.png",
+              "Idle/animations/Brigid_walk/north-east/frame_004.png",
+              "Idle/animations/Brigid_walk/north-east/frame_005.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-09-04T12:29:18.651723"
+}

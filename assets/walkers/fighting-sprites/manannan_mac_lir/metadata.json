@@ -1,0 +1,177 @@
+{
+  "group_id": "83b14a21-d846-4262-b41f-64da24bb2d6f",
+  "states": [
+    {
+      "character": {
+        "id": "4cc9159e-9507-4cb8-ad96-861ea27a8d80",
+        "name": "Idle",
+        "prompt": "Manann\u00e1n mac Lir, Irish god of the sea and the Otherworld. A tall weathered man with long wave-grey hair and beard and pale sea-grey eyes. Gaelic sea-lord garments in dark muted tones: a deep teal and storm-grey wool l\u00e9ine and a heavy dark cloak with subtle blue-green shifting hues, fastened with a tarnished bronze wave-shaped brooch, a bronze torc. Carries a long bronze-headed spear and a woven crane-skin bag at his belt. Only faint restrained watery tones, no bright aura or mist. Detailed, grounded and mysterious, rendered in dark painterly pixel art. No bright flat colours, no revealing armour, no modern clothing, no trident.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-09-02T11:32:48.024966+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Attacking_with_staff": {
+            "south-east": [
+              "Idle/animations/Attacking_with_staff/south-east/frame_000.png",
+              "Idle/animations/Attacking_with_staff/south-east/frame_001.png",
+              "Idle/animations/Attacking_with_staff/south-east/frame_002.png",
+              "Idle/animations/Attacking_with_staff/south-east/frame_003.png",
+              "Idle/animations/Attacking_with_staff/south-east/frame_004.png",
+              "Idle/animations/Attacking_with_staff/south-east/frame_005.png",
+              "Idle/animations/Attacking_with_staff/south-east/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Attacking_with_staff/west/frame_000.png",
+              "Idle/animations/Attacking_with_staff/west/frame_001.png",
+              "Idle/animations/Attacking_with_staff/west/frame_002.png",
+              "Idle/animations/Attacking_with_staff/west/frame_003.png",
+              "Idle/animations/Attacking_with_staff/west/frame_004.png",
+              "Idle/animations/Attacking_with_staff/west/frame_005.png",
+              "Idle/animations/Attacking_with_staff/west/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Attacking_with_staff/north-east/frame_000.png",
+              "Idle/animations/Attacking_with_staff/north-east/frame_001.png",
+              "Idle/animations/Attacking_with_staff/north-east/frame_002.png",
+              "Idle/animations/Attacking_with_staff/north-east/frame_003.png",
+              "Idle/animations/Attacking_with_staff/north-east/frame_004.png",
+              "Idle/animations/Attacking_with_staff/north-east/frame_005.png",
+              "Idle/animations/Attacking_with_staff/north-east/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Attacking_with_staff/north-west/frame_000.png",
+              "Idle/animations/Attacking_with_staff/north-west/frame_001.png",
+              "Idle/animations/Attacking_with_staff/north-west/frame_002.png",
+              "Idle/animations/Attacking_with_staff/north-west/frame_003.png",
+              "Idle/animations/Attacking_with_staff/north-west/frame_004.png",
+              "Idle/animations/Attacking_with_staff/north-west/frame_005.png",
+              "Idle/animations/Attacking_with_staff/north-west/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Attacking_with_staff/south/frame_000.png",
+              "Idle/animations/Attacking_with_staff/south/frame_001.png",
+              "Idle/animations/Attacking_with_staff/south/frame_002.png",
+              "Idle/animations/Attacking_with_staff/south/frame_003.png",
+              "Idle/animations/Attacking_with_staff/south/frame_004.png",
+              "Idle/animations/Attacking_with_staff/south/frame_005.png",
+              "Idle/animations/Attacking_with_staff/south/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Attacking_with_staff/east/frame_000.png",
+              "Idle/animations/Attacking_with_staff/east/frame_001.png",
+              "Idle/animations/Attacking_with_staff/east/frame_002.png",
+              "Idle/animations/Attacking_with_staff/east/frame_003.png",
+              "Idle/animations/Attacking_with_staff/east/frame_004.png",
+              "Idle/animations/Attacking_with_staff/east/frame_005.png",
+              "Idle/animations/Attacking_with_staff/east/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Attacking_with_staff/south-west/frame_000.png",
+              "Idle/animations/Attacking_with_staff/south-west/frame_001.png",
+              "Idle/animations/Attacking_with_staff/south-west/frame_002.png",
+              "Idle/animations/Attacking_with_staff/south-west/frame_003.png",
+              "Idle/animations/Attacking_with_staff/south-west/frame_004.png",
+              "Idle/animations/Attacking_with_staff/south-west/frame_005.png",
+              "Idle/animations/Attacking_with_staff/south-west/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Attacking_with_staff/north/frame_000.png",
+              "Idle/animations/Attacking_with_staff/north/frame_001.png",
+              "Idle/animations/Attacking_with_staff/north/frame_002.png",
+              "Idle/animations/Attacking_with_staff/north/frame_003.png",
+              "Idle/animations/Attacking_with_staff/north/frame_004.png",
+              "Idle/animations/Attacking_with_staff/north/frame_005.png",
+              "Idle/animations/Attacking_with_staff/north/frame_006.png"
+            ]
+          },
+          "Manannan_walk": {
+            "north-east": [
+              "Idle/animations/Manannan_walk/north-east/frame_000.png",
+              "Idle/animations/Manannan_walk/north-east/frame_001.png",
+              "Idle/animations/Manannan_walk/north-east/frame_002.png",
+              "Idle/animations/Manannan_walk/north-east/frame_003.png",
+              "Idle/animations/Manannan_walk/north-east/frame_004.png",
+              "Idle/animations/Manannan_walk/north-east/frame_005.png"
+            ],
+            "west": [
+              "Idle/animations/Manannan_walk/west/frame_000.png",
+              "Idle/animations/Manannan_walk/west/frame_001.png",
+              "Idle/animations/Manannan_walk/west/frame_002.png",
+              "Idle/animations/Manannan_walk/west/frame_003.png",
+              "Idle/animations/Manannan_walk/west/frame_004.png",
+              "Idle/animations/Manannan_walk/west/frame_005.png"
+            ],
+            "north": [
+              "Idle/animations/Manannan_walk/north/frame_000.png",
+              "Idle/animations/Manannan_walk/north/frame_001.png",
+              "Idle/animations/Manannan_walk/north/frame_002.png",
+              "Idle/animations/Manannan_walk/north/frame_003.png",
+              "Idle/animations/Manannan_walk/north/frame_004.png",
+              "Idle/animations/Manannan_walk/north/frame_005.png"
+            ],
+            "east": [
+              "Idle/animations/Manannan_walk/east/frame_000.png",
+              "Idle/animations/Manannan_walk/east/frame_001.png",
+              "Idle/animations/Manannan_walk/east/frame_002.png",
+              "Idle/animations/Manannan_walk/east/frame_003.png",
+              "Idle/animations/Manannan_walk/east/frame_004.png",
+              "Idle/animations/Manannan_walk/east/frame_005.png"
+            ],
+            "north-west": [
+              "Idle/animations/Manannan_walk/north-west/frame_000.png",
+              "Idle/animations/Manannan_walk/north-west/frame_001.png",
+              "Idle/animations/Manannan_walk/north-west/frame_002.png",
+              "Idle/animations/Manannan_walk/north-west/frame_003.png",
+              "Idle/animations/Manannan_walk/north-west/frame_004.png",
+              "Idle/animations/Manannan_walk/north-west/frame_005.png"
+            ],
+            "south": [
+              "Idle/animations/Manannan_walk/south/frame_000.png",
+              "Idle/animations/Manannan_walk/south/frame_001.png",
+              "Idle/animations/Manannan_walk/south/frame_002.png",
+              "Idle/animations/Manannan_walk/south/frame_003.png",
+              "Idle/animations/Manannan_walk/south/frame_004.png",
+              "Idle/animations/Manannan_walk/south/frame_005.png"
+            ],
+            "south-west": [
+              "Idle/animations/Manannan_walk/south-west/frame_000.png",
+              "Idle/animations/Manannan_walk/south-west/frame_001.png",
+              "Idle/animations/Manannan_walk/south-west/frame_002.png",
+              "Idle/animations/Manannan_walk/south-west/frame_003.png",
+              "Idle/animations/Manannan_walk/south-west/frame_004.png",
+              "Idle/animations/Manannan_walk/south-west/frame_005.png"
+            ],
+            "south-east": [
+              "Idle/animations/Manannan_walk/south-east/frame_000.png",
+              "Idle/animations/Manannan_walk/south-east/frame_001.png",
+              "Idle/animations/Manannan_walk/south-east/frame_002.png",
+              "Idle/animations/Manannan_walk/south-east/frame_003.png",
+              "Idle/animations/Manannan_walk/south-east/frame_004.png",
+              "Idle/animations/Manannan_walk/south-east/frame_005.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-09-04T12:29:00.278256"
+}
