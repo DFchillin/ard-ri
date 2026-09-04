@@ -244,3 +244,52 @@ prosperity states across (Founded→Settled→Working→Thriving):
 - Battle **death animation** frames (engine support already shipped).
 - Desktop **drag-to-lay a row of buildings** (like roads), "Build ×N ✓".
 - Colonies → standing / High-King metagame; more chapters & narrative.
+
+---
+
+## 11. Culture, war & building evolution (planned)
+
+### Two kinds of "evolution" — keep them separate
+- **Prosperity states** — automatic, visual only. Each 4-state building grades
+  s1→s4 by its own success (dwelling: pop+food+culture; farm: growth; market:
+  stock). Atmosphere, no player action. (Shipped.)
+- **Upgrade tiers** — deliberate, mechanical. The dwelling chain roundhouse →
+  longhouse → stone house → hill-fort (militaryhouses4f art), each houses more
+  folk; the player pays to upgrade, gated by chapter.
+- **Type unlocks** — new building *types* unlock per chapter (orchard L4,
+  fennidi L5, great granary L6, aonach L7 shipped).
+
+### The through-line: a Culture score
+Venues raise **culture**; high culture draws more folk, sends more to the
+muster, and steadies war-band morale. One stat powers every cultural venue.
+
+### Building roster (art already drawn)
+Culture venues (`culture4f` + `herohalls4f`):
+- **Bard's hall** (culture r1) — a seanchaí walker raises street culture (like the druid).
+- **Feast / ale hall** (culture r3) — happiness + culture; the on-map place to **host heroes**.
+- **Sports field / faiche** (culture r0) — hurlers: trains fit youths into warriors at home.
+- **Assembly green / óenach** (culture r4) — a seasonal festival: culture/trade spike.
+- **Poet's / healer's cottage** (hero r3–r4) — replaces lost city-folk / lifts morale.
+
+War & mercenaries (`militaryhouses4f` + `herohalls4f`):
+- **Training ground** (mil r0) — folk + time → home-grown warriors.
+- **Smithy** (mil r1) — iron → arms the levy into a better tier (or a trade good).
+- **Mercenary lodge** (hero r1 "Fian lodge") — hire buannadha/gallóglaigh for
+  silver + a per-season upkeep: strong units you rent, not raise.
+
+### Four paths to an army (the unifying rule)
+Win (veterans) · Train (training ground / sports field) · Hire (mercenary
+lodge, paid) · Summon (heroes/gods). Roster gains from each.
+
+### Prep & phasing
+- **Re-slice** culture4f/herohalls4f at a forced 4 columns (detector merged
+  states 3–4); name rows per the roster above.
+- Wire the smithy / training ground / dwelling tiers already sliced.
+- **Vertical slice first** to prove the systems: either the Culture layer
+  (score + bard's hall + sports field) or the War layer (mercenary lodge —
+  most self-contained: hire → roster → upkeep).
+
+### Economy legibility (see §walkers)
+The walker-service model (market/well/altar dispatch walkers that deliver only
+to adjacent dwellings) is invisible; add delivery pips + clearer inspects so
+players can see food/water/culture reaching (or missing) each home.
