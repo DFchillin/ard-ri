@@ -21,7 +21,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 
 // kind -> behaviour. All additive so a fade to black reads as "gone".
 const CFG = {
-  smoke:  { n: 10, color: 0xe4dcc6, size: 0.5,  op: 0.42, vy: 0.55, drift: 0.06, life: 2.2, grow: 1.6, rise: true },
+  smoke:  { n: 10, color: 0xe4dcc6, size: 0.5,  op: 0.21, vy: 0.55, drift: 0.06, life: 2.2, grow: 1.6, rise: true },
   field:  { n: 16, color: 0xffd062, size: 0.3,  op: 0.85, vy: 0.28, drift: 0.05, life: 2.4, grow: 1.0, rise: true },
   market: { n: 14, color: 0xe6ecf4, size: 0.26, op: 0.9,  vy: -0.5, drift: 0.12, life: 1.7, grow: 1.0, rise: false },
   graze:  { n: 30, color: 0x9cff72, size: 0.3,  op: 0.72, vy: 0.34, drift: 0.04, life: 2.8, grow: 1.0, rise: true },
