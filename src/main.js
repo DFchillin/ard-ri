@@ -643,6 +643,16 @@ if (mapFab) mapFab.addEventListener('click', () => {
   if (!raidsUnlocked()) { flashNotice('🗺 Your túath is not yet strong enough to send a raid abroad. Grow it and throw back the menace first, and the wider world is yours.'); return; }
   openKingdomMap('war');
 });
+// Back to the title screen — save first, then show the title (the world-clock
+// stops on its own while the title is up). "Play the Campaign" drops back in.
+const menuFab = document.getElementById('menu-fab');
+if (menuFab) menuFab.addEventListener('click', () => {
+  if (started) saveSettlement();
+  cancelPending();
+  if (typeof tool !== 'undefined') { tool = null; ui.setTool(null); }
+  ui.hideInspect();
+  if (titleScreenEl) titleScreenEl.classList.remove('hidden');
+});
 // Raiding and colonies open only once the settlement has proved itself by
 // weathering First Steps, the culture of Level 2, and casting out the menace.
 function raidsUnlocked() { return !!campaign._menaceRepelled || campaign.level > 3; }

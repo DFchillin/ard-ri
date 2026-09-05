@@ -131,7 +131,7 @@ html, body {
 #compass-label { font-family: var(--font-display); font-size: 12px; color: var(--gold); }
 
 /* Brightness + advisors buttons, stacked above the map controls */
-#brightness-btn, #advisors-fab, #map-fab {
+#brightness-btn, #advisors-fab, #map-fab, #menu-fab {
   position: absolute;
   left: 14px;
   width: 44px; height: 44px;
@@ -142,6 +142,7 @@ html, body {
 #advisors-fab { bottom: 118px; }
 #brightness-btn { bottom: 168px; }
 #map-fab { bottom: 218px; }
+#menu-fab { bottom: 268px; }
 #advisors-fab.active { background: var(--gold); color: #1c130a; border-color: var(--gold); }
 
 /* Brightness modal */
@@ -574,7 +575,7 @@ table.ledger .neg { color: #e08a6a; }
 body.in-battle #topbar, body.in-battle #mission,
 body.in-battle #speedbar, body.in-battle #build-panel, body.in-battle #build-toggle,
 body.in-battle #inspect-fab, body.in-battle #brightness-btn, body.in-battle #advisors-fab,
-body.in-battle #map-fab {
+body.in-battle #map-fab, body.in-battle #menu-fab {
   display: none !important;
 }
 /* keep the map controls (zoom/rotate) in battle, clear of the sidebar */
