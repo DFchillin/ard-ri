@@ -455,7 +455,18 @@ export class Game {
     }
   }
 
-  // A settler walks in from the entrance and moves into a dwelling with room.
+  // The map-edge tile nearest a building — settlers arrive from (and leave to)
+  // the countryside just off the edge closest to the ráth, not clear across the
+  // whole map, so a lone traveller never treks the empty middle.
+  _arrivalTile(b) {
+    const s = this.map.size - 1;
+    const cands = [{ x: 0, z: b.z }, { x: s, z: b.z }, { x: b.x, z: 0 }, { x: b.x, z: s }];
+    let best = cands[0], bd = Infinity;
+    for (const c of cands) { const d = Math.abs(c.x - b.x) + Math.abs(c.z - b.z); if (d < bd) { bd = d; best = c; } }
+    return best;
+  }
+
+  // A settler walks in from the nearest edge and moves into a dwelling with room.
   _sendImmigrant() {
     const home = this.buildings.find(
       (b) => b.def.role === 'dwelling' && b.pop + b.incoming < b.cap
@@ -464,7 +475,7 @@ export class Game {
     home.incoming += 1;
     const female = Math.random() < 0.5;
     const person = { name: randomName(female), female, ...personFor('villager') };
-    const tr = new Traveler(this.map, this.entrance, { x: home.x, z: home.z }, {
+    const tr = new Traveler(this.map, this._arrivalTile(home), { x: home.x, z: home.z }, {
       type: 'villager', speed: 2.4, person,
       onArrive: () => {
         home.incoming = Math.max(0, home.incoming - 1);
@@ -481,7 +492,7 @@ export class Game {
     this.folk = Math.max(0, this.folk - 1);
     const female = Math.random() < 0.5;
     const person = { name: randomName(female), female, ...personFor('villager') };
-    const tr = new Traveler(this.map, { x: home.x, z: home.z }, this.entrance, { type: 'villager', speed: 2.4, person });
+    const tr = new Traveler(this.map, { x: home.x, z: home.z }, this._arrivalTile(home), { type: 'villager', speed: 2.4, person });
     this.walkers.push(tr);
     this.walkerGroup.add(tr.sprite);
   }
@@ -587,12 +598,12 @@ export class Game {
     if (!inst.sprite || (inst._popCd || 0) > 0) return;
     inst._popCd = 0.55;
     const p = inst.sprite.position, a = Math.random() * Math.PI * 2;
-    this._floatie(p.x + Math.cos(a) * 0.6, 1.9, p.z + Math.sin(a) * 0.6, kind, { sz: 0.035, vy: 1.0, life: 1.2, over: true });
+    this._floatie(p.x + Math.cos(a) * 0.6, 1.9, p.z + Math.sin(a) * 0.6, kind, { sz: 0.07, vy: 1.0, life: 1.2, over: true });
     if (walker && walker.sprite) {
       const w = walker.sprite.position;
       for (let i = 0; i < 3; i++) {
         const b = Math.random() * Math.PI * 2, r = 0.4 + Math.random() * 0.5;
-        this._floatie(w.x, 0.9 + Math.random() * 0.3, w.z, kind, { sz: 0.024, vx: Math.cos(b) * r, vz: Math.sin(b) * r, vy: 0.35, life: 0.7, over: true });
+        this._floatie(w.x, 0.9 + Math.random() * 0.3, w.z, kind, { sz: 0.05, vx: Math.cos(b) * r, vz: Math.sin(b) * r, vy: 0.35, life: 0.7, over: true });
       }
     }
   }

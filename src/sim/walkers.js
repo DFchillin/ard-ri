@@ -91,9 +91,10 @@ export class Traveler {
     this.a = map.tileToWorld(startTile.x, startTile.z);
     this.b = map.tileToWorld(targetTile.x, targetTile.z);
     this.dist = Math.hypot(this.b.x - this.a.x, this.b.z - this.a.z) || 1;
+    this.off = { x: (Math.random() - 0.5) * 0.34, z: (Math.random() - 0.5) * 0.34 }; // fan out when several travel together
     this.sprite = makeWalkerChip(type, this.person ? this.person.female : undefined);
     this.sprite.userData = { kind: 'walker', person: this.person, type };
-    this.sprite.position.set(this.a.x, 0.05, this.a.z);
+    this.sprite.position.set(this.a.x + this.off.x, 0.05, this.a.z + this.off.z);
     if (this.sprite.faceWorld) this.sprite.faceWorld(targetTile.x - startTile.x, targetTile.z - startTile.z);
   }
 
@@ -103,9 +104,9 @@ export class Traveler {
     this.t += (dt * this.speed * MOVE_SCALE) / this.dist;
     const k = Math.min(this.t, 1);
     this.sprite.position.set(
-      this.a.x + (this.b.x - this.a.x) * k,
+      this.a.x + (this.b.x - this.a.x) * k + this.off.x,
       0.05,
-      this.a.z + (this.b.z - this.a.z) * k
+      this.a.z + (this.b.z - this.a.z) * k + this.off.z
     );
     if (this.sprite.animate) this.sprite.animate(dt, true);
     if (this.t >= 1) { this.done = true; if (this.onArrive) this.onArrive(); }
