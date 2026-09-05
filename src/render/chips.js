@@ -144,18 +144,22 @@ export function makeWalkerChip(type, female) {
     s.scale.set(0.6, WALKER_H, 1);
   });
   // animation state on dedicated props — walkers overwrite userData for inspect
-  s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._lunge = 0;
+  s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._lunge = 0; s._lunging = false;
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
   s.strike = () => { if (s._lunge <= 0) s._lunge = LUNGE_DUR; }; // no attack frame — jab instead
   s.animate = (dt, moving) => {
-    // The lunge is a position hop toward the foe (and a small rise), so it works
-    // even for the plain fallback figure and never touches the walk texture.
+    // The lunge is a position hop toward the foe (a small rise too). Only the
+    // battle uses it, where this chip is a child of a group at local (0,0,0); a
+    // settlement walker positions this same sprite directly in world space, so we
+    // must ONLY touch position while a lunge is actually running and clear it once
+    // when it ends — never every frame, which would peg the walker to the origin.
     if (s._lunge > 0) {
-      s._lunge -= dt;
+      s._lunge -= dt; s._lunging = true;
       const k = Math.sin((1 - Math.max(0, s._lunge) / LUNGE_DUR) * Math.PI); // out then back
       const len = Math.hypot(s._dx, s._dz) || 1;
       s.position.set((s._dx / len) * LUNGE_DIST * k, 0.12 * k, (s._dz / len) * LUNGE_DIST * k);
-    } else if (s.position.x || s.position.y || s.position.z) {
+    } else if (s._lunging) {
+      s._lunging = false;
       s.position.set(0, 0, 0);
     }
     if (s._failed) return; // fallback colour figure — nothing to swap
