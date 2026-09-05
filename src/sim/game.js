@@ -11,11 +11,16 @@ import { Walker, Traveler } from './walkers.js?v=CBUST';
 // so the invisible food/water/culture transfer can be seen. Colour = what arrived.
 const PIP_COLOR = { food: 0xe8c86b, water: 0x6fb0e0, culture: 0xb07ad0 };
 const PIP_TEX = (() => {
-  const c = document.createElement('canvas'); c.width = c.height = 32;
+  const c = document.createElement('canvas'); c.width = c.height = 48;
   const x = c.getContext('2d');
-  const g = x.createRadialGradient(16, 16, 1, 16, 16, 15);
-  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.55, 'rgba(255,255,255,0.8)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-  x.fillStyle = g; x.beginPath(); x.arc(16, 16, 15, 0, Math.PI * 2); x.fill();
+  // A solid colour bead (white core → soft edge) with a thin dark rim, so it
+  // reads as a crisp coloured dot over bright hearth-smoke as well as dark ground
+  // rather than washing out the way an additive glow does.
+  const g = x.createRadialGradient(24, 20, 1, 24, 24, 22);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.5, 'rgba(255,255,255,0.98)');
+  g.addColorStop(0.85, 'rgba(255,255,255,0.7)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.beginPath(); x.arc(24, 24, 22, 0, Math.PI * 2); x.fill();
+  x.strokeStyle = 'rgba(35,22,12,0.55)'; x.lineWidth = 2.5; x.beginPath(); x.arc(24, 24, 20, 0, Math.PI * 2); x.stroke();
   const t = new THREE.CanvasTexture(c); return t;
 })();
 import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=CBUST';
@@ -570,12 +575,16 @@ export class Game {
     if (!inst.sprite || (inst._popCd || 0) > 0) return;
     inst._popCd = 0.55;
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: PIP_TEX, color: PIP_COLOR[kind] || 0xffffff,
-      transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
-    s.center.set(0.5, 0.5); s.scale.set(0.4, 0.4, 1);
+      transparent: true, opacity: 1, depthTest: false, depthWrite: false }));
+    s.renderOrder = 20; // always drawn over the smoke, never occluded by it
+    s.center.set(0.5, 0.5); s.scale.set(0.5, 0.5, 1);
+    // Spawn to the side of the chimney (smoke rises near centre) and up high, then
+    // float higher still — so the bead clears the hearth-smoke plume entirely.
     const p = inst.sprite.position;
-    s.position.set(p.x + (Math.random() - 0.5) * 0.4, 1.2, p.z + (Math.random() - 0.5) * 0.4);
+    const a = Math.random() * Math.PI * 2;
+    s.position.set(p.x + Math.cos(a) * 0.6, 1.9, p.z + Math.sin(a) * 0.6);
     this.floatieGroup.add(s);
-    this._floaties.push({ s, age: 0, life: 1.1 });
+    this._floaties.push({ s, age: 0, life: 1.2 });
   }
 
   // Ambient particle effects — real time, so they drift even while paused.
@@ -584,8 +593,10 @@ export class Game {
     for (let i = this._floaties.length - 1; i >= 0; i--) {
       const f = this._floaties[i]; f.age += dt;
       const t = f.age / f.life;
-      f.s.position.y += dt * 0.9;
-      f.s.material.opacity = 0.9 * (1 - t);
+      f.s.position.y += dt * 1.0;
+      f.s.material.opacity = 1 - t * t; // hold bright, then fade late so the colour reads
+      const pop = 1 + 0.25 * Math.sin(Math.min(1, t * 4) * Math.PI / 2); // a small pop as it appears
+      f.s.scale.set(0.5 * pop, 0.5 * pop, 1);
       if (t >= 1) { this.floatieGroup.remove(f.s); f.s.material.dispose(); this._floaties.splice(i, 1); }
     }
     if (this.menace) this._moveMenaceCreature(dt);
