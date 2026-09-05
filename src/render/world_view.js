@@ -133,8 +133,11 @@ export class WorldView {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setIndex(idx);
+    // Add ?dbg (or ?debug) to the URL to tint every road tile bright magenta —
+    // handy for confirming at a glance whether a walker is actually on a road.
+    const dbg = typeof location !== 'undefined' && /[?&](dbg|debug)\b/.test(location.search);
     this.roadGroup.add(
-      new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x8a7350, side: THREE.DoubleSide }))
+      new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: dbg ? 0xff2fbf : 0x8a7350, side: THREE.DoubleSide }))
     );
     this._addBorder(buckets.deaglan, 0xe8c96b);
     this._addBorder(buckets.midir, 0xb98cff);
