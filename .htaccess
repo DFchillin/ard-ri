@@ -3,9 +3,15 @@ DirectoryIndex index.html
 RewriteEngine Off
 AddType application/javascript .js .mjs
 
-# Always revalidate app code so deploys show up without a hard refresh.
+# Always revalidate app code so deploys show up without a hard refresh. The entry
+# HTML must never be stored — it holds the per-deploy ?v= keys for everything else.
 <IfModule mod_headers.c>
-  <FilesMatch "\.(js|mjs|css|html)$">
+  <FilesMatch "\.(js|mjs|css)$">
     Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
   </FilesMatch>
 </IfModule>
