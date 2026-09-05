@@ -69,7 +69,7 @@ const ui = new UI({
   onSpeed: (s) => { sim.speed = s; savedSpeed = null; },
   onRotate: (d) => { if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
   onZoom: (f) => { if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
-  onInspectClose: () => resumeGame(),
+  onInspectClose: () => { _inspectDwelling = null; resumeGame(); },
   onFestivalContinue: () => { if (battleWon) { battleWon = false; battle.exit(); } else resumeGame(); },
   onStartMission: (n) => startMission(n),
   onPlaceConfirm: () => confirmBuild(),
@@ -899,12 +899,59 @@ function buildingHtml(inst) {
   const d = inst.def;
   let extra = '';
   if (d.role === 'granary' || d.role === 'market') extra = `<p>Harvest in store: ${inst.stock}</p>`;
-  if (d.role === 'dwelling') extra = `<p>Folk: ${inst.pop}/${inst.cap} · Food: ${inst.food}/10 · Water: ${inst.water}/10 · Culture: ${inst.culture}/10</p>`;
+  if (d.role === 'dwelling') extra = dwellingRankHtml(inst);
   if (d.role === 'altar') extra = altarHtml();
   if (d.role === 'gallan') extra = gallanHtml(inst);
   if (d.role === 'homestead') { const graze = game._grazing(inst); const cap = 20 + graze * 4; extra = `<p>Herd: 🐄 ${inst.herd} / ${cap} · Grazing land: ${graze} tiles</p><p class="dim">Leave open pasture around the ráth and the herd grows faster. Cattle is your wealth in the wider world — and what a raider carries off.</p><button id="trade-btn" class="continue-btn">🌍 Trade in the wider world</button>`; }
   return `<h3>${d.label}</h3><div class="role">${d.role === 'homestead' ? 'Your seat' : 'Building'}</div><p>${d.desc}</p>${pipelineNote(inst)}${extra}`;
 }
+// A dwelling's standing, from its folk and how well it's fed, watered and
+// heartened — the same three things walkers carry in.
+const HOUSE_MAX = 10;
+function dwellRank(inst) {
+  if (inst.pop <= 0) return { emoji: '·', title: 'Empty', s: 0 };
+  const s = 0.25 + (inst.pop / Math.max(1, inst.cap)) * 0.15
+    + (inst.food / HOUSE_MAX) * 0.2 + (inst.water / HOUSE_MAX) * 0.2 + (inst.culture / HOUSE_MAX) * 0.2;
+  if (s >= 0.85) return { emoji: '🏅', title: 'Thriving', s };
+  if (s >= 0.68) return { emoji: '🙂', title: 'Content', s };
+  if (s >= 0.5) return { emoji: '🌾', title: 'Getting by', s };
+  return { emoji: '🥀', title: 'Struggling', s };
+}
+function meterRow(label, val, max, cls) {
+  const pct = Math.max(0, Math.min(100, Math.round((val / max) * 100)));
+  return `<div class="meter ${cls}"><span class="ml">${label}</span><span class="track"><i style="width:${pct}%"></i></span><span class="mv">${val}/${max}</span></div>`;
+}
+function dwellingRankHtml(inst) {
+  const r = dwellRank(inst);
+  return `<div class="dwell-rank"><div class="rank-title">${r.emoji} ${r.title}</div>` +
+    meterRow('Folk', inst.pop, inst.cap || 1, 'folk') +
+    meterRow('Food', inst.food, HOUSE_MAX, 'food') +
+    meterRow('Water', inst.water, HOUSE_MAX, 'water') +
+    meterRow('Culture', inst.culture, HOUSE_MAX, 'culture') +
+    '</div>';
+}
+// Keep the open dwelling panel's meters filling live as walkers deliver, without
+// re-rendering (and clobbering) the whole panel each frame.
+let _inspectDwelling = null;
+function refreshDwellMeter(inst) {
+  const body = document.getElementById('inspect-body');
+  if (!body) return;
+  const rank = body.querySelector('.dwell-rank');
+  if (!rank) return;
+  const set = (cls, val, max) => {
+    const bar = body.querySelector(`.meter.${cls} .track i`);
+    const mv = body.querySelector(`.meter.${cls} .mv`);
+    if (bar) bar.style.width = Math.max(0, Math.min(100, Math.round((val / max) * 100))) + '%';
+    if (mv) mv.textContent = `${val}/${max}`;
+  };
+  set('folk', inst.pop, inst.cap || 1);
+  set('food', inst.food, HOUSE_MAX);
+  set('water', inst.water, HOUSE_MAX);
+  set('culture', inst.culture, HOUSE_MAX);
+  const rt = rank.querySelector('.rank-title');
+  if (rt) { const r = dwellRank(inst); rt.textContent = `${r.emoji} ${r.title}`; }
+}
+
 // Say plainly what a building needs to work — so the grain/water/culture
 // pipelines are never a mystery.
 function pipelineNote(inst) {
@@ -1027,6 +1074,7 @@ function terrainHtml(tile) {
 }
 function inspectAt(e) {
   setNdc(e);
+  _inspectDwelling = null; // a fresh tap; only a dwelling panel arms the live meter
   if (menaceHitAt(e)) { openMenacePrompt(); return; }
   const wh = raycaster.intersectObjects(game.walkerGroup.children, true)[0];
   if (wh) {
@@ -1049,6 +1097,7 @@ function inspectAt(e) {
     inst = tile.occupant;
   }
   ui.showInspect(buildingHtml(inst), false);
+  if (inst.def.role === 'dwelling') _inspectDwelling = inst; // keep its meters live
   if (inst.def.role === 'altar') wireAltar();
   if (inst.def.role === 'gallan') wireGallan(inst);
   if (inst.def.role === 'homestead') { const tb = document.getElementById('trade-btn'); if (tb) tb.addEventListener('click', openTrade); }
@@ -1337,6 +1386,7 @@ function frame() {
   const scaled = live ? dt * sim.speed : 0;
   game.update(scaled);
   game.updateFx(dt); // ambient effects run in real time
+  if (_inspectDwelling && !_inspectDwelling.dead) refreshDwellMeter(_inspectDwelling); // fill the open panel's meters live
   econAcc += scaled;
   while (econAcc >= ECON_TICK) { econAcc -= ECON_TICK; game.tick(); pushStats(); checkMission(); }
   dayAcc += scaled;
