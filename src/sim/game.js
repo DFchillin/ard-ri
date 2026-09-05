@@ -587,12 +587,12 @@ export class Game {
     if (!inst.sprite || (inst._popCd || 0) > 0) return;
     inst._popCd = 0.55;
     const p = inst.sprite.position, a = Math.random() * Math.PI * 2;
-    this._floatie(p.x + Math.cos(a) * 0.6, 1.9, p.z + Math.sin(a) * 0.6, kind, { sz: 0.1, vy: 1.0, life: 1.2, over: true });
+    this._floatie(p.x + Math.cos(a) * 0.6, 1.9, p.z + Math.sin(a) * 0.6, kind, { sz: 0.035, vy: 1.0, life: 1.2, over: true });
     if (walker && walker.sprite) {
       const w = walker.sprite.position;
       for (let i = 0; i < 3; i++) {
         const b = Math.random() * Math.PI * 2, r = 0.4 + Math.random() * 0.5;
-        this._floatie(w.x, 0.9 + Math.random() * 0.3, w.z, kind, { sz: 0.07, vx: Math.cos(b) * r, vz: Math.sin(b) * r, vy: 0.35, life: 0.7, over: true });
+        this._floatie(w.x, 0.9 + Math.random() * 0.3, w.z, kind, { sz: 0.024, vx: Math.cos(b) * r, vz: Math.sin(b) * r, vy: 0.35, life: 0.7, over: true });
       }
     }
   }
