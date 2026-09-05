@@ -114,6 +114,10 @@ const WALKER_COLOR = {
 const WALKER_H = 1.3;   // world height every walker renders at, whatever the art's pixel size
 const WALK_FRAMES = 6;  // walk poses per facing (cardinals repeat their idle)
 const WALK_FPS = 0.11;  // seconds per walk frame
+// Regulars have no attack art, so in the clash they jab: a quick lunge toward
+// the foe and back. Cheap, render-side, reads as "having a go".
+const LUNGE_DUR = 0.34;
+const LUNGE_DIST = 0.38;
 export function makeWalkerChip(type, female) {
   const role = WALK_FILE[type] || 'villager';
   // Half the folk are women — every role has a matching female sprite set in a
@@ -140,9 +144,20 @@ export function makeWalkerChip(type, female) {
     s.scale.set(0.6, WALKER_H, 1);
   });
   // animation state on dedicated props — walkers overwrite userData for inspect
-  s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0;
+  s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._lunge = 0;
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
+  s.strike = () => { if (s._lunge <= 0) s._lunge = LUNGE_DUR; }; // no attack frame — jab instead
   s.animate = (dt, moving) => {
+    // The lunge is a position hop toward the foe (and a small rise), so it works
+    // even for the plain fallback figure and never touches the walk texture.
+    if (s._lunge > 0) {
+      s._lunge -= dt;
+      const k = Math.sin((1 - Math.max(0, s._lunge) / LUNGE_DUR) * Math.PI); // out then back
+      const len = Math.hypot(s._dx, s._dz) || 1;
+      s.position.set((s._dx / len) * LUNGE_DIST * k, 0.12 * k, (s._dz / len) * LUNGE_DIST * k);
+    } else if (s.position.x || s.position.y || s.position.z) {
+      s.position.set(0, 0, 0);
+    }
     if (s._failed) return; // fallback colour figure — nothing to swap
     const fr = T[screenDir(s._dx, s._dz)] || T.s;
     if (moving) {
