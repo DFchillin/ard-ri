@@ -512,9 +512,9 @@ export class Game {
     if (!entry) return;
     this._spawn(entry, {
       type: 'water_carrier', label: 'W', steps: 24, speed: 2.6, source: well,
-      onTile: (x, z) => {
+      onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.water < HOUSE_CAP) { inst.water = Math.min(HOUSE_CAP, inst.water + 5); this._pop(inst, 'water'); }
+          if (inst.def.role === 'dwelling' && inst.water < HOUSE_CAP) { inst.water = Math.min(HOUSE_CAP, inst.water + 5); this._deliverFx(inst, w, 'water'); }
         }
       },
     });
@@ -526,9 +526,9 @@ export class Game {
     if (!entry) return;
     this._spawn(entry, {
       type: 'druid', label: 'D', steps: 26, speed: 2.2, source: altar,
-      onTile: (x, z) => {
+      onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) { inst.culture = Math.min(HOUSE_CAP, inst.culture + 5); this._pop(inst, 'culture'); }
+          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) { inst.culture = Math.min(HOUSE_CAP, inst.culture + 5); this._deliverFx(inst, w, 'culture'); }
         }
       },
     });
@@ -557,34 +557,44 @@ export class Game {
     if (!entry) return;
     this._spawn(entry, {
       type: 'market_trader', label: 'M', steps: 24, speed: 2.6, source: market,
-      onTile: (x, z) => {
+      onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
           if (inst.def.role === 'dwelling' && market.stock > 0 && inst.food < HOUSE_CAP) {
             inst.food = Math.min(HOUSE_CAP, inst.food + 5);
             market.stock -= 1;
-            this._pop(inst, 'food');
+            this._deliverFx(inst, w, 'food');
           }
         }
       },
     });
   }
 
-  // A pip floats up from a building when a walker just delivered to it. Throttled
-  // per building (a busy round shows a steady drip, not a burst).
-  _pop(inst, kind) {
+  // One floating chip — a small soft coloured bead. `over` draws it above the smoke.
+  _floatie(x, y, z, kind, { sz = 0.1, vx = 0, vy = 1.0, vz = 0, life = 1.2, over = false } = {}) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: PIP_TEX, color: PIP_COLOR[kind] || 0xffffff,
+      transparent: true, opacity: 1, depthTest: !over, depthWrite: false }));
+    if (over) s.renderOrder = 20; // drawn over the smoke, never occluded by it
+    s.center.set(0.5, 0.5); s.scale.set(sz, sz, 1);
+    s.position.set(x, y, z);
+    this.floatieGroup.add(s);
+    this._floaties.push({ s, age: 0, life, sz, vx, vy, vz });
+  }
+
+  // A delivery to a dwelling: a small bead lifts off the home, and a matching
+  // scatter of tiny chips puffs from the walker who carried it — so it's clear
+  // who brought what. Throttled per home (a busy round drips, not bursts).
+  _deliverFx(inst, walker, kind) {
     if (!inst.sprite || (inst._popCd || 0) > 0) return;
     inst._popCd = 0.55;
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: PIP_TEX, color: PIP_COLOR[kind] || 0xffffff,
-      transparent: true, opacity: 1, depthTest: false, depthWrite: false }));
-    s.renderOrder = 20; // always drawn over the smoke, never occluded by it
-    s.center.set(0.5, 0.5); s.scale.set(0.5, 0.5, 1);
-    // Spawn to the side of the chimney (smoke rises near centre) and up high, then
-    // float higher still — so the bead clears the hearth-smoke plume entirely.
-    const p = inst.sprite.position;
-    const a = Math.random() * Math.PI * 2;
-    s.position.set(p.x + Math.cos(a) * 0.6, 1.9, p.z + Math.sin(a) * 0.6);
-    this.floatieGroup.add(s);
-    this._floaties.push({ s, age: 0, life: 1.2 });
+    const p = inst.sprite.position, a = Math.random() * Math.PI * 2;
+    this._floatie(p.x + Math.cos(a) * 0.6, 1.9, p.z + Math.sin(a) * 0.6, kind, { sz: 0.1, vy: 1.0, life: 1.2, over: true });
+    if (walker && walker.sprite) {
+      const w = walker.sprite.position;
+      for (let i = 0; i < 3; i++) {
+        const b = Math.random() * Math.PI * 2, r = 0.4 + Math.random() * 0.5;
+        this._floatie(w.x, 0.9 + Math.random() * 0.3, w.z, kind, { sz: 0.07, vx: Math.cos(b) * r, vz: Math.sin(b) * r, vy: 0.35, life: 0.7, over: true });
+      }
+    }
   }
 
   // Ambient particle effects — real time, so they drift even while paused.
@@ -593,10 +603,10 @@ export class Game {
     for (let i = this._floaties.length - 1; i >= 0; i--) {
       const f = this._floaties[i]; f.age += dt;
       const t = f.age / f.life;
-      f.s.position.y += dt * 1.0;
+      f.s.position.x += f.vx * dt; f.s.position.y += f.vy * dt; f.s.position.z += f.vz * dt;
       f.s.material.opacity = 1 - t * t; // hold bright, then fade late so the colour reads
       const pop = 1 + 0.25 * Math.sin(Math.min(1, t * 4) * Math.PI / 2); // a small pop as it appears
-      f.s.scale.set(0.5 * pop, 0.5 * pop, 1);
+      f.s.scale.set(f.sz * pop, f.sz * pop, 1);
       if (t >= 1) { this.floatieGroup.remove(f.s); f.s.material.dispose(); this._floaties.splice(i, 1); }
     }
     if (this.menace) this._moveMenaceCreature(dt);

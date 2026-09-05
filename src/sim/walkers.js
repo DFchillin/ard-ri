@@ -17,18 +17,21 @@ export class Walker {
     this.next = null;
     this.t = 0;
     this.done = false;
+    // A small fixed spot within the tile so several walkers sharing a tile fan
+    // out instead of stacking exactly on top of one another.
+    this.off = { x: (Math.random() - 0.5) * 0.34, z: (Math.random() - 0.5) * 0.34 };
 
     this.sprite = makeWalkerChip(type, this.person ? this.person.female : undefined);
     this.sprite.userData = { kind: 'walker', person: this.person, type };
     this._moveSpriteTo(this.cur, this.cur, 0);
-    if (onTile) onTile(this.cur.x, this.cur.z);
+    if (onTile) onTile(this.cur.x, this.cur.z, this);
     this._pickNext(null);
   }
 
   _moveSpriteTo(a, b, k) {
     const wa = this.map.tileToWorld(a.x, a.z);
     const wb = this.map.tileToWorld(b.x, b.z);
-    this.sprite.position.set(wa.x + (wb.x - wa.x) * k, 0.05, wa.z + (wb.z - wa.z) * k);
+    this.sprite.position.set(wa.x + (wb.x - wa.x) * k + this.off.x, 0.05, wa.z + (wb.z - wa.z) * k + this.off.z);
   }
 
   _pickNext(prev) {
@@ -58,7 +61,7 @@ export class Walker {
       const prev = this.cur;
       this.cur = this.next;
       this.steps -= 1;
-      if (this.onTile) this.onTile(this.cur.x, this.cur.z);
+      if (this.onTile) this.onTile(this.cur.x, this.cur.z, this);
       this._pickNext(prev);
     }
   }
