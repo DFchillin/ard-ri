@@ -15,11 +15,16 @@ BLD = os.path.join(REPO, 'assets/buildings')
 
 COLS = 4  # every sheet shows four prosperity states across
 
-# sheet -> row order (top to bottom). None skips a row.
+# sheet -> row order (top to bottom). None skips a row. A value may instead be a
+# dict {rows, src, label} to read the sheet from another folder (src) and, when a
+# sheet has its building names printed down the left margin (label), skip that
+# band when finding the column grid.
 SHEETS = {
     'essentials4f':     ['field', 'roundhouse', 'orchard', 'market', None],
     'militaryhouses4f': ['training_ground', 'smithy', 'longhouse', 'stonehouse', 'hillfort'],
     'culture4f':        ['hurling_field', 'feast_hall', 'nemeton', 'gallan', 'orchard'],
+    'sheetredob':       {'rows': ['smithy', 'longhouse', 'stonehouse', 'storehouse', 'market'],
+                         'src': 'assets/flat-buildings', 'label': True},
 }
 
 def strip_bg(im):
@@ -51,14 +56,40 @@ def strip_bg(im):
 # Optional args name which sheets to (re)slice; default is all of them. Handy
 # for cutting a freshly-dropped culture4f without disturbing the other sheets.
 only = set(sys.argv[1:])
-for sheet, rowmap in SHEETS.items():
+for sheet, cfg in SHEETS.items():
     if only and sheet not in only:
         continue
-    path = os.path.join(BLD, sheet + '.png')
+    rowmap = cfg['rows'] if isinstance(cfg, dict) else cfg
+    srcdir = cfg.get('src', 'assets/buildings') if isinstance(cfg, dict) else 'assets/buildings'
+    label = cfg.get('label', False) if isinstance(cfg, dict) else False
+    path = os.path.join(REPO, srcdir, sheet + '.png')
     if not os.path.exists(path):
         print('skip (missing):', sheet); continue
     im = strip_bg(Image.open(path).convert('RGBA'))
     A = np.asarray(im)[:, :, 3] > 20
+    if label:
+        # Printed labels are thin text; buildings are tall blobs. Find the first
+        # column whose tallest vertical content run clears a good fraction of a
+        # row's height (a building body, not a text line) and blank everything to
+        # its left, so no label bleeds into column one whatever its length.
+        rowH = A.shape[0] / len(rowmap)
+        def _tallrun(colmask):
+            best = cur = 0
+            for v in colmask:
+                cur = cur + 1 if v else 0
+                if cur > best:
+                    best = cur
+            return best
+        cut = 0
+        for x in range(A.shape[1]):
+            if _tallrun(A[:, x]) > rowH * 0.4:
+                cut = x
+                break
+        if cut:
+            a = np.asarray(im).copy()
+            a[:, :cut, 3] = 0
+            im = Image.fromarray(a, 'RGBA')
+            A = a[:, :, 3] > 20
     ys = np.where(A.mean(1) > 0.003)[0]
     xs = np.where(A.mean(0) > 0.003)[0]
     y0, y1 = int(ys.min()), int(ys.max() + 1)
