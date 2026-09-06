@@ -131,18 +131,10 @@ html, body {
 #compass-label { font-family: var(--font-display); font-size: 12px; color: var(--gold); }
 
 /* Brightness + advisors buttons, stacked above the map controls */
-#brightness-btn, #advisors-fab, #map-fab, #menu-fab {
-  position: absolute;
-  left: 14px;
-  width: 44px; height: 44px;
-  border: 1px solid var(--border); border-radius: 50%;
-  background: var(--panel); color: var(--ink);
-  font-size: 20px; line-height: 1; z-index: 5;
-}
-#advisors-fab { bottom: 118px; }
-#brightness-btn { bottom: 168px; }
-#map-fab { bottom: 218px; }
-#menu-fab { bottom: 268px; }
+/* World / advisors / brightness / main-menu now live in the build drawer's
+   footer row, not as floating FABs, so the map edges stay clear. */
+#build-extras { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); }
+#build-extras .tool-btn { flex: 1; }
 #advisors-fab.active { background: var(--gold); color: #1c130a; border-color: var(--gold); }
 
 /* Brightness modal */
