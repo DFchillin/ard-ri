@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js?v=CBUST';
-import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeMenaceCreature, setChipActive, setChipState } from '../render/chips.js?v=CBUST';
+import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeWarriorChip, setChipActive, setChipState } from '../render/chips.js?v=CBUST';
 import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
 
@@ -92,7 +92,7 @@ export class Game {
     this._markMenace(true);
     this._razeInMenace();
     this._drawMenaceZone();
-    const cre = makeMenaceCreature(); this.menace.creature = cre; this.menaceGroup.add(cre);
+    const cre = makeWarriorChip('fomor', 3.6); this.menace.creature = cre; this.menaceGroup.add(cre); // the red-and-black Fomor, same figure you march on
     this._moveMenaceCreature(0);
   }
   clearMenace() {
@@ -136,11 +136,15 @@ export class Game {
   }
   _moveMenaceCreature(dt) {
     const m = this.menace; if (!m || !m.creature) return;
+    const cre = m.creature, prevX = cre.position.x, prevZ = cre.position.z;
     m.t += dt * 0.5;
     const ts = this.map.tile;
     const px = (m.x + m.w / 2 + Math.sin(m.t) * (m.w / 2 - 0.6)) * ts - this.map.half;
     const pz = (m.z + m.h / 2 + Math.cos(m.t * 0.7) * (m.h / 2 - 0.6)) * ts - this.map.half;
-    m.creature.position.set(px, 0.1, pz);
+    cre.position.set(px, 0.05, pz);
+    const dx = px - prevX, dz = pz - prevZ, moving = Math.hypot(dx, dz) > 0.0005;
+    if (cre.faceWorld) cre.faceWorld(dx, dz);
+    if (cre.animate) cre.animate(dt, moving); // the giant walks its blighted ground
   }
   // Count the open pasture (bare grass, no road, no building) in a ring around
   // the homestead — the grazing that lets the herd grow.
