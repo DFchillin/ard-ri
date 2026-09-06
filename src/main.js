@@ -241,6 +241,7 @@ const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, 
 let campaign = Object.assign({ leader: null, home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 0, mapSeed: _mapSeed, settlement: null, level: 1, doneObjectives: [] }, _savedCampaign);
 if (!campaign.roster) campaign.roster = { ...DEFAULT_ROSTER };
 if (!campaign.fallen) campaign.fallen = [];
+if (!campaign.pendingRise) campaign.pendingRise = []; // souls committed to the next Samhain rite
 if (!campaign.level) campaign.level = 1;
 if (!campaign.doneObjectives) campaign.doneObjectives = [];
 if (!campaign.goods) campaign.goods = {};
@@ -604,9 +605,11 @@ function triggerFestival(f) { pauseGame(); ui.showFestival({ name: f.name, emoji
 function advanceDay() {
   cal.day += 1;
   let festivalToday = false;
+  let newMonth = false;
   if (cal.day > DAYS_PER_MONTH) {
     cal.day = 1;
     cal.month = (cal.month + 1) % 12;
+    newMonth = true;
     const s = seasonOfMonth(cal.month);
     if (s !== curSeason) {
       curSeason = s; applySeason(s); collectColonyTribute(); // colonies render tribute each turn of the year
@@ -614,9 +617,10 @@ function advanceDay() {
     }
     const fest = FESTIVALS[cal.month];
     if (fest) { festivalToday = true; triggerFestival(fest); }
+    if (festivalToday && cal.month === 10) resurrectPrayed(); // Samhain — the prayed-for rise from the dead
   }
   const wasBroke = game.broke;
-  game.settleDay({ festival: festivalToday }); // rents in, public wages out
+  game.settleDay({ festival: festivalToday, newMonth }); // rents in, wages out, homes drain & evolve
   if (game.broke && !wasBroke) triggerAdvisor();
   pushStats();
   updateDate();
@@ -1020,23 +1024,39 @@ function pipelineNote(inst) {
   }
   return '';
 }
-// An altar is also a place to pray to the war-dead — the roll of the fallen,
-// and the rite that calls one back to the muster as a ghost warrior.
+// An altar is a place to pray to the war-dead. You commit souls to the rite
+// through the year — up to three — and they rise together at Samhain, when the
+// veil thins, to walk with you as ghost warriors.
+const RISE_MAX = 3;
 function altarHtml() {
   const n = campaign.fallen.length;
+  const pending = (campaign.pendingRise || []).length;
   const roll = campaign.fallen.slice(-5).map((f) => `${f.name} <span class="en">${UNIT_TYPES[f.type] ? UNIT_TYPES[f.type].label : f.type}</span>`).join('<br>');
+  const canPray = n > 0 && pending < RISE_MAX;
   return `<div class="altar-dead"><div class="role">The war-dead · ${n} fallen · ${campaign.ghosts} risen</div>` +
     (n ? `<blockquote>${roll}${n > 5 ? '<br>…' : ''}</blockquote>` : `<p class="dim">None have fallen in your service yet.</p>`) +
-    `<button id="pray-btn" class="continue-btn"${n ? '' : ' disabled'}>🕯️ Pray — raise a ghost warrior</button></div>`;
+    `<p class="dim">Souls committed to the Samhain rite: <b>${pending}/${RISE_MAX}</b>. They rise together when the veil thins at Samhain.</p>` +
+    `<button id="pray-btn" class="continue-btn"${canPray ? '' : ' disabled'}>🕯️ Commit a soul to the Samhain rite</button></div>`;
 }
 function prayAtAltar() {
-  if (!campaign.fallen.length) return;
+  if (!campaign.pendingRise) campaign.pendingRise = [];
+  if (!campaign.fallen.length || campaign.pendingRise.length >= RISE_MAX) return;
   const f = campaign.fallen.pop();
-  campaign.ghosts = (campaign.ghosts || 0) + 1;
+  campaign.pendingRise.push(f);
   saveCampaign();
   const body = document.getElementById('inspect-body');
-  if (body) body.innerHTML = `<h3>A Rite of Return</h3><div class="role">Altóir</div><p>${f.name} answers the prayer and rises again — a ghost warrior, pale and fearless, ready to muster. ${campaign.ghosts} of the dead now walk with you.</p>` + altarHtml();
+  if (body) body.innerHTML = `<h3>A Prayer for the Dead</h3><div class="role">Altóir</div><p>${f.name} is named to the rite. At Samhain, when the veil thins, the committed dead will rise as ghost warriors to walk with you.</p>` + altarHtml();
   wireAltar();
+}
+// Samhain: the souls committed through the year rise together.
+function resurrectPrayed() {
+  const p = campaign.pendingRise || [];
+  if (!p.length) return;
+  const n = p.length;
+  campaign.ghosts = (campaign.ghosts || 0) + n;
+  campaign.pendingRise = [];
+  saveCampaign();
+  flashNotice(`🎃 Samhain — the veil thins. ${n} of the war-dead rise as ghost warriors to walk with you.`);
 }
 function wireAltar() { const b = document.getElementById('pray-btn'); if (b) b.addEventListener('click', prayAtAltar); }
 // A gallán where a warrior may stand vigil — committing them out of the muster

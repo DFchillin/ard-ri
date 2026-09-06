@@ -28,9 +28,17 @@ import { randomName } from '../data/names.js?v=CBUST';
 import { personFor } from '../data/phrases.js?v=CBUST';
 
 const MARKET_CAP = 12;
-const HOUSE_CAP = 10;
+const HOUSE_CAP = 10;      // a delivery fills a home to this — its stock reads in days
 const RENT_PER_HEAD = 1;   // silver per content head per day
-const DISTRESS_LEAVE = 18; // econ ticks with NO food AND NO water before a family leaves
+// Homes hold their supply for days now, not seconds — one delivery lasts a good
+// while and drains once a day, so keeping folk happy is about reaching them, not
+// racing a fast timer.
+const FOOD_DECAY = 1;      // per day → a full home is fed ~10 days
+const WATER_DECAY = 1;     // per day → ~10 days
+const CULTURE_DECAY = 2;   // per day → ~5 days
+const DISTRESS_DAYS = 4;   // days with NO food AND NO water before a family leaves
+const PROSPER_TIER = 2;    // a home at this prosperity tier or above holds more folk
+const PROSPER_CAP = 6;     // the folk a prospering home can hold
 const FESTIVAL_BONUS = 1.5;
 const GRANARY_CAP = 48;    // grain a store holds before it's full
 const FARM_GROW = 24;      // econ ticks for a field to ripen
@@ -193,13 +201,32 @@ export class Game {
     return { score, title, content, cultured };
   }
   dailyWages() { return this.buildings.reduce((n, b) => n + (b.def.upkeep || 0), 0); }
-  settleDay({ festival = false } = {}) {
+  settleDay({ festival = false, newMonth = false } = {}) {
     const rent = this.dailyRent(festival);
     const wages = this.dailyWages();
     this.silver += rent;
     if (this.silver >= wages) { this.silver -= wages; this.broke = false; }
     else { this.silver = 0; this.broke = wages > 0; } // payroll unmet — public folk go unpaid
+    for (const b of this.buildings) if (b.def.role === 'dwelling') this._dwellingDay(b, festival, newMonth);
     return { rent, wages, net: rent - wages, festival, broke: this.broke };
+  }
+
+  // A home, once a day: its supply drains, it may lose a family to lasting want,
+  // and its prosperity tier steps up at a festival (if it's thriving) or slips at
+  // a plain month-turn (if it's been neglected). A prospering home holds more folk.
+  _dwellingDay(b, festival, newMonth) {
+    b.food = Math.max(0, b.food - FOOD_DECAY);
+    b.water = Math.max(0, b.water - WATER_DECAY);
+    b.culture = Math.max(0, b.culture - CULTURE_DECAY);
+    if (b.food <= 0 && b.water <= 0) {
+      b.distress = (b.distress || 0) + 1;
+      if (b.distress >= DISTRESS_DAYS && b.pop > 0) { b.distress = 0; this._emigrate(b); }
+    } else b.distress = 0;
+    const thriving = b.pop >= b.cap && b.food >= 6 && b.water >= 6 && b.culture >= 6;
+    const neglected = b.food < 3 || b.water < 3;
+    if (festival && thriving && b.tier < 3) b.tier += 1;
+    else if (newMonth && !festival && neglected && b.tier > 0) b.tier -= 1;
+    b.cap = b.tier >= PROSPER_TIER ? PROSPER_CAP : (b.def.folk || 4);
   }
 
   _center(f) {
@@ -224,7 +251,7 @@ export class Game {
   _spawnBuilding(key, f) {
     const def = BUILDINGS[key];
     const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, water: 0, culture: 0, timer: 0,
-      pop: 0, cap: def.folk || 0, incoming: 0, distress: 0, active: false,
+      pop: 0, cap: def.folk || 0, incoming: 0, distress: 0, active: false, tier: 0,
       grown: 0, ripe: false, harvestsLeft: 0, connected: false, herd: def.role === 'homestead' ? 10 : 0,
       warden: null, // a gallán may have a warrior dedicated to stand vigil (raises muster favour)
       growMax: FARM_GROW, harvests: FARM_HARVESTS, yieldTotal: (def.load || 0) * FARM_HARVESTS }; // for the field inspect readout
@@ -270,7 +297,7 @@ export class Game {
     }
     const buildings = this.buildings.map((b) => ({ key: b.key, x: b.x, z: b.z,
       pop: b.pop, stock: b.stock, food: b.food, water: b.water, culture: b.culture, herd: b.herd,
-      grown: b.grown, ripe: b.ripe, harvestsLeft: b.harvestsLeft, warden: b.warden || null }));
+      grown: b.grown, ripe: b.ripe, harvestsLeft: b.harvestsLeft, warden: b.warden || null, tier: b.tier || 0 }));
     const menace = this.menace ? { x: this.menace.x, z: this.menace.z, w: this.menace.w, h: this.menace.h } : null;
     return { silver: this.silver, cattle: this.cattle, folk: this.folk, buildings, roads, cros, menace };
   }
@@ -295,7 +322,8 @@ export class Game {
       if (!this.map.canPlace(b.x, b.z, w, h)) continue;
       const inst = this._spawnBuilding(b.key, { x: b.x, z: b.z, w, h });
       Object.assign(inst, { pop: b.pop || 0, stock: b.stock || 0, food: b.food || 0, water: b.water || 0, culture: b.culture || 0,
-        grown: b.grown || 0, ripe: !!b.ripe, harvestsLeft: b.harvestsLeft || 0, warden: b.warden || null });
+        grown: b.grown || 0, ripe: !!b.ripe, harvestsLeft: b.harvestsLeft || 0, warden: b.warden || null, tier: b.tier || 0 });
+      if (def.role === 'dwelling') inst.cap = inst.tier >= PROSPER_TIER ? PROSPER_CAP : (def.folk || 4);
       if (def.role === 'homestead') { inst.herd = b.herd || 10; this._updateHerd(inst); }
     }
     if (snap.menace) this.spawnMenace(snap.menace.x, snap.menace.z, snap.menace.w, snap.menace.h);
@@ -369,9 +397,8 @@ export class Game {
   // How thriving a building looks, 0..1, mapped onto its four prosperity frames.
   _prosperity(b) {
     switch (b.def.role) {
-      case 'dwelling': // bare → occupied → fed → cultured-and-full
-        if (b.pop <= 0) return 0;
-        return Math.min(1, 0.34 + (b.pop / Math.max(1, b.cap)) * 0.22 + (b.food / HOUSE_CAP) * 0.22 + (b.culture / HOUSE_CAP) * 0.22);
+      case 'dwelling': // a sticky prosperity tier: it rises at festivals, slips if neglected
+        return (b.tier || 0) / 3;
       case 'farm': // growing through the season, then the ripe harvest
         return b.ripe ? 1 : Math.min(0.66, (b.grown / FARM_GROW) * 0.66);
       case 'market': // busier the more it holds
@@ -442,16 +469,8 @@ export class Game {
         }
         break;
       }
-      case 'dwelling': {
-        if (b.food > 0) b.food -= 1;
-        if (b.water > 0) b.water -= 1;
-        if (b.culture > 0) b.culture -= 1; // culture wanes without a druid's visits (a bonus, never a cause to leave)
-        if (b.food <= 0 && b.water <= 0) { // no food AND no water — a family in distress
-          b.distress += 1;
-          if (b.distress >= DISTRESS_LEAVE && b.pop > 0) { b.distress = 0; this._emigrate(b); }
-        } else b.distress = 0;
-        break;
-      }
+      case 'dwelling':
+        break; // a home's supply drains once a day now, in settleDay — not per tick
     }
   }
 
@@ -525,7 +544,7 @@ export class Game {
       type: 'water_carrier', label: 'W', steps: 24, speed: 2.6, source: well,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.water < HOUSE_CAP) { inst.water = Math.min(HOUSE_CAP, inst.water + 5); this._deliverFx(inst, w, 'water'); }
+          if (inst.def.role === 'dwelling' && inst.water < HOUSE_CAP) { inst.water = HOUSE_CAP; this._deliverFx(inst, w, 'water'); } // one visit fills the home (~10 days)
         }
       },
     });
@@ -539,7 +558,7 @@ export class Game {
       type: 'druid', label: 'D', steps: 26, speed: 2.2, source: altar,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) { inst.culture = Math.min(HOUSE_CAP, inst.culture + 5); this._deliverFx(inst, w, 'culture'); }
+          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) { inst.culture = HOUSE_CAP; this._deliverFx(inst, w, 'culture'); } // one visit lifts the home (~5 days)
         }
       },
     });
@@ -571,7 +590,7 @@ export class Game {
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
           if (inst.def.role === 'dwelling' && market.stock > 0 && inst.food < HOUSE_CAP) {
-            inst.food = Math.min(HOUSE_CAP, inst.food + 5);
+            inst.food = HOUSE_CAP; // fill the larder in one visit (~10 days)
             market.stock -= 1;
             this._deliverFx(inst, w, 'food');
           }
