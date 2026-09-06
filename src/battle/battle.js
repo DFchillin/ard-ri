@@ -296,7 +296,7 @@ export class Battle {
       pos: { x, z }, dead: false, mesh: null, slot: { dx: 0, dz: 0 } };
     const mesh = makeUnitVisual(type, team);
     mesh.position.set(x, 0, z);
-    u.mesh = mesh; u.ring = mesh.userData.ring; u.bar = mesh.userData.bar;
+    u.mesh = mesh; u.ring = mesh.userData.ring; u.bar = mesh.userData.bar; u.tag = mesh.userData.tag;
     drawBar(u.bar, 1, 0x6cc551);
     this.unitGroup.add(mesh); this.units.push(u);
     return u;
@@ -313,6 +313,7 @@ export class Battle {
   _killVisual(u) {
     if (u.ring) u.ring.visible = false;
     if (u.bar) u.bar.visible = false;
+    if (u.tag) u.tag.visible = false;
     const spr = u.mesh.userData.spr;
     this._deathBurst(u.pos.x, u.pos.z, spr ? spr.scale.y || 1.2 : 1);
     if (spr) { spr.material.transparent = true; this._dying.push({ u, spr, ttl: DEATH_DUR, dur: DEATH_DUR, op0: spr.material.opacity == null ? 1 : spr.material.opacity }); }
@@ -720,8 +721,32 @@ function makeUnitVisual(type, team) {
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.34 * foot, 0.5 * foot, 24), new THREE.MeshBasicMaterial({ color: TEAM[team], transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; ring.userData.team = TEAM[team]; g.add(ring); g.userData.ring = ring;
   const bar = makeBar(0.7 * Math.max(1, foot * 0.8)); bar.position.y = tall + 0.5; g.add(bar); g.userData.bar = bar;
+  // A small name tag so you can read who's who on the field — team-coloured for
+  // friend/foe at a glance, gold for the named heroes and gods.
+  const hero = t.cat === 'hero' || t.cat === 'god';
+  const tag = makeNameTag(t.label, TEAM[team], hero);
+  tag.position.y = tall + 0.78; g.add(tag); g.userData.tag = tag;
   g.userData.foot = foot;
   return g;
+}
+// A billboard label: dark pill + outlined text, team-coloured (heroes/gods gold).
+function makeNameTag(text, color, hero) {
+  const fs = hero ? 30 : 22, pad = 10;
+  const m = document.createElement('canvas').getContext('2d');
+  m.font = `${hero ? 'bold ' : ''}${fs}px Georgia, serif`;
+  const w = Math.ceil(m.measureText(text).width) + pad * 2, h = fs + pad;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const c = cv.getContext('2d');
+  c.font = `${hero ? 'bold ' : ''}${fs}px Georgia, serif`;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillStyle = 'rgba(8,12,10,0.5)'; c.fillRect(0, 0, w, h);
+  c.lineWidth = 4; c.strokeStyle = 'rgba(0,0,0,0.7)'; c.strokeText(text, w / 2, h / 2 + 1);
+  c.fillStyle = hero ? '#f2d666' : hex(color); c.fillText(text, w / 2, h / 2 + 1);
+  const tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, opacity: hero ? 1 : 0.9 }));
+  s.renderOrder = 30; s.center.set(0.5, 0);
+  const px = 0.006; s.scale.set(w * px, h * px, 1);
+  return s;
 }
 // A company standard: a billboard pole + team pennant with a sigil dot in the
 // leader's colour, borne above the leader to mark the company's ground.
