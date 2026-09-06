@@ -27,6 +27,12 @@ export const BUILDINGS = {
     desc: 'A bruíon — the great feasting-hall, hung with banners and loud with ale and story. Its poets and revellers walk the roads and lift the culture of every home they pass.' },
   nemeton: { label: 'Stone Circle', sprite: 'altar', art: 'nemeton', states: 4, drawW: 3.5, icon: '🌀', footprint: [3, 3], cost: 22, role: 'culture', unlockLevel: 3,
     desc: 'A neimheadh — a ring of carved stones, sacred ground where the túath gathers for the great feasts of the year. Its druids walk the roads and raise the culture of the streets around it.' },
+  wrestling_ring: { label: 'Wrestling Green', sprite: 'market', art: 'wrestling_ring', states: 4, drawW: 4.0, icon: '🤼', footprint: [4, 4], cost: 28, role: 'culture', unlockLevel: 5,
+    desc: 'A faiche coraíochta — the wrestling green, ringed with posts and benches for the whole túath to crowd around. Champions are made here at the fair; the crowd it draws carries that fire out onto the roads.' },
+  brehon_court: { label: 'Brehon Court', sprite: 'altar', art: 'brehon_court', states: 4, drawW: 4.0, icon: '⚖️', footprint: [4, 4], cost: 34, role: 'culture', unlockLevel: 6,
+    desc: 'An fhaiche dála — the assembly-green where the breitheamh gives judgment from the seat of stones under the Fénechas, the old law. Its people walk the roads and settle the streets they pass with the confidence of a just túath.' },
+  healer_well: { label: 'Healer’s Well', sprite: 'roundhouse', art: 'healer_well', states: 4, drawW: 4.0, icon: '🌿', footprint: [4, 4], cost: 30, role: 'culture', unlockLevel: 7,
+    desc: 'Teach an leighis is an tobar naofa — the healer’s hut beside the sacred well, hung with drying herbs. The lucht leighis carry cure and clean water out along the roads and raise the heart of every home they tend.' },
   homestead: { label: 'Leader’s Homestead', sprite: 'roundhouse', art: 'longhouse', states: 4, icon: '🐄', footprint: [3, 3], cost: 30, role: 'homestead', unique: true, folk: 2, unlockLevel: 2,
     desc: 'Your own ráth and the seat of your rule. Cattle — the true measure of a king — graze the open pasture around it and multiply. Wealth to send in tribute or trade for what Ériu cannot make, and the prize a raider drives off.' },
 };
@@ -37,7 +43,7 @@ export const CATEGORIES = [
   { id: 'homes', icon: '🏠', label: 'Homes', items: ['homestead', 'roundhouse'] },
   { id: 'farming', icon: '🌾', label: 'Farming', items: ['field', 'orchard', 'granary', 'sciobolmor'] },
   { id: 'services', icon: '🏛️', label: 'Services', items: ['market', 'aonach', 'well', 'altar'] },
-  { id: 'culture', icon: '🎶', label: 'Culture', items: ['feast_hall', 'hurling_field', 'nemeton', 'gallan'] },
+  { id: 'culture', icon: '🎶', label: 'Culture', items: ['feast_hall', 'hurling_field', 'nemeton', 'gallan', 'wrestling_ring', 'brehon_court', 'healer_well'] },
 ];
 
 export const ROAD_ITEM = { key: 'road', label: 'Road', icon: '🛣️', cost: 0,

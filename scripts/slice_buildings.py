@@ -25,6 +25,9 @@ SHEETS = {
     'culture4f':        ['hurling_field', 'feast_hall', 'nemeton', 'gallan', 'orchard'],
     'sheetredob':       {'rows': ['smithy', 'longhouse', 'stonehouse', 'storehouse', 'market'],
                          'src': 'assets/flat-buildings', 'label': True},
+    # hurling field and feast hall already come from culture4f, so skip those rows
+    'sheetredoc':       {'rows': [None, 'wrestling_ring', None, 'brehon_court', 'healer_well'],
+                         'src': 'assets/flat-buildings', 'label': True},
 }
 
 def strip_bg(im):
@@ -68,10 +71,14 @@ for sheet, cfg in SHEETS.items():
     im = strip_bg(Image.open(path).convert('RGBA'))
     A = np.asarray(im)[:, :, 3] > 20
     if label:
-        # Printed labels are thin text; buildings are tall blobs. Find the first
-        # column whose tallest vertical content run clears a good fraction of a
-        # row's height (a building body, not a text line) and blank everything to
-        # its left, so no label bleeds into column one whatever its length.
+        # Printed labels are thin text; buildings are tall blobs. A label band's
+        # tallest vertical run stays under half a row, while a building body fills
+        # well over half. These labels sit in the same muted palette as the art and
+        # their longest words reach almost to column one, so neither a colour test
+        # nor a gutter-valley cut separates them — but no text column is ever as
+        # tall as a building. Cut at the first column that is unmistakably a
+        # building (tallrun > 0.55 of a row): everything left of it is label (and
+        # at most a few pixels of the ground's grassy left rim, which is harmless).
         rowH = A.shape[0] / len(rowmap)
         def _tallrun(colmask):
             best = cur = 0
@@ -80,11 +87,9 @@ for sheet, cfg in SHEETS.items():
                 if cur > best:
                     best = cur
             return best
-        cut = 0
-        for x in range(A.shape[1]):
-            if _tallrun(A[:, x]) > rowH * 0.4:
-                cut = x
-                break
+        tr = np.array([_tallrun(A[:, x]) for x in range(A.shape[1])])
+        strong = np.where(tr > rowH * 0.55)[0]
+        cut = int(strong[0]) if len(strong) else 0
         if cut:
             a = np.asarray(im).copy()
             a[:, :cut, 3] = 0
