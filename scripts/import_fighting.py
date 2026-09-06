@@ -24,8 +24,9 @@ ART = {
     'cu_chulainn': 'cuchulainn', 'fionn_mac_cumhaill': 'fionn', 'lugh_lamhfhada': 'lugh',
     'nuada_airgetlam': 'nuada', 'manannan_mac_lir': 'manannan', 'brigid': 'brigid',
     'the_dagda': 'dagda', 'the_morrigan': 'morrigan',
-    'isometric_celtic_warrior': 'warrior', 'elite_gaelic_champion': 'curadh',
-    # (common_gaelic_warrior is now the spare — the isometric figure is the warrior)
+    'common_gaelic_warrior': 'warrior', 'elite_gaelic_champion': 'curadh',
+    # (isometric_celtic_warrior is the spare — its heavy armour reads too late-period;
+    #  the common warrior is the plainer, more period-true levy figure)
 }
 
 def load(p):
