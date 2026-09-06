@@ -30,9 +30,9 @@ export const UNIT_TYPES = {
   dagda:        { label: 'An Dagda',       ga: 'the Good God',      cat: 'god', rank: 6, atk: 9.0, hp: 40, build: 3.4, speed: 2.8, morale: 100, aura: 24, battle: { art: 'dagda', h: 3.8, tiles: 2 }, piece: { color: 0xf2ead6, tall: 1.7 } },
   morrigan:     { label: 'An Mhórríon',    ga: 'phantom queen of war', cat: 'god', rank: 6, atk: 8.0, hp: 32, build: 2.4, speed: 3.4, morale: 100, aura: 24, battle: { art: 'morrigan', h: 3.5, tiles: 2 }, piece: { color: 0xc86a8a, tall: 1.6 } },
   // --- the returned dead: prayed back at an altar, they know no fear ---
-  ghost:        { label: 'Ghost Warrior',  ga: 'laoch taibhse',     cat: 'warrior', rank: 2, atk: 2.4, hp: 5, build: 0.4, speed: 3.5, morale: 100, aura: 0, spectral: true, battle: { art: 'warrior', h: 1.55 }, piece: { color: 0x9fc8ff, tall: 0.9 } },
+  ghost:        { label: 'Ghost Warrior',  ga: 'laoch taibhse',     cat: 'warrior', rank: 2, atk: 2.4, hp: 5, build: 0.4, speed: 3.5, morale: 100, aura: 0, spectral: true, battle: { art: 'ghost', h: 1.55 }, piece: { color: 0x9fc8ff, tall: 0.9 } },
   // --- the menace: a Fomorian giant and its lesser brood (foes only) ---
-  fomor:        { label: 'The Fomor',      ga: 'an Fomhórach',      cat: 'god', rank: 7, atk: 11.0, hp: 70, build: 4.0, speed: 2.2, morale: 100, aura: 0, menace: true, piece: { color: 0x2b2436, tall: 2.4 }, tiles: 3 },
+  fomor:        { label: 'The Fomor',      ga: 'an Fomhórach',      cat: 'god', rank: 7, atk: 11.0, hp: 70, build: 4.0, speed: 2.2, morale: 100, aura: 0, menace: true, battle: { art: 'fomor', h: 3.8, tiles: 3 }, piece: { color: 0x2b2436, tall: 2.4 }, tiles: 3 },
   fuath:        { label: 'Fuath',          ga: 'a water-fiend',     cat: 'special', rank: 4, atk: 4.0, hp: 14, build: 1.2, speed: 3.0, morale: 100, aura: 0, menace: true, piece: { color: 0x3a5a52, tall: 1.2 } },
 };
 

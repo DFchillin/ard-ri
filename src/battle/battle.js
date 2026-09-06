@@ -714,7 +714,7 @@ function makeUnitVisual(type, team) {
   const g = new THREE.Group();
   let tall = 1.0;
   if (t.battle) { const spr = makeWarriorChip(t.battle.art, t.battle.h); g.add(spr); g.userData.spr = spr; tall = t.battle.h;
-    if (t.spectral) { spr.material.color.set(0x9fd0ff); spr.material.opacity = 0.6; spr.material.transparent = true; } } // a pale, translucent revenant
+    if (t.spectral) { spr.material.opacity = 0.55; spr.material.transparent = true; } } // a pale, translucent revenant — its art is already monochrome
   else if (t.sprite) { const spr = makeWalkerChip(t.sprite); spr.scale.multiplyScalar(0.85); g.add(spr); g.userData.spr = spr; tall = 1.4; }
   else { buildPiece(g, t.piece.color, t.piece.tall, t.cat); tall = t.piece.tall + 0.5; }
   const foot = (t.battle && t.battle.tiles) || t.tiles || 1; // heroes stand on 1 square, gods/menace on more
