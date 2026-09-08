@@ -21,7 +21,7 @@ export const BUILDINGS = {
     desc: 'A standing-stone shrine to the old powers. Its druid is kept by your treasury, and a hero is far likelier to answer a túath that keeps one.' },
   gallan: { label: 'Gallán', sprite: 'altar', art: 'gallan', states: 4, drawW: 3.3, icon: '🪨', footprint: [3, 3], cost: 16, role: 'gallan', unlockLevel: 3,
     desc: 'A gallán — a great carved standing-stone. Dedicate one of your warriors to keep vigil at it: while they stand watch they cannot take the field, but the old powers look far kinder on your muster, and a hosted hero or god is likelier to answer the horn.' },
-  hurling_field: { label: 'Hurling Field', sprite: 'market', art: 'hurling_field', states: 4, drawW: 4.0, icon: '🏑', footprint: [4, 4], cost: 24, role: 'culture', unlockLevel: 3,
+  hurling_field: { label: 'Hurling Field', sprite: 'market', art: 'hurling_field', states: 4, drawW: 4.0, icon: '🏑', footprint: [4, 4], cost: 24, role: 'culture', unlockLevel: 3, cultureWalker: { type: 'villager', war: true, label: 'P' },
     desc: 'A faiche iomána — the hurling green. Young folk match camán and sliotar here, and the whole túath turns out to roar them on. Sends players onto the roads to lift the spirits of the streets they pass.' },
   feast_hall: { label: 'Feast Hall', sprite: 'longhouse', art: 'feast_hall', states: 4, drawW: 4.0, icon: '🍺', footprint: [4, 4], cost: 30, role: 'culture', unlockLevel: 3,
     desc: 'A bruíon — the great feasting-hall, hung with banners and loud with ale and story. Its poets and revellers walk the roads and lift the culture of every home they pass.' },

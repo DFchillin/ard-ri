@@ -81,6 +81,10 @@ const ui = new UI({
 // Lets the build menu hide a unique building (the homestead) once one is raised.
 ui.builtCount = (role) => game.count(role);
 
+// Grain stores hold barley from fields and apples from orchards in one pool — name
+// the goods for what the settlement actually grows, so apples get their due.
+function hasOrchard() { return game.buildings.some((b) => b.def.produce === 'apples'); }
+function storeGoods() { return hasOrchard() ? 'grain &amp; apples' : 'grain'; }
 function showAdvisors() {
   const B = game.buildings;
   const sum = (role, key) => B.reduce((n, b) => n + (b.def.role === role ? (b[key] || 0) : 0), 0);
@@ -99,7 +103,7 @@ function showAdvisors() {
     `<h3>Trusted Advisors</h3><div class="role">Counsel at your ear</div>` +
     `<div class="advisor"><h4>🌾 An Rechtaire · the Steward</h4><table class="ledger">` +
       row('Fields sown', fields + (ripe ? ` · ${ripe} ripe` : '')) +
-      row('Grain in store', sum('granary', 'stock')) +
+      row(hasOrchard() ? 'Grain &amp; apples' : 'Grain in store', sum('granary', 'stock')) +
       row('At market', sum('market', 'stock')) +
       row('Wells', game.count('well')) +
     `</table></div>` +
@@ -217,22 +221,27 @@ function isColony(region) { return campaign.colonies.some((c) => c.region === re
 function foundColony(region) {
   if (isColony(region)) return null;
   const k = kingdomById(region);
-  campaign.colonies.push({ region, name: k.en, seasons: 0 });
+  campaign.colonies.push({ region, name: k.en, seasons: 0, folk: 0, settlement: null });
   saveCampaign();
   return k;
 }
 // Each turn of the year, the colonies render their tribute to the homestead.
+function colonyFolk(c) { return campaign.active === c.region ? game.folk : (c.folk || 0); }
 function collectColonyTribute() {
   if (!campaign.colonies.length) return;
-  let cattle = 0; const goods = [];
+  let cattle = 0; const goods = []; let small = 0;
   for (const c of campaign.colonies) {
     c.seasons = (c.seasons || 0) + 1;
-    cattle += 4 + ((Math.random() * 5) | 0);
-    if (Math.random() < 0.4) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; goods.push(GOODS[gk].icon); }
+    const folk = colonyFolk(c);
+    const cows = Math.floor(folk / 10); // a cow in tribute for every ten who settle there
+    cattle += cows;
+    if (!cows) small += 1;
+    if (folk >= 10 && Math.random() < 0.4) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; goods.push(GOODS[gk].icon); }
   }
   if (cattle) setCattle(campaign.cattle + cattle);
   saveCampaign();
-  flashNotice(`🏴 Tribute from ${campaign.colonies.length} ${campaign.colonies.length > 1 ? 'colonies' : 'colony'}: 🐄 ${cattle}${goods.length ? ' · ' + goods.join(' ') : ''}`);
+  if (cattle || goods.length) flashNotice(`🏴 Tribute from your colonies: 🐄 ${cattle}${goods.length ? ' · ' + goods.join(' ') : ''}`);
+  else if (small) flashNotice('🏴 Your colonies are yet too small to render tribute — build them up past ten souls (open the 🗺 map and enter one).');
 }
 
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
@@ -246,14 +255,44 @@ if (!campaign.level) campaign.level = 1;
 if (!campaign.doneObjectives) campaign.doneObjectives = [];
 if (!campaign.goods) campaign.goods = {};
 if (!campaign.hosted) campaign.hosted = {};
-if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won by raiding further afield
+if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won by raiding further afield — each a full ráth of its own
+if (!campaign.active) campaign.active = 'home'; // which settlement is loaded: 'home' or a colony's region id
+for (const c of campaign.colonies) { if (c.folk == null) c.folk = 0; if (c.settlement === undefined) c.settlement = null; } // fields for buildable colonies
 if (campaign.raidsWon == null) campaign.raidsWon = 0; // won raids drive the map-era chapter unlocks (levels 4+)
 for (const h of ['cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan']) delete campaign.roster[h]; // heroes/gods are summoned, not owned — clean any legacy grant
 if (campaign.mapSeed == null) campaign.mapSeed = _mapSeed;
 function saveCampaign() { try { localStorage.setItem(CAMPAIGN_KEY, JSON.stringify(campaign)); } catch (e) {} }
-function saveSettlement() { campaign.settlement = game.snapshot(); campaign.cattle = game.cattle; saveCampaign(); }
+// The active settlement — home ráth or a colony — is snapshotted to its own slot,
+// so each is a standing town you can leave and come back to. Cattle is realm-wide.
+function activeColony() { return campaign.active && campaign.active !== 'home' ? campaign.colonies.find((c) => c.region === campaign.active) : null; }
+function saveSettlement() {
+  const snap = game.snapshot();
+  const c = activeColony();
+  if (c) { c.settlement = snap; c.folk = game.folk; }
+  else campaign.settlement = snap;
+  campaign.cattle = game.cattle; saveCampaign();
+}
+const COLONY_START_SILVER = 120;
+function emptySettlement() { return { silver: COLONY_START_SILVER, cattle: campaign.cattle, folk: 0, buildings: [], roads: [], cros: [], menace: null }; }
+// Leave the current settlement (saving it) and load another — 'home' or a colony
+// region id. A colony with no ráth yet loads an empty map to build from scratch.
+function switchSettlement(target) {
+  if (started) saveSettlement();
+  cancelPending(); ui.hideInspect(); _inspectDwelling = null;
+  campaign.active = target;
+  let snap = target === 'home' ? campaign.settlement : (campaign.colonies.find((c) => c.region === target) || {}).settlement;
+  game.load(snap || emptySettlement());
+  game.cattle = campaign.cattle;
+  view.rebuildRoads(); view.rebuildCros();
+  applyWarTint();
+  started = true;
+  saveCampaign(); pushStats(); updateDate();
+}
 // Cattle is single-sourced on the campaign; the settlement mirrors it.
 function setCattle(n) { campaign.cattle = Math.max(0, Math.round(n)); game.cattle = campaign.cattle; pushStats(); saveCampaign(); }
+// The slua's field colour drives the hurling green's players — keep it in step
+// with the chosen livery so a re-coloured banner recolours the folk it sends out.
+function applyWarTint() { try { game.warTint = parseInt((campaign.livery[0] || '#4a86ff').replace('#', ''), 16) || 0x4a86ff; } catch (e) { game.warTint = 0x4a86ff; } }
 
 // --- Levels: the campaign told in chapters ---
 let levelObjectives = [];
@@ -313,14 +352,25 @@ function applyUnlock(lvl) {
   if (u.note) flashNotice(u.note);
 }
 battle.setLivery(campaign.livery);
-// Restore a standing ráth if one was saved on this device.
-if (campaign.settlement) {
-  game.load(campaign.settlement);
-  game.cattle = campaign.cattle != null ? campaign.cattle : game.cattle;
-  view.rebuildRoads(); view.rebuildCros();
-  started = true; // you already have a settlement — the sim runs
+// Restore the settlement you last stood in — home ráth or a colony — so a reload
+// drops you back where you were, and never saves one town's state into another's.
+{
+  const bootSnap = campaign.active === 'home'
+    ? campaign.settlement
+    : (campaign.colonies.find((c) => c.region === campaign.active) || {}).settlement;
+  if (bootSnap) {
+    game.load(bootSnap);
+    game.cattle = campaign.cattle != null ? campaign.cattle : game.cattle;
+    view.rebuildRoads(); view.rebuildCros();
+    started = true; // you already have a settlement — the sim runs
+  } else if (campaign.active !== 'home') {
+    game.load(emptySettlement()); // an unbuilt colony you were standing in
+    view.rebuildRoads(); view.rebuildCros();
+    started = true;
+  }
 }
 game.cattle = campaign.cattle; // single-source the herd from the start (fresh campaigns begin with none)
+applyWarTint();
 saveCampaign();
 
 // A small Gaelic name-bank so the war-dead are remembered by name, not tally.
@@ -378,7 +428,7 @@ function buildKingdomMap() {
   document.getElementById('kg-action').addEventListener('click', kingdomAction);
   const c1 = document.getElementById('kg-c1'), c2 = document.getElementById('kg-c2');
   c1.value = campaign.livery[0]; c2.value = campaign.livery[1];
-  const onCol = () => { campaign.livery = [c1.value, c2.value]; battle.setLivery(campaign.livery); drawFlagPreview(); };
+  const onCol = () => { campaign.livery = [c1.value, c2.value]; battle.setLivery(campaign.livery); applyWarTint(); drawFlagPreview(); };
   c1.addEventListener('input', onCol); c2.addEventListener('input', onCol);
   const nameIn = document.getElementById('kg-name-in');
   if (nameIn) { nameIn.value = campaign.leader || ''; nameIn.addEventListener('input', () => { campaign.leader = nameIn.value.trim() || null; }); }
@@ -395,9 +445,7 @@ function drawFlagPreview() {
   x.strokeStyle = 'rgba(0,0,0,0.45)'; x.strokeRect(X, Y, W, H);
 }
 function selectKingdom(id) {
-  if (kg.mode === 'war' && id === campaign.home) return;
-  if (kg.mode === 'war' && isColony(id)) return; // already held
-  kg.sel = id;
+  kg.sel = id; kg.enter = null;
   for (const rid in kg.regions) kg.regions[rid].classList.toggle('sel', rid === id);
   const k = kingdomById(id);
   document.getElementById('kg-none').classList.add('hidden');
@@ -406,6 +454,23 @@ function selectKingdom(id) {
   document.getElementById('kg-ga').textContent = k.ga;
   const act = document.getElementById('kg-action'); act.disabled = false;
   if (kg.mode !== 'war') { document.getElementById('kg-seat').textContent = `Seat of ${k.seat}.`; act.textContent = `Begin in ${k.en} ▸`; return; }
+  // War map doubles as the way home and into your colonies: your own lands aren't
+  // raided — they're entered and built.
+  if (id === campaign.home) {
+    kg.enter = 'home';
+    document.getElementById('kg-seat').textContent = `Your home túath, ${k.seat}. Return to build and hold your ráth.`;
+    act.textContent = campaign.active === 'home' ? `You are here` : `Return to ${k.en} 🏰`;
+    act.disabled = campaign.active === 'home';
+    return;
+  }
+  if (isColony(id)) {
+    kg.enter = id;
+    const folk = colonyFolk(campaign.colonies.find((c) => c.region === id));
+    document.getElementById('kg-seat').textContent = `Your colony at ${k.seat} — ${folk} folk. Enter to build it up; it renders a cow home for every ten who settle there.`;
+    act.textContent = campaign.active === id ? `You are here` : `Build in ${k.en} 🏗`;
+    act.disabled = campaign.active === id;
+    return;
+  }
   const far = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(id);
   document.getElementById('kg-seat').textContent = far
     ? `Further afield — march on ${k.seat}, and win to plant a colony there, a new Dál that renders tribute home.`
@@ -414,10 +479,10 @@ function selectKingdom(id) {
 }
 function openKingdomMap(mode, then) {
   buildKingdomMap();
-  kg.mode = mode; kg.sel = null; kg.then = then || null;
-  document.getElementById('kg-title').textContent = mode === 'war' ? 'Where will you raid?' : 'The Kingdoms of Ériu';
+  kg.mode = mode; kg.sel = null; kg.enter = null; kg.then = then || null;
+  document.getElementById('kg-title').textContent = mode === 'war' ? 'Raid, or ride home' : 'The Kingdoms of Ériu';
   document.getElementById('kg-hint').textContent = mode === 'war'
-    ? 'Choose a kingdom to fall upon. Your own lands are barred.'
+    ? 'Fall upon a foreign kingdom — or tap your own home or a colony to enter and build it.'
     : 'Choose the túath you will call home, and the colours your slua will carry.';
   document.getElementById('kg-none').classList.remove('hidden');
   document.getElementById('kg-info').classList.add('hidden');
@@ -425,10 +490,12 @@ function openKingdomMap(mode, then) {
   { const ni = document.getElementById('kg-name-in'); if (ni && mode !== 'war') ni.value = campaign.leader || ''; }
   const act = document.getElementById('kg-action'); act.disabled = true;
   act.textContent = mode === 'war' ? 'Raid ⚔' : 'Begin your reign ▸';
+  const activeRegion = campaign.active === 'home' ? campaign.home : campaign.active;
   for (const rid in kg.regions) {
-    kg.regions[rid].classList.remove('sel');
+    kg.regions[rid].classList.remove('sel', 'dim');
     kg.regions[rid].classList.toggle('held', isColony(rid));
-    kg.regions[rid].classList.toggle('dim', mode === 'war' && (rid === campaign.home || isColony(rid)));
+    // In war mode your home and colonies are the way in, not barred — mark the one you're standing in.
+    kg.regions[rid].classList.toggle('here', mode === 'war' && rid === activeRegion);
   }
   if (campaign.home && kg.regions[campaign.home]) { kg.homeMark.setAttribute('points', kingdomById(campaign.home).pts); kg.homeMark.style.display = ''; }
   else kg.homeMark.style.display = 'none';
@@ -569,7 +636,10 @@ function renderTrade() {
 }
 function kingdomAction() {
   if (!kg.sel) return;
-  if (kg.mode === 'war') { campaign.target = kg.sel; campaign._raidFar = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(kg.sel); campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); enterBattle('attack'); return; }
+  if (kg.mode === 'war') {
+    if (kg.enter) { const t = kg.enter; closeKingdomMap(); switchSettlement(t); enterSettlement(); return; } // enter home / a colony to build it
+    campaign.target = kg.sel; campaign._raidFar = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(kg.sel); campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); enterBattle('attack'); return;
+  }
   campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery);
   if (kg.then === 'war') { openKingdomMap('war'); return; } // ride out to raid
   if (kg.then === 'intro') { closeKingdomMap(); showIntro(); return; } // first time: opening tale, then into the ráth
@@ -912,7 +982,7 @@ function personHtml(p) {
 function buildingHtml(inst) {
   const d = inst.def;
   let extra = '';
-  if (d.role === 'granary' || d.role === 'market') extra = `<p>Harvest in store: ${inst.stock}</p>`;
+  if (d.role === 'granary' || d.role === 'market') extra = `<p>${storeGoods()[0].toUpperCase() + storeGoods().slice(1)} in store: ${inst.stock}</p>`;
   if (d.role === 'dwelling') extra = dwellingRankHtml(inst);
   if (d.role === 'altar') extra = altarHtml();
   if (d.role === 'gallan') extra = gallanHtml(inst);
@@ -986,6 +1056,7 @@ function pipelineNote(inst) {
       if (!road) return warn(`${crop[0].toUpperCase() + crop.slice(1)} is ripe but there is no road — lay one to a grain store or the harvest rots.`) + line('Harvest');
       if (!hasStore) return warn('Ripe, but no grain store to carry it to — build a Grain Store.') + line('Harvest');
       if (g.folk < 4) return warn(status + ` But too few folk (${g.folk}/4) to carry it — the harvest waits.`) + line('Harvest');
+      if (!g._storeHasRoom()) return warn(status + ' But every grain store is full — raise another store, or a market to move it on; the ripe crop waits and is not lost.') + line('Harvest');
       return flow(status) + line('Harvest');
     }
     const pct = inst.growMax ? Math.min(99, Math.round((inst.grown / inst.growMax) * 100)) : 0;
@@ -995,7 +1066,7 @@ function pipelineNote(inst) {
     if (g.folk < 4) return warn(head + ` ⚠ Needs 4 folk to harvest (you have ${g.folk}).`) + line('Next harvest');
     return flow(head) + line('Next harvest');
   }
-  if (d.role === 'granary') return road ? flow('Fields fill it with grain; markets restock from it.') : warn('No road — carriers and markets cannot reach it. Lay a road.');
+  if (d.role === 'granary') return road ? flow(`Fields and orchards fill it with ${storeGoods()}; markets restock from it.`) : warn('No road — carriers and markets cannot reach it. Lay a road.');
   if (d.role === 'market') {
     if (!road) return warn('No road — cannot reach a grain store. Lay a road.');
     if (!g.anyStock('granary')) return warn('No stocked grain store on the roads yet — a field must fill a store first.');
@@ -1059,29 +1130,69 @@ function resurrectPrayed() {
   flashNotice(`🎃 Samhain — the veil thins. ${n} of the war-dead rise as ghost warriors to walk with you.`);
 }
 function wireAltar() { const b = document.getElementById('pray-btn'); if (b) b.addEventListener('click', prayAtAltar); }
-// A gallán where a warrior may stand vigil — committing them out of the muster
-// in exchange for the old powers' favour when you summon.
-function gallanHtml(inst) {
+// A gallán serves two rites. A warrior may stand vigil at it (out of the muster,
+// for the old powers' favour), and the stone may be consecrated to a god or hero —
+// pray to that patron with gold and a cow and they walk among your homes, blessing
+// them to the full of every good for two months.
+const PATRON_GODS = ['lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan', 'cuchulainn', 'fionn'];
+const PRAY_GOLD = 30, PRAY_COW = 1, BLESS_HOMES = 3, BLESS_DAYS = 12; // 2 full months at 6 days a month
+function patronSection(inst) {
+  if (!inst.patron) {
+    return `<div class="role">The patron</div>` +
+      `<p class="dim">Consecrate the stone to one of the old powers. Then, with gold and a cow laid at the gallán, pray for a visitation — the god walks among your homes and blesses them.</p>` +
+      `<div class="patron-picks">` + PATRON_GODS.map((k) => `<button class="patron-pick continue-btn" data-k="${k}">${SUMMON_LORE[k].emoji} ${SUMMON_LORE[k].name}</button>`).join('') + `</div>`;
+  }
+  const s = SUMMON_LORE[inst.patron];
+  const homes = game.dwellings().length;
+  const canPray = game.silver >= PRAY_GOLD && campaign.cattle >= PRAY_COW && homes > 0;
+  const why = homes === 0 ? 'No homes with folk to bless yet.'
+    : game.silver < PRAY_GOLD ? `Need 🪙${PRAY_GOLD} in the treasury.`
+    : campaign.cattle < PRAY_COW ? 'Need a cow to lay at the stone.' : '';
+  return `<div class="role">${s.emoji} Dedicated to ${s.name}</div>` +
+    `<p class="dim">Lay 🪙${PRAY_GOLD} and 🐄${PRAY_COW} at the stone and pray. ${s.name} will walk among your ${BLESS_HOMES} nearest homes and bless them to the full of food, water and heart for two months.</p>` +
+    (why ? `<p class="pl-warn">⚠ ${why}</p>` : '') +
+    `<button id="pray-god" class="continue-btn"${canPray ? '' : ' disabled'}>🙏 Pray to ${s.name} — 🪙${PRAY_GOLD} · 🐄${PRAY_COW}</button>` +
+    `<button id="patron-clear" class="continue-btn ghost">Re-dedicate the stone</button>`;
+}
+function vigilSection(inst) {
   const cur = inst.warden;
   if (cur) {
     const fav = Math.round((WARDEN_FAVOUR[cur] || 0.12) * 100);
     const name = UNIT_TYPES[cur] ? UNIT_TYPES[cur].label : cur;
-    return `<div class="altar-dead"><div class="role">The vigil</div>` +
+    return `<hr class="soft"><div class="role">The vigil</div>` +
       `<p class="pl-ok">→ A ${name} keeps vigil at the stone — <b>+${fav}%</b> to your muster favour. They will not answer the horn while they watch.</p>` +
-      `<button id="gallan-clear" class="continue-btn">Recall the warden</button></div>`;
+      `<button id="gallan-clear" class="continue-btn ghost">Recall the warden</button>`;
   }
   const free = WARDEN_RANKS.filter((t) => (campaign.roster[t] || 0) > 0);
   if (!free.length) {
-    return `<div class="altar-dead"><div class="role">The vigil</div>` +
-      `<p class="dim">No warriors free to keep the vigil. Win or muster some, then dedicate one here.</p></div>`;
+    return `<hr class="soft"><div class="role">The vigil</div>` +
+      `<p class="dim">No warriors free to keep a vigil. Win or muster some, then dedicate one here.</p>`;
   }
-  return `<div class="altar-dead"><div class="role">The vigil</div>` +
-    `<p class="dim">Dedicate a warrior to stand watch. A warden cannot also fight — but the old powers favour a túath that keeps its champions at the stones.</p>` +
-    free.map((t) => `<button class="gallan-pick continue-btn" data-t="${t}">Set ${UNIT_TYPES[t].label} — +${Math.round(WARDEN_FAVOUR[t] * 100)}% (${campaign.roster[t]} free)</button>`).join('') +
-    `</div>`;
+  return `<hr class="soft"><div class="role">The vigil</div>` +
+    `<p class="dim">Dedicate a warrior to stand watch — out of the muster, but the old powers favour a túath that keeps its champions at the stones.</p>` +
+    free.map((t) => `<button class="gallan-pick continue-btn ghost" data-t="${t}">Set ${UNIT_TYPES[t].label} — +${Math.round(WARDEN_FAVOUR[t] * 100)}% (${campaign.roster[t]} free)</button>`).join('');
+}
+function gallanHtml(inst) {
+  return `<div class="altar-dead">` + patronSection(inst) + vigilSection(inst) + `</div>`;
 }
 function refreshGallan(inst) { const body = document.getElementById('inspect-body'); if (body) { body.innerHTML = buildingHtml(inst); wireGallan(inst); } }
+function prayToGod(inst) {
+  if (!inst.patron || game.silver < PRAY_GOLD || campaign.cattle < PRAY_COW) return;
+  const n = game.blessDwellings(inst.patron, inst, { count: BLESS_HOMES, days: BLESS_DAYS });
+  if (!n) { flashNotice('🙏 No homes with folk to bless yet — settle some first.'); return; }
+  game.silver -= PRAY_GOLD;
+  setCattle(campaign.cattle - PRAY_COW); // also pushes stats + saves the campaign
+  saveSettlement();
+  const s = SUMMON_LORE[inst.patron];
+  ui.hideInspect();
+  flashNotice(`${s.emoji} ${s.name} walks out of the gallán to bless ${n} of your homes — two months without want.`);
+}
 function wireGallan(inst) {
+  document.querySelectorAll('.patron-pick').forEach((b) => b.addEventListener('click', () => { inst.patron = b.dataset.k; saveSettlement(); refreshGallan(inst); }));
+  const pray = document.getElementById('pray-god');
+  if (pray) pray.addEventListener('click', () => prayToGod(inst));
+  const pc = document.getElementById('patron-clear');
+  if (pc) pc.addEventListener('click', () => { inst.patron = null; saveSettlement(); refreshGallan(inst); });
   const clr = document.getElementById('gallan-clear');
   if (clr) clr.addEventListener('click', () => { clearWarden(inst); refreshGallan(inst); });
   document.querySelectorAll('.gallan-pick').forEach((b) => b.addEventListener('click', () => { assignWarden(inst, b.dataset.t); refreshGallan(inst); }));

@@ -273,6 +273,7 @@ html, body {
 #kg-map .kg-colony { fill: none; stroke-width: 5; stroke-dasharray: 9 6; pointer-events: none; }
 #kg-map .kg-colony-flag { font-size: 30px; text-anchor: middle; pointer-events: none; }
 #kg-map .kg-home { fill: none; stroke: var(--gold); stroke-width: 5; stroke-dasharray: 8 6; pointer-events: none; }
+#kg-map .kg-region.here { fill: rgba(120,220,140,0.22); stroke: rgba(120,220,140,0.8); stroke-width: 4; }
 .kg-detail { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; min-width: 180px; }
 .kg-detail h3 { font-family: var(--font-display); color: var(--gold); font-weight: normal; margin: 0; font-size: 17px; }
 .kg-ga { font-style: italic; opacity: 0.85; font-size: 13px; }
@@ -435,6 +436,11 @@ table.ledger .neg { color: #e08a6a; }
   font-size: 15px;
 }
 .continue-btn.hidden { display: none; }
+.continue-btn.ghost { background: transparent; color: var(--gold); border: 1px solid rgba(226,193,110,0.5); }
+.continue-btn.ghost:disabled { opacity: 0.45; }
+#inspect-body hr.soft { border: none; border-top: 1px solid rgba(255,255,255,0.12); margin: 14px 0 4px; }
+.patron-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.patron-picks .continue-btn { margin-top: 4px; font-size: 13px; padding: 8px 6px; }
 
 /* Festival announcement */
 #festival-overlay {

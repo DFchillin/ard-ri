@@ -61,7 +61,8 @@ export class Game {
     this.walkerGroup = new THREE.Group();
     this.menaceGroup = new THREE.Group();
     this.floatieGroup = new THREE.Group();
-    scene.add(this.buildingGroup, this.walkerGroup, this.menaceGroup, this.floatieGroup);
+    this.blessGroup = new THREE.Group();
+    scene.add(this.buildingGroup, this.walkerGroup, this.menaceGroup, this.floatieGroup, this.blessGroup);
     this._floaties = [];
     this.menace = null;
 
@@ -71,6 +72,8 @@ export class Game {
     this.folk = 0;
     this.cattle = 40;
     this.broke = false;
+    this.warTint = 0x4a86ff; // the slua's field colour — set from the campaign livery; the hurling green sends folk in it
+    this.blessings = []; // active god-processions blessing the dwellings
     this._immTimer = 0;
     this.entrance = { x: 0, z: Math.floor(map.size / 2) }; // settlers arrive here
 
@@ -171,6 +174,7 @@ export class Game {
   }
   count(role) { return this.buildings.filter((b) => b.def.role === role).length; }
   anyStock(role) { return this.buildings.some((b) => b.def.role === role && b.stock > 0); }
+  _storeHasRoom() { return this.buildings.some((b) => b.def.role === 'granary' && b.stock < GRANARY_CAP); }
 
   // Half the folk are able workers — the rest are children and elders.
   workforce() { return Math.floor(this.folk * 0.5); }
@@ -219,16 +223,28 @@ export class Game {
   // and its prosperity tier steps up at a festival (if it's thriving) or slips at
   // a plain month-turn (if it's been neglected). A prospering home holds more folk.
   _dwellingDay(b, festival, newMonth) {
-    b.food = Math.max(0, b.food - FOOD_DECAY);
-    b.water = Math.max(0, b.water - WATER_DECAY);
-    b.culture = Math.max(0, b.culture - CULTURE_DECAY);
-    if (b.food <= 0 && b.water <= 0) {
-      b.distress = (b.distress || 0) + 1;
-      if (b.distress >= DISTRESS_DAYS && b.pop > 0) { b.distress = 0; this._emigrate(b); }
-    } else b.distress = 0;
-    const thriving = b.pop >= b.cap && b.food >= 6 && b.water >= 6 && b.culture >= 6;
+    if (b.blessedDays > 0) {
+      // A god's blessing holds this home at the full of every good — no want, no
+      // drain — for as long as it lasts (set when a patron god is prayed to).
+      b.food = HOUSE_CAP; b.water = HOUSE_CAP; b.culture = HOUSE_CAP; b.distress = 0;
+      b.blessedDays -= 1;
+    } else {
+      b.food = Math.max(0, b.food - FOOD_DECAY);
+      b.water = Math.max(0, b.water - WATER_DECAY);
+      b.culture = Math.max(0, b.culture - CULTURE_DECAY);
+      if (b.food <= 0 && b.water <= 0) {
+        b.distress = (b.distress || 0) + 1;
+        if (b.distress >= DISTRESS_DAYS && b.pop > 0) { b.distress = 0; this._emigrate(b); }
+      } else b.distress = 0;
+    }
+    // Prosperity climbs a step whenever a full, fed, watered home turns a month —
+    // festivals give the same lift — so a well-kept home reaches its greater
+    // capacity (holds 6) in a season or two, and you see it grow. The top tier
+    // also wants a heartened, cultured home.
+    const kept = b.pop >= b.cap && b.food >= 5 && b.water >= 5;
+    const thriving = kept && (b.tier < 2 || b.culture >= 5);
     const neglected = b.food < 3 || b.water < 3;
-    if (festival && thriving && b.tier < 3) b.tier += 1;
+    if ((newMonth || festival) && thriving && b.tier < 3) b.tier += 1;
     else if (newMonth && !festival && neglected && b.tier > 0) b.tier -= 1;
     b.cap = b.tier >= PROSPER_TIER ? PROSPER_CAP : (b.def.folk || 4);
   }
@@ -257,7 +273,8 @@ export class Game {
     const inst = { key, def, x: f.x, z: f.z, w: f.w, h: f.h, stock: 0, food: 0, water: 0, culture: 0, timer: 0,
       pop: 0, cap: def.folk || 0, incoming: 0, distress: 0, active: false, tier: 0,
       grown: 0, ripe: false, harvestsLeft: 0, connected: false, herd: def.role === 'homestead' ? 10 : 0,
-      warden: null, // a gallán may have a warrior dedicated to stand vigil (raises muster favour)
+      blessedDays: 0, // days a god's blessing keeps this home at the full of every good
+      warden: null, patron: null, // a gallán may dedicate a warrior (warden) and be attributed to a god/hero (patron)
       growMax: FARM_GROW, harvests: FARM_HARVESTS, yieldTotal: (def.load || 0) * FARM_HARVESTS }; // for the field inspect readout
     this.map.place(f.x, f.z, f.w, f.h, inst);
 
@@ -301,13 +318,16 @@ export class Game {
     }
     const buildings = this.buildings.map((b) => ({ key: b.key, x: b.x, z: b.z,
       pop: b.pop, stock: b.stock, food: b.food, water: b.water, culture: b.culture, herd: b.herd,
-      grown: b.grown, ripe: b.ripe, harvestsLeft: b.harvestsLeft, warden: b.warden || null, tier: b.tier || 0 }));
+      grown: b.grown, ripe: b.ripe, harvestsLeft: b.harvestsLeft, warden: b.warden || null, patron: b.patron || null,
+      blessedDays: b.blessedDays || 0, tier: b.tier || 0 }));
     const menace = this.menace ? { x: this.menace.x, z: this.menace.z, w: this.menace.w, h: this.menace.h } : null;
     return { silver: this.silver, cattle: this.cattle, folk: this.folk, buildings, roads, cros, menace };
   }
   load(snap) {
     if (!snap) return;
     this.clearMenace();
+    for (const c of this.blessGroup.children.slice()) this.blessGroup.remove(c);
+    this.blessings = [];
     for (const b of this.buildings.slice()) { this.buildingGroup.remove(b.sprite); if (b.fx) b.fx.dispose(); if (b.fx2) b.fx2.dispose(); }
     this.buildings = [];
     for (const w of this.walkers.slice()) this.walkerGroup.remove(w.sprite);
@@ -326,7 +346,8 @@ export class Game {
       if (!this.map.canPlace(b.x, b.z, w, h)) continue;
       const inst = this._spawnBuilding(b.key, { x: b.x, z: b.z, w, h });
       Object.assign(inst, { pop: b.pop || 0, stock: b.stock || 0, food: b.food || 0, water: b.water || 0, culture: b.culture || 0,
-        grown: b.grown || 0, ripe: !!b.ripe, harvestsLeft: b.harvestsLeft || 0, warden: b.warden || null, tier: b.tier || 0 });
+        grown: b.grown || 0, ripe: !!b.ripe, harvestsLeft: b.harvestsLeft || 0, warden: b.warden || null, patron: b.patron || null,
+        blessedDays: b.blessedDays || 0, tier: b.tier || 0 });
       if (def.role === 'dwelling') inst.cap = inst.tier >= PROSPER_TIER ? PROSPER_CAP : (def.folk || 4);
       if (def.role === 'homestead') { inst.herd = b.herd || 10; this._updateHerd(inst); }
     }
@@ -369,6 +390,7 @@ export class Game {
     const person = { name: randomName(female), female, ...personFor(opts.type) };
     const w = new Walker(this.map, entry, { ...opts, person });
     w.source = opts.source || null;
+    if (opts.tint != null && w.sprite && w.sprite.material) w.sprite.material.color.setHex(opts.tint); // war-colour the hurling players
     this.walkers.push(w);
     this.walkerGroup.add(w.sprite);
   }
@@ -407,8 +429,8 @@ export class Game {
         return b.ripe ? 1 : Math.min(0.66, (b.grown / FARM_GROW) * 0.66);
       case 'market': // busier the more it holds
         return b.connected ? Math.min(1, 0.34 + (b.stock / MARKET_CAP) * 0.66) : 0;
-      case 'gallan': // a bare stone → tended ground → a warden keeps vigil and the stone is lit
-        return b.warden ? 1 : 0.3;
+      case 'gallan': // a bare stone → consecrated/tended → a patron god or a warden lights it
+        return (b.warden || b.patron) ? 1 : 0.3;
       case 'culture': // a venue comes alive once it is on the roads and folk can reach it
         return b.connected ? 1 : 0.3;
       default:
@@ -424,8 +446,11 @@ export class Game {
           break;
         }
         // Ripe: bring the harvest in — needs a road, 4 hands in the settlement,
-        // spare labour, and at most 2 carriers on the roads at once.
-        if (b.connected && this.folk >= FARM_MIN_FOLK && this._labour > 0 &&
+        // spare labour, at most 2 carriers on the roads at once, AND a grain store
+        // with room. When every store is full the field simply holds its ripe
+        // crop and waits, rather than sending a carrier that spills the harvest
+        // into a full store — so a good year is never silently lost.
+        if (b.connected && this.folk >= FARM_MIN_FOLK && this._labour > 0 && this._storeHasRoom() &&
             this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 2) {
           b.timer = 0; this._labour--; this._sendGrain(b);
           if (--b.harvestsLeft <= 0) { b.ripe = false; b.grown = 0; } // back to growing
@@ -457,9 +482,10 @@ export class Game {
       case 'culture': {
         // A culture venue — feast hall, hurling field, stone-circle — sends folk out
         // along the roads (storytellers, revellers, players) who lift the culture of
-        // every dwelling they pass, just as a shrine's druid does.
+        // every dwelling they pass, just as a shrine's druid does. Most send druids;
+        // the hurling green sends its players, in the slua's war colours.
         if (this.folk > 0 && this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 3) {
-          b.timer = 0; this._sendDruid(b);
+          b.timer = 0; this._sendCultureRaiser(b);
         }
         break;
       }
@@ -554,6 +580,74 @@ export class Game {
     });
   }
 
+  // Culture venue → a culture-raiser wanders the roads, lifting the culture of the
+  // dwellings it passes. Most send a druid; a venue can name its own walker via
+  // def.cultureWalker (the hurling green sends villagers in the war colours).
+  _sendCultureRaiser(src) {
+    const cw = src.def.cultureWalker || {};
+    const entry = entryRoadTile(this.map, src);
+    if (!entry) return;
+    this._spawn(entry, {
+      type: cw.type || 'druid', label: cw.label || 'D', steps: 26, speed: 2.2, source: src,
+      tint: cw.war ? this.warTint : null,
+      onTile: (x, z, w) => {
+        for (const inst of adjacentBuildings(this.map, x, z)) {
+          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) { inst.culture = HOUSE_CAP; this._deliverFx(inst, w, 'culture'); }
+        }
+      },
+    });
+  }
+
+  // A patron god, prayed to at a gallán, manifests at the stones and walks among a
+  // few of the nearest homes, blessing each to the full of every good for a good
+  // while (blessedDays) — a divine boon that neither wants nor drains. Returns how
+  // many homes will be visited (0 if there are none to bless).
+  blessDwellings(godArt, fromInst, { count = 3, days = 12, h = 3.6 } = {}) {
+    const homes = this.buildings.filter((b) => b.def.role === 'dwelling' && b.pop > 0);
+    if (!homes.length) return 0;
+    const c0 = this._center(fromInst);
+    homes.sort((a, b) => {
+      const ca = this._center(a), cb = this._center(b);
+      return Math.hypot(ca.x - c0.x, ca.z - c0.z) - Math.hypot(cb.x - c0.x, cb.z - c0.z);
+    });
+    const targets = homes.slice(0, count);
+    const chip = makeWarriorChip(godArt, h);
+    chip.position.set(c0.x, 0.05, c0.z);
+    this.blessGroup.add(chip);
+    this.blessings.push({ chip, targets, i: 0, days, hold: 0 });
+    return targets.length;
+  }
+  _updateBlessings(dt) {
+    for (let i = this.blessings.length - 1; i >= 0; i--) {
+      const bl = this.blessings[i], chip = bl.chip;
+      const home = bl.targets[bl.i];
+      if (home && (!home.sprite || home.dead)) { bl.i += 1; continue; } // home razed mid-walk — skip on
+      if (home) {
+        const tgt = this._center(home);
+        const dx = tgt.x - chip.position.x, dz = tgt.z - chip.position.z, dist = Math.hypot(dx, dz);
+        if (dist > 0.2) {
+          const k = Math.min(1, (3.4 * dt) / dist);
+          chip.position.x += dx * k; chip.position.z += dz * k;
+          if (chip.faceWorld) chip.faceWorld(dx, dz);
+          if (chip.animate) chip.animate(dt, true);
+        } else {
+          home.blessedDays = bl.days; home.food = HOUSE_CAP; home.water = HOUSE_CAP; home.culture = HOUSE_CAP;
+          const p = home.sprite.position;
+          this._floatie(p.x, 2.1, p.z, 'food', { sz: 0.3, vy: 1.1, life: 1.3, over: true });
+          this._floatie(p.x + 0.35, 2.0, p.z, 'water', { sz: 0.3, vy: 1.1, life: 1.4, over: true });
+          this._floatie(p.x - 0.35, 2.0, p.z, 'culture', { sz: 0.3, vy: 1.1, life: 1.5, over: true });
+          bl.i += 1;
+          if (chip.animate) chip.animate(dt, false);
+        }
+      } else {
+        bl.hold += dt; // all homes blessed — the god fades from the field
+        if (chip.material) { chip.material.transparent = true; chip.material.opacity = Math.max(0, 1 - bl.hold * 1.4); }
+        if (chip.animate) chip.animate(dt, false);
+        if (bl.hold >= 1.0) { this.blessGroup.remove(chip); this.blessings.splice(i, 1); }
+      }
+    }
+  }
+
   // Altar → druid wanders roads, raising the culture of the dwellings it passes.
   _sendDruid(altar) {
     const entry = entryRoadTile(this.map, altar);
@@ -644,6 +738,7 @@ export class Game {
       if (t >= 1) { this.floatieGroup.remove(f.s); f.s.material.dispose(); this._floaties.splice(i, 1); }
     }
     if (this.menace) this._moveMenaceCreature(dt);
+    if (this.blessings.length) this._updateBlessings(dt);
   }
 
   // --- Animation, one call per frame (dt already scaled by game speed) ---
