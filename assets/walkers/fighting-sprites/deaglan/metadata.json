@@ -1,0 +1,251 @@
+{
+  "group_id": "4e34f51e-11f6-41e7-a5f7-c50b9793c31a",
+  "states": [
+    {
+      "character": {
+        "id": "86f32aaf-a92e-4f7f-a7c7-cd7bc1ff83f5",
+        "name": "Idle",
+        "prompt": "Deaglan the road builder, a cheerful young Irish labourer with fair freckled skin, short ginger-auburn hair faded at the sides, a short reddish beard and a broad grin. Ancient Celtic/Gaelic clothing: a forest-green woollen cloak (brat) pinned at one shoulder with a round bronze Celtic penannular brooch, worn over a natural undyed linen l\u00e9ine tunic, a wide leather belt, dark woollen trousers and leather boots. He carries a large iron-headed wooden shovel resting over one shoulder. Rugged, good-natured Gaelic road-builder.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-09-08T01:33:28.870188+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Attacking_with_shovel": {
+            "north": [
+              "Idle/animations/Attacking_with_shovel/north/frame_000.png",
+              "Idle/animations/Attacking_with_shovel/north/frame_001.png",
+              "Idle/animations/Attacking_with_shovel/north/frame_002.png",
+              "Idle/animations/Attacking_with_shovel/north/frame_003.png",
+              "Idle/animations/Attacking_with_shovel/north/frame_004.png",
+              "Idle/animations/Attacking_with_shovel/north/frame_005.png",
+              "Idle/animations/Attacking_with_shovel/north/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Attacking_with_shovel/south/frame_000.png",
+              "Idle/animations/Attacking_with_shovel/south/frame_001.png",
+              "Idle/animations/Attacking_with_shovel/south/frame_002.png",
+              "Idle/animations/Attacking_with_shovel/south/frame_003.png",
+              "Idle/animations/Attacking_with_shovel/south/frame_004.png",
+              "Idle/animations/Attacking_with_shovel/south/frame_005.png",
+              "Idle/animations/Attacking_with_shovel/south/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Attacking_with_shovel/north-west/frame_000.png",
+              "Idle/animations/Attacking_with_shovel/north-west/frame_001.png",
+              "Idle/animations/Attacking_with_shovel/north-west/frame_002.png",
+              "Idle/animations/Attacking_with_shovel/north-west/frame_003.png",
+              "Idle/animations/Attacking_with_shovel/north-west/frame_004.png",
+              "Idle/animations/Attacking_with_shovel/north-west/frame_005.png",
+              "Idle/animations/Attacking_with_shovel/north-west/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Attacking_with_shovel/north-east/frame_000.png",
+              "Idle/animations/Attacking_with_shovel/north-east/frame_001.png",
+              "Idle/animations/Attacking_with_shovel/north-east/frame_002.png",
+              "Idle/animations/Attacking_with_shovel/north-east/frame_003.png",
+              "Idle/animations/Attacking_with_shovel/north-east/frame_004.png",
+              "Idle/animations/Attacking_with_shovel/north-east/frame_005.png",
+              "Idle/animations/Attacking_with_shovel/north-east/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Attacking_with_shovel/west/frame_000.png",
+              "Idle/animations/Attacking_with_shovel/west/frame_001.png",
+              "Idle/animations/Attacking_with_shovel/west/frame_002.png",
+              "Idle/animations/Attacking_with_shovel/west/frame_003.png",
+              "Idle/animations/Attacking_with_shovel/west/frame_004.png",
+              "Idle/animations/Attacking_with_shovel/west/frame_005.png",
+              "Idle/animations/Attacking_with_shovel/west/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Attacking_with_shovel/south-west/frame_000.png",
+              "Idle/animations/Attacking_with_shovel/south-west/frame_001.png",
+              "Idle/animations/Attacking_with_shovel/south-west/frame_002.png",
+              "Idle/animations/Attacking_with_shovel/south-west/frame_003.png",
+              "Idle/animations/Attacking_with_shovel/south-west/frame_004.png",
+              "Idle/animations/Attacking_with_shovel/south-west/frame_005.png",
+              "Idle/animations/Attacking_with_shovel/south-west/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Attacking_with_shovel/east/frame_000.png",
+              "Idle/animations/Attacking_with_shovel/east/frame_001.png",
+              "Idle/animations/Attacking_with_shovel/east/frame_002.png",
+              "Idle/animations/Attacking_with_shovel/east/frame_003.png",
+              "Idle/animations/Attacking_with_shovel/east/frame_004.png",
+              "Idle/animations/Attacking_with_shovel/east/frame_005.png",
+              "Idle/animations/Attacking_with_shovel/east/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Attacking_with_shovel/south-east/frame_000.png",
+              "Idle/animations/Attacking_with_shovel/south-east/frame_001.png",
+              "Idle/animations/Attacking_with_shovel/south-east/frame_002.png",
+              "Idle/animations/Attacking_with_shovel/south-east/frame_003.png",
+              "Idle/animations/Attacking_with_shovel/south-east/frame_004.png",
+              "Idle/animations/Attacking_with_shovel/south-east/frame_005.png",
+              "Idle/animations/Attacking_with_shovel/south-east/frame_006.png"
+            ]
+          },
+          "Digging": {
+            "south-east": [
+              "Idle/animations/Digging/south-east/frame_000.png",
+              "Idle/animations/Digging/south-east/frame_001.png",
+              "Idle/animations/Digging/south-east/frame_002.png",
+              "Idle/animations/Digging/south-east/frame_003.png",
+              "Idle/animations/Digging/south-east/frame_004.png",
+              "Idle/animations/Digging/south-east/frame_005.png",
+              "Idle/animations/Digging/south-east/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Digging/west/frame_000.png",
+              "Idle/animations/Digging/west/frame_001.png",
+              "Idle/animations/Digging/west/frame_002.png",
+              "Idle/animations/Digging/west/frame_003.png",
+              "Idle/animations/Digging/west/frame_004.png",
+              "Idle/animations/Digging/west/frame_005.png",
+              "Idle/animations/Digging/west/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Digging/north-west/frame_000.png",
+              "Idle/animations/Digging/north-west/frame_001.png",
+              "Idle/animations/Digging/north-west/frame_002.png",
+              "Idle/animations/Digging/north-west/frame_003.png",
+              "Idle/animations/Digging/north-west/frame_004.png",
+              "Idle/animations/Digging/north-west/frame_005.png",
+              "Idle/animations/Digging/north-west/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Digging/north-east/frame_000.png",
+              "Idle/animations/Digging/north-east/frame_001.png",
+              "Idle/animations/Digging/north-east/frame_002.png",
+              "Idle/animations/Digging/north-east/frame_003.png",
+              "Idle/animations/Digging/north-east/frame_004.png",
+              "Idle/animations/Digging/north-east/frame_005.png",
+              "Idle/animations/Digging/north-east/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Digging/south-west/frame_000.png",
+              "Idle/animations/Digging/south-west/frame_001.png",
+              "Idle/animations/Digging/south-west/frame_002.png",
+              "Idle/animations/Digging/south-west/frame_003.png",
+              "Idle/animations/Digging/south-west/frame_004.png",
+              "Idle/animations/Digging/south-west/frame_005.png",
+              "Idle/animations/Digging/south-west/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Digging/north/frame_000.png",
+              "Idle/animations/Digging/north/frame_001.png",
+              "Idle/animations/Digging/north/frame_002.png",
+              "Idle/animations/Digging/north/frame_003.png",
+              "Idle/animations/Digging/north/frame_004.png",
+              "Idle/animations/Digging/north/frame_005.png",
+              "Idle/animations/Digging/north/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Digging/south/frame_000.png",
+              "Idle/animations/Digging/south/frame_001.png",
+              "Idle/animations/Digging/south/frame_002.png",
+              "Idle/animations/Digging/south/frame_003.png",
+              "Idle/animations/Digging/south/frame_004.png",
+              "Idle/animations/Digging/south/frame_005.png",
+              "Idle/animations/Digging/south/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Digging/east/frame_000.png",
+              "Idle/animations/Digging/east/frame_001.png",
+              "Idle/animations/Digging/east/frame_002.png",
+              "Idle/animations/Digging/east/frame_003.png",
+              "Idle/animations/Digging/east/frame_004.png",
+              "Idle/animations/Digging/east/frame_005.png",
+              "Idle/animations/Digging/east/frame_006.png"
+            ]
+          },
+          "walk": {
+            "north-east": [
+              "Idle/animations/walk/north-east/frame_000.png",
+              "Idle/animations/walk/north-east/frame_001.png",
+              "Idle/animations/walk/north-east/frame_002.png",
+              "Idle/animations/walk/north-east/frame_003.png",
+              "Idle/animations/walk/north-east/frame_004.png",
+              "Idle/animations/walk/north-east/frame_005.png"
+            ],
+            "west": [
+              "Idle/animations/walk/west/frame_000.png",
+              "Idle/animations/walk/west/frame_001.png",
+              "Idle/animations/walk/west/frame_002.png",
+              "Idle/animations/walk/west/frame_003.png",
+              "Idle/animations/walk/west/frame_004.png",
+              "Idle/animations/walk/west/frame_005.png"
+            ],
+            "east": [
+              "Idle/animations/walk/east/frame_000.png",
+              "Idle/animations/walk/east/frame_001.png",
+              "Idle/animations/walk/east/frame_002.png",
+              "Idle/animations/walk/east/frame_003.png",
+              "Idle/animations/walk/east/frame_004.png",
+              "Idle/animations/walk/east/frame_005.png"
+            ],
+            "south": [
+              "Idle/animations/walk/south/frame_000.png",
+              "Idle/animations/walk/south/frame_001.png",
+              "Idle/animations/walk/south/frame_002.png",
+              "Idle/animations/walk/south/frame_003.png",
+              "Idle/animations/walk/south/frame_004.png",
+              "Idle/animations/walk/south/frame_005.png"
+            ],
+            "south-east": [
+              "Idle/animations/walk/south-east/frame_000.png",
+              "Idle/animations/walk/south-east/frame_001.png",
+              "Idle/animations/walk/south-east/frame_002.png",
+              "Idle/animations/walk/south-east/frame_003.png",
+              "Idle/animations/walk/south-east/frame_004.png",
+              "Idle/animations/walk/south-east/frame_005.png"
+            ],
+            "north": [
+              "Idle/animations/walk/north/frame_000.png",
+              "Idle/animations/walk/north/frame_001.png",
+              "Idle/animations/walk/north/frame_002.png",
+              "Idle/animations/walk/north/frame_003.png",
+              "Idle/animations/walk/north/frame_004.png",
+              "Idle/animations/walk/north/frame_005.png"
+            ],
+            "south-west": [
+              "Idle/animations/walk/south-west/frame_000.png",
+              "Idle/animations/walk/south-west/frame_001.png",
+              "Idle/animations/walk/south-west/frame_002.png",
+              "Idle/animations/walk/south-west/frame_003.png",
+              "Idle/animations/walk/south-west/frame_004.png",
+              "Idle/animations/walk/south-west/frame_005.png"
+            ],
+            "north-west": [
+              "Idle/animations/walk/north-west/frame_000.png",
+              "Idle/animations/walk/north-west/frame_001.png",
+              "Idle/animations/walk/north-west/frame_002.png",
+              "Idle/animations/walk/north-west/frame_003.png",
+              "Idle/animations/walk/north-west/frame_004.png",
+              "Idle/animations/walk/north-west/frame_005.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-09-09T12:46:15.518255"
+}

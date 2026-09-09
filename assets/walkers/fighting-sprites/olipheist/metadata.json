@@ -1,0 +1,36 @@
+{
+  "group_id": "c62d7a18-e0e4-42cc-a9a3-263e940432d4",
+  "states": [
+    {
+      "character": {
+        "id": "6359baef-c225-4eb9-9529-aef8e3289b7e",
+        "name": "Idle",
+        "prompt": "Ollph\u00e9ist, a great Celtic serpent-wyrm from Irish myth. A massive legless coiling serpent with dark bronze-green scales and a pale cream underbelly, its sinuous body curled into an S-shape. A pair of curling ram-like horns sweep back from its head, glowing amber eyes, and a fanged open maw. Subtle Celtic knotwork patterning runs along its scales, with a faint spined ridge down its back. Ancient, menacing water serpent \u2014 no legs, no wings.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-09-04T13:32:40.954415+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-09-09T12:47:44.302304"
+}
