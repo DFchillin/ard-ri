@@ -23,7 +23,7 @@ const PIP_TEX = (() => {
   x.strokeStyle = 'rgba(35,22,12,0.55)'; x.lineWidth = 2.5; x.beginPath(); x.arc(24, 24, 20, 0, Math.PI * 2); x.stroke();
   const t = new THREE.CanvasTexture(c); return t;
 })();
-import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=CBUST';
+import { entryRoadTile, adjacentBuildings, roadConnected, roadNeighbors } from './roads.js?v=CBUST';
 import { randomName } from '../data/names.js?v=CBUST';
 import { personFor } from '../data/phrases.js?v=CBUST';
 
@@ -387,7 +387,7 @@ export class Game {
 
   _spawn(entry, opts) {
     const female = Math.random() < 0.5;
-    const person = { name: randomName(female), female, ...personFor(opts.type) };
+    const person = { name: randomName(female), female, ...personFor(opts.personType || opts.type) };
     const w = new Walker(this.map, entry, { ...opts, person });
     w.source = opts.source || null;
     if (opts.tint != null && w.sprite && w.sprite.material) w.sprite.material.color.setHex(opts.tint); // war-colour the hurling players
@@ -588,7 +588,7 @@ export class Game {
     const entry = entryRoadTile(this.map, src);
     if (!entry) return;
     this._spawn(entry, {
-      type: cw.type || 'druid', label: cw.label || 'D', steps: 26, speed: 2.2, source: src,
+      type: cw.type || 'druid', personType: cw.persona || null, label: cw.label || 'D', steps: 26, speed: 2.2, source: src,
       tint: cw.war ? this.warTint : null,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
@@ -598,52 +598,105 @@ export class Game {
     });
   }
 
-  // A patron god, prayed to at a gallán, manifests at the stones and walks among a
-  // few of the nearest homes, blessing each to the full of every good for a good
-  // while (blessedDays) — a divine boon that neither wants nor drains. Returns how
-  // many homes will be visited (0 if there are none to bless).
+  // Each festival, a feast hall pours a burst of revellers onto the roads — more
+  // than its everyday pair — to carry the celebration through the streets.
+  festivalRevels() {
+    for (const b of this.buildings) {
+      const n = b.def.festivalRevellers || 0;
+      if (!n || !entryRoadTile(this.map, b) || this.folk <= 0) continue;
+      for (let i = 0; i < n; i++) this._sendCultureRaiser(b);
+    }
+  }
+
+  // A patron god, prayed to at a gallán, manifests at the stones and walks the
+  // town's own roads — slowly, at a god's stately pace — blessing the homes it
+  // passes: it stops before a house, faces it and streams coloured light at it,
+  // then leaves it at the full of every good, held for a good while (blessedDays).
+  // Returns roughly how many homes it means to bless (0 if there are none).
   blessDwellings(godArt, fromInst, { count = 3, days = 12, h = 3.6 } = {}) {
     const homes = this.buildings.filter((b) => b.def.role === 'dwelling' && b.pop > 0);
     if (!homes.length) return 0;
-    const c0 = this._center(fromInst);
-    homes.sort((a, b) => {
-      const ca = this._center(a), cb = this._center(b);
-      return Math.hypot(ca.x - c0.x, ca.z - c0.z) - Math.hypot(cb.x - c0.x, cb.z - c0.z);
-    });
-    const targets = homes.slice(0, count);
     const chip = makeWarriorChip(godArt, h);
-    chip.position.set(c0.x, 0.05, c0.z);
+    const entry = entryRoadTile(this.map, fromInst);
+    if (!entry) {
+      // The stone stands off the roads — the god cannot walk them. Bless the
+      // nearest homes on the spot instead so the prayer is never wasted.
+      const c0 = this._center(fromInst);
+      homes.sort((a, b) => { const ca = this._center(a), cb = this._center(b); return Math.hypot(ca.x - c0.x, ca.z - c0.z) - Math.hypot(cb.x - c0.x, cb.z - c0.z); });
+      for (const hme of homes.slice(0, count)) this._applyBlessing(hme, days);
+      return Math.min(count, homes.length);
+    }
+    const w0 = this.map.tileToWorld(entry.x, entry.z);
+    chip.position.set(w0.x, 0.05, w0.z);
     this.blessGroup.add(chip);
-    this.blessings.push({ chip, targets, i: 0, days, hold: 0 });
-    return targets.length;
+    this.blessings.push({ chip, days, need: count, blessed: new Set(),
+      cur: { x: entry.x, z: entry.z }, next: null, prev: null, t: 0, steps: 90,
+      mode: 'walk', target: null, blessT: 0, emitT: 0, hold: 0 });
+    this._blessPickNext(this.blessings[this.blessings.length - 1]);
+    return Math.min(count, homes.length);
   }
+  _applyBlessing(home, days) {
+    if (!home || !home.sprite) return;
+    home.blessedDays = days; home.food = HOUSE_CAP; home.water = HOUSE_CAP; home.culture = HOUSE_CAP;
+    const p = home.sprite.position;
+    this._floatie(p.x, 2.1, p.z, 'food', { sz: 0.3, vy: 1.1, life: 1.3, over: true });
+    this._floatie(p.x + 0.35, 2.0, p.z, 'water', { sz: 0.3, vy: 1.1, life: 1.4, over: true });
+    this._floatie(p.x - 0.35, 2.0, p.z, 'culture', { sz: 0.3, vy: 1.1, life: 1.5, over: true });
+  }
+  _blessPickNext(bl) {
+    let opts = roadNeighbors(this.map, bl.cur.x, bl.cur.z);
+    const open = opts.filter((n) => { const t = this.map.get(n.x, n.z); return t && !t.blocked; });
+    if (open.length) opts = open;
+    const fwd = bl.prev ? opts.filter((n) => !(n.x === bl.prev.x && n.z === bl.prev.z)) : opts;
+    const pool = fwd.length ? fwd : opts;
+    bl.next = pool.length ? pool[(Math.random() * pool.length) | 0] : null;
+    if (bl.next && bl.chip.faceWorld) bl.chip.faceWorld(bl.next.x - bl.cur.x, bl.next.z - bl.cur.z);
+  }
+  _blessColour(i) { return ['food', 'water', 'culture'][i % 3]; }
   _updateBlessings(dt) {
+    const BLESS_SPEED = 0.7; // tiles/sec — a god's slow, deliberate procession
     for (let i = this.blessings.length - 1; i >= 0; i--) {
       const bl = this.blessings[i], chip = bl.chip;
-      const home = bl.targets[bl.i];
-      if (home && (!home.sprite || home.dead)) { bl.i += 1; continue; } // home razed mid-walk — skip on
-      if (home) {
-        const tgt = this._center(home);
-        const dx = tgt.x - chip.position.x, dz = tgt.z - chip.position.z, dist = Math.hypot(dx, dz);
-        if (dist > 0.2) {
-          const k = Math.min(1, (3.4 * dt) / dist);
-          chip.position.x += dx * k; chip.position.z += dz * k;
-          if (chip.faceWorld) chip.faceWorld(dx, dz);
-          if (chip.animate) chip.animate(dt, true);
-        } else {
-          home.blessedDays = bl.days; home.food = HOUSE_CAP; home.water = HOUSE_CAP; home.culture = HOUSE_CAP;
-          const p = home.sprite.position;
-          this._floatie(p.x, 2.1, p.z, 'food', { sz: 0.3, vy: 1.1, life: 1.3, over: true });
-          this._floatie(p.x + 0.35, 2.0, p.z, 'water', { sz: 0.3, vy: 1.1, life: 1.4, over: true });
-          this._floatie(p.x - 0.35, 2.0, p.z, 'culture', { sz: 0.3, vy: 1.1, life: 1.5, over: true });
-          bl.i += 1;
-          if (chip.animate) chip.animate(dt, false);
-        }
-      } else {
-        bl.hold += dt; // all homes blessed — the god fades from the field
-        if (chip.material) { chip.material.transparent = true; chip.material.opacity = Math.max(0, 1 - bl.hold * 1.4); }
+      if (bl.mode === 'bless') {
+        const home = bl.target;
+        if (!home || !home.sprite || home.dead) { bl.mode = 'walk'; this._blessPickNext(bl); continue; }
+        const tp = home.sprite.position;
+        if (chip.faceWorld) chip.faceWorld(tp.x - chip.position.x, tp.z - chip.position.z);
         if (chip.animate) chip.animate(dt, false);
-        if (bl.hold >= 1.0) { this.blessGroup.remove(chip); this.blessings.splice(i, 1); }
+        // Stream coloured light from the god's hands at the house.
+        bl.emitT -= dt;
+        if (bl.emitT <= 0) {
+          bl.emitT = 0.07;
+          const dx = tp.x - chip.position.x, dz = tp.z - chip.position.z, d = Math.hypot(dx, dz) || 1;
+          const kind = this._blessColour((bl._emitN = (bl._emitN || 0) + 1));
+          this._floatie(chip.position.x, 1.7, chip.position.z, kind,
+            { sz: 0.16, vx: (dx / d) * (d / 0.5), vy: 0.5, vz: (dz / d) * (d / 0.5), life: 0.55, over: true });
+        }
+        bl.blessT -= dt;
+        if (bl.blessT <= 0) { this._applyBlessing(home, bl.days); bl.blessed.add(home); bl.need -= 1; bl.target = null; bl.mode = 'walk'; this._blessPickNext(bl); }
+        continue;
+      }
+      if (bl.mode === 'leave') {
+        bl.hold += dt;
+        if (chip.material) { chip.material.transparent = true; chip.material.opacity = Math.max(0, 1 - bl.hold * 1.2); }
+        if (chip.animate) chip.animate(dt, false);
+        if (bl.hold >= 1.2) { this.blessGroup.remove(chip); this.blessings.splice(i, 1); }
+        continue;
+      }
+      // mode 'walk'
+      if (bl.need <= 0 || bl.steps <= 0 || !bl.next) { bl.mode = 'leave'; continue; }
+      const wa = this.map.tileToWorld(bl.cur.x, bl.cur.z), wb = this.map.tileToWorld(bl.next.x, bl.next.z);
+      bl.t += dt * BLESS_SPEED;
+      const k = Math.min(bl.t, 1);
+      chip.position.set(wa.x + (wb.x - wa.x) * k, 0.05, wa.z + (wb.z - wa.z) * k);
+      if (chip.animate) chip.animate(dt, true);
+      if (bl.t >= 1) {
+        bl.t = 0; bl.prev = bl.cur; bl.cur = bl.next; bl.steps -= 1;
+        // Reached a tile — is there an unblessed home to bless beside it?
+        const home = adjacentBuildings(this.map, bl.cur.x, bl.cur.z)
+          .find((inst) => inst.def.role === 'dwelling' && inst.pop > 0 && !bl.blessed.has(inst));
+        if (home && bl.need > 0) { bl.mode = 'bless'; bl.target = home; bl.blessT = 2.4; bl.emitT = 0; }
+        else this._blessPickNext(bl);
       }
     }
   }

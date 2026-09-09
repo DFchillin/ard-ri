@@ -257,6 +257,7 @@ if (!campaign.goods) campaign.goods = {};
 if (!campaign.hosted) campaign.hosted = {};
 if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won by raiding further afield — each a full ráth of its own
 if (!campaign.active) campaign.active = 'home'; // which settlement is loaded: 'home' or a colony's region id
+if (campaign.yearsElapsed == null) campaign.yearsElapsed = 0; // festivals are announced only for the first three years
 for (const c of campaign.colonies) { if (c.folk == null) c.folk = 0; if (c.settlement === undefined) c.settlement = null; } // fields for buildable colonies
 if (campaign.raidsWon == null) campaign.raidsWon = 0; // won raids drive the map-era chapter unlocks (levels 4+)
 for (const h of ['cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan']) delete campaign.roster[h]; // heroes/gods are summoned, not owned — clean any legacy grant
@@ -685,8 +686,15 @@ function advanceDay() {
       curSeason = s; applySeason(s); collectColonyTribute(); // colonies render tribute each turn of the year
       if (campaign.level === 3 && game.hasMenace()) { game.expandMenace(); saveSettlement(); flashNotice('☠️ The blight creeps outward, devouring more of your land. Muster and march before it takes all.'); }
     }
+    if (cal.month === 0) { campaign.yearsElapsed = (campaign.yearsElapsed || 0) + 1; saveCampaign(); } // a full turn of the year
     const fest = FESTIVALS[cal.month];
-    if (fest) { festivalToday = true; triggerFestival(fest); }
+    if (fest) {
+      festivalToday = true;
+      // The four festivals are announced for your first three years; after that
+      // the folk keep them without a herald — you'll see the season turn yourself.
+      if ((campaign.yearsElapsed || 0) < 3) triggerFestival(fest);
+      game.festivalRevels(); // the feast halls pour their revellers onto the roads
+    }
     if (festivalToday && cal.month === 10) resurrectPrayed(); // Samhain — the prayed-for rise from the dead
   }
   const wasBroke = game.broke;
@@ -976,7 +984,8 @@ function updatePreview(e) {
 
 // --- Inspect ---
 function personHtml(p) {
-  return `<h3>${p.name}</h3><div class="role">${p.roleEn} · ${p.roleGa}</div>` +
+  const name = p.nick ? `${p.name} ‘${p.nick}’` : p.name;
+  return `<h3>${name}</h3><div class="role">${p.roleEn} · ${p.roleGa}</div>` +
     `<blockquote>“${p.phraseGa}”<br><span class="en">“${p.phraseEn}”</span></blockquote>`;
 }
 function buildingHtml(inst) {
