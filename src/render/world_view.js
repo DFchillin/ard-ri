@@ -113,7 +113,7 @@ export class WorldView {
     for (let z = 0; z < map.size; z++) {
       for (let x = 0; x < map.size; x++) {
         const t = map.get(x, z);
-        if (!t.road) continue;
+        if (!t.road || t.roadHidden) continue; // a Deaglán road stays hidden until he digs it in
         const wx = x * ts - half + inset, wz = z * ts - half + inset;
         const s = ts - inset * 2;
         pos.push(wx, 0.04, wz, wx + s, 0.04, wz, wx + s, 0.04, wz + s, wx, 0.04, wz + s);

@@ -708,32 +708,43 @@ export class Game {
   // Deaglán the path-maker and his dog Finn come out when you lay one of his
   // roads: he walks its length, stops once to dig it in (his shovel), and Finn
   // races up and down the whole length testing it — then the two slip away.
-  roadCrew(path) {
+  roadCrew(path, onReveal) {
     if (!path || path.length < 2) return;
     const tiles = path.map((p) => ({ x: p.x, z: p.z }));
     const w0 = this.map.tileToWorld(tiles[0].x, tiles[0].z);
-    const deagWalk = makeWalkerChip('deaglan');
-    const deagDig = makeWalkerChip('deaglan_dig'); deagDig.visible = false;
-    const finn = makeWalkerChip('finn_run');
+    // deaglan/finn have no _f set, so force female:false; Finn the dog rides at
+    // half a person's height.
+    const deagWalk = makeWalkerChip('deaglan', false);
+    const deagDig = makeWalkerChip('deaglan_dig', false); deagDig.visible = false;
+    const finn = makeWalkerChip('finn_run', false, 0.65);
     for (const c of [deagWalk, deagDig, finn]) { c.position.set(w0.x, 0.05, w0.z); this.crewGroup.add(c); }
-    this.crews.push({ tiles, deagWalk, deagDig, finn, di: 0, dt: 0,
+    this.crews.push({ tiles, onReveal, deagWalk, deagDig, finn, di: 0, dt: 0,
       digAt: 1 + ((Math.random() * Math.max(1, tiles.length - 1)) | 0), dug: false, digging: false, digT: 0,
-      fi: 0, fdir: 1, ft: 0, leaving: false, fade: 0 });
+      fi: 0, fdir: 1, ft: 0, revealed: -1, leaving: false, fade: 0 });
   }
+  _crewReveal(cr, k) { if (k > cr.revealed && cr.tiles[k]) { cr.revealed = k; if (cr.onReveal) cr.onReveal(cr.tiles[k]); } }
   _crewMove(chip, a, b, k) {
     const wa = this.map.tileToWorld(a.x, a.z), wb = this.map.tileToWorld(b.x, b.z);
     chip.position.set(wa.x + (wb.x - wa.x) * k, 0.05, wa.z + (wb.z - wa.z) * k);
     if (chip.faceWorld && (b.x !== a.x || b.z !== a.z)) chip.faceWorld(b.x - a.x, b.z - a.z);
   }
   _updateCrews(dt) {
-    const DEAG_SPEED = 2.0, FINN_SPEED = 4.5;
+    const DEAG_SPEED = 2.0, FINN_SPEED = 4.5, TS = this.map.tile;
     for (let i = this.crews.length - 1; i >= 0; i--) {
       const cr = this.crews[i], T = cr.tiles, last = T.length - 1;
-      // The dog runs the whole length, up and down, always at a run.
-      cr.ft += dt * FINN_SPEED;
-      while (cr.ft >= 1) { cr.ft -= 1; cr.fi += cr.fdir; if (cr.fi >= last) { cr.fi = last; cr.fdir = -1; } else if (cr.fi <= 0) { cr.fi = 0; cr.fdir = 1; } }
-      this._crewMove(cr.finn, T[cr.fi], T[Math.max(0, Math.min(last, cr.fi + cr.fdir))], cr.ft);
-      if (cr.finn.animate) cr.finn.animate(dt, true);
+      // Finn sits by Deaglán while he digs; otherwise he runs the length testing it.
+      if (cr.digging && !cr.leaving) {
+        const wt = this.map.tileToWorld(T[cr.di].x, T[cr.di].z);
+        const fx = wt.x + TS * 0.42, fz = wt.z + TS * 0.30;
+        cr.finn.position.set(fx, 0.05, fz);
+        if (cr.finn.faceWorld) cr.finn.faceWorld(wt.x - fx, wt.z - fz); // look back at his master
+        if (cr.finn.animate) cr.finn.animate(dt, false); // stopped — sits and waits
+      } else {
+        cr.ft += dt * FINN_SPEED;
+        while (cr.ft >= 1) { cr.ft -= 1; cr.fi += cr.fdir; if (cr.fi >= last) { cr.fi = last; cr.fdir = -1; } else if (cr.fi <= 0) { cr.fi = 0; cr.fdir = 1; } }
+        this._crewMove(cr.finn, T[cr.fi], T[Math.max(0, Math.min(last, cr.fi + cr.fdir))], cr.ft);
+        if (cr.finn.animate) cr.finn.animate(dt, true);
+      }
       cr.deagWalk.visible = !cr.digging; cr.deagDig.visible = cr.digging;
       if (cr.leaving) {
         cr.fade += dt;
@@ -748,14 +759,18 @@ export class Game {
         cr.deagDig.position.set(wt.x, 0.05, wt.z);
         if (cr.deagDig.animate) cr.deagDig.animate(dt, true);
         cr.digT -= dt;
-        if (cr.digT <= 0) { cr.digging = false; cr.dug = true; }
+        if (cr.digT <= 0) { cr.digging = false; cr.dug = true; } // the square he dug is revealed as he walks off it
         continue;
       }
-      if (cr.di >= last) { cr.leaving = true; continue; }
+      if (cr.di >= last) { this._crewReveal(cr, last); cr.leaving = true; continue; } // dig in the final square, then go
       cr.dt += dt * DEAG_SPEED;
       this._crewMove(cr.deagWalk, T[cr.di], T[cr.di + 1], Math.min(cr.dt, 1));
       if (cr.deagWalk.animate) cr.deagWalk.animate(dt, true);
-      if (cr.dt >= 1) { cr.dt = 0; cr.di += 1; if (!cr.dug && cr.di === cr.digAt) { cr.digging = true; cr.digT = 1.6; } }
+      if (cr.dt >= 1) {
+        cr.dt = 0; cr.di += 1;
+        this._crewReveal(cr, cr.di - 1); // the square he just finished fills in behind him
+        if (!cr.dug && cr.di === cr.digAt) { cr.digging = true; cr.digT = 1.6; }
+      }
     }
   }
 

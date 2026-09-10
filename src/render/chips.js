@@ -122,11 +122,13 @@ const WALK_FPS = 0.11;  // seconds per walk frame
 // the foe and back. Cheap, render-side, reads as "having a go".
 const LUNGE_DUR = 0.34;
 const LUNGE_DIST = 0.38;
-export function makeWalkerChip(type, female) {
+export function makeWalkerChip(type, female, h = WALKER_H) {
   const role = WALK_FILE[type] || 'villager';
   // Half the folk are women — every role has a matching female sprite set in a
   // <role>_f folder, so the streets read as families, not a town of one gender.
   // `female` ties the sprite to the person's name; omit it for a random pick.
+  // (Roles without an _f set, like the dog, must pass female:false.) `h` sets the
+  // world height — the dog rides at half a person's height.
   const useF = female === undefined ? Math.random() < 0.5 : !!female;
   const base = useF ? role + '_f' : role;
   const T = {};
@@ -135,17 +137,17 @@ export function makeWalkerChip(type, female) {
   const first = T.s.stand;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: first, transparent: true, alphaTest: 0.12 }));
   s.center.set(0.5, 0);
-  s.scale.set(0.7, WALKER_H, 1); // sensible default before the art loads
+  s.scale.set(0.7, h, 1); // sensible default before the art loads
   // Size to a fixed world height so the figure reads at a consistent size no
   // matter what resolution the frame was authored at (aspect from the art).
-  onReady(first, () => { const i = first.image; if (i && i.width) s.scale.set(WALKER_H * (i.width / i.height), WALKER_H, 1); });
+  onReady(first, () => { const i = first.image; if (i && i.width) s.scale.set(h * (i.width / i.height), h, 1); });
   // Safety net: if the art can't load, show a plain coloured figure, never nothing.
   tex(`assets/walkers/${base}/s_stand.png`, () => {
     s._failed = true;
     s.material.map = null;
     s.material.color.set(WALKER_COLOR[type] || 0xffffff);
     s.material.needsUpdate = true;
-    s.scale.set(0.6, WALKER_H, 1);
+    s.scale.set(0.6, h, 1);
   });
   // animation state on dedicated props — walkers overwrite userData for inspect
   s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._lunge = 0; s._lunging = false;

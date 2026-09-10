@@ -937,13 +937,16 @@ function buildRoadOptions() {
 }
 function commitRoad() {
   const opt = roadOptions[roadOptIdx] || { kind: 'deaglan' };
-  let changed = false;
+  const deag = opt.kind === 'deaglan';
+  const laid = [];
   for (const p of pendingRoad) {
-    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = opt.kind; changed = true; }
+    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) { t.roadKind = opt.kind; if (deag) t.roadHidden = true; } laid.push(p); }
   }
-  if (changed) {
+  if (laid.length) {
     view.rebuildRoads(); saveSettlement();
-    if (opt.kind === 'deaglan') game.roadCrew(pendingRoad.slice()); // Deaglán & his dog come out to lay his path
+    // Deaglán & his dog come out to lay his path — the tiles stay hidden until he
+    // digs each one in, appearing behind him as he goes.
+    if (deag) game.roadCrew(laid, (tile) => { const t = map.get(tile.x, tile.z); if (t) t.roadHidden = false; view.rebuildRoads(); });
   }
   cancelPending();
 }
@@ -1547,3 +1550,15 @@ function frame() {
   renderer.render(scene, camera);
 }
 frame();
+
+// Dev-only handle (activated with ?dev in the URL) for testing/inspection — inert
+// for normal players. Exposes the world and a helper to lay a Deaglán road.
+if (typeof location !== 'undefined' && /[?&]dev\b/.test(location.search)) {
+  window.__ardri = { game, map, view,
+    layDeaglanRoad(tiles) {
+      const laid = [];
+      for (const p of tiles) { if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) { t.roadKind = 'deaglan'; t.roadHidden = true; } laid.push(p); } }
+      if (laid.length) { view.rebuildRoads(); game.roadCrew(laid, (tile) => { const t = map.get(tile.x, tile.z); if (t) t.roadHidden = false; view.rebuildRoads(); }); }
+      return laid.length;
+    } };
+}
