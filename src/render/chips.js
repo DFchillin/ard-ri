@@ -21,6 +21,10 @@ const ROLE_FILE = {
 const WALK_FILE = {
   villager: 'villager', grain_carrier: 'grain_carrier',
   market_trader: 'market_trader', water_carrier: 'water_carrier', druid: 'druid',
+  // The path-maker and his dog, and the vigil guard — a "dig"/"run" role is the
+  // same figure's alternate animation played as its walk cycle.
+  deaglan: 'deaglan', deaglan_dig: 'deaglan_dig',
+  finn: 'finn', finn_run: 'finn_run', vigil: 'vigil', vigil_f: 'vigil_f',
 };
 
 const FALLBACK = {

@@ -10,7 +10,7 @@ export const UNIT_TYPES = {
   villager:     { label: 'Villager',       ga: 'aos na túaithe',    cat: 'regular', rank: 1, atk: 1.3, hp: 3, build: 0.4, speed: 3.6, morale: 50, aura: 0, sprite: 'villager' },
   water:        { label: 'Water-carrier',  ga: 'iompróir uisce',    cat: 'regular', rank: 1, atk: 1.1, hp: 3, build: 0.3, speed: 3.9, morale: 48, aura: 0, sprite: 'water_carrier' },
   grain:        { label: 'Grain-carrier',  ga: 'iompróir arbhair',  cat: 'regular', rank: 1, atk: 1.2, hp: 3, build: 0.3, speed: 3.5, morale: 50, aura: 0, sprite: 'grain_carrier' },
-  deaglan:      { label: 'Deaglán',        ga: 'the path-maker',    cat: 'regular', rank: 1, atk: 1.5, hp: 4, build: 0.4, speed: 4.4, morale: 62, aura: 0, sprite: 'market_trader' },
+  deaglan:      { label: 'Deaglán',        ga: 'the path-maker',    cat: 'regular', rank: 1, atk: 1.5, hp: 4, build: 0.4, speed: 4.4, morale: 62, aura: 0, sprite: 'market_trader', battle: { art: 'deaglan', h: 1.55 } },
   druid:        { label: 'Druid',          ga: 'draoi',             cat: 'regular', rank: 1, atk: 1.8, hp: 4, build: 0.3, speed: 3.2, morale: 72, aura: 8, sprite: 'druid' },
   // --- trained tiers: folk grow into these by surviving won battles ---
   warrior:      { label: 'Warrior',        ga: 'laoch',             cat: 'warrior', rank: 2, atk: 2.0, hp: 5, build: 0.6, speed: 3.2, morale: 66, aura: 0, battle: { art: 'warrior', h: 1.5 }, piece: { color: 0xb0763a, tall: 0.9 } },
@@ -31,8 +31,8 @@ export const UNIT_TYPES = {
   morrigan:     { label: 'An Mhórríon',    ga: 'phantom queen of war', cat: 'god', rank: 6, atk: 8.0, hp: 32, build: 2.4, speed: 3.4, morale: 100, aura: 24, battle: { art: 'morrigan', h: 3.5, tiles: 2 }, piece: { color: 0xc86a8a, tall: 1.6 } },
   // --- the returned dead: prayed back at an altar, they know no fear ---
   ghost:        { label: 'Ghost Warrior',  ga: 'laoch taibhse',     cat: 'warrior', rank: 2, atk: 2.4, hp: 5, build: 0.4, speed: 3.5, morale: 100, aura: 0, spectral: true, battle: { art: 'ghost', h: 1.55 }, piece: { color: 0x9fc8ff, tall: 0.9 } },
-  // --- the menace: a Fomorian giant and its lesser brood (foes only) ---
-  fomor:        { label: 'The Fomor',      ga: 'an Fomhórach',      cat: 'god', rank: 7, atk: 11.0, hp: 70, build: 4.0, speed: 2.2, morale: 100, aura: 0, menace: true, battle: { art: 'fomor', h: 3.8, tiles: 3 }, piece: { color: 0x2b2436, tall: 2.4 }, tiles: 3 },
+  // --- the menace: the Ollphéist, a great serpent, and its lesser brood (foes only) ---
+  fomor:        { label: 'The Ollphéist',  ga: 'an Ollphéist',      cat: 'god', rank: 7, atk: 11.0, hp: 70, build: 4.0, speed: 2.2, morale: 100, aura: 0, menace: true, battle: { art: 'olipheist', h: 3.8, tiles: 3 }, piece: { color: 0x2b4a36, tall: 2.4 }, tiles: 3 },
   fuath:        { label: 'Fuath',          ga: 'a water-fiend',     cat: 'special', rank: 4, atk: 4.0, hp: 14, build: 1.2, speed: 3.0, morale: 100, aura: 0, menace: true, piece: { color: 0x3a5a52, tall: 1.2 } },
 };
 

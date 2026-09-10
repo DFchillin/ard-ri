@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js?v=CBUST';
-import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeWarriorChip, setChipActive, setChipState } from '../render/chips.js?v=CBUST';
+import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeWarriorChip, makeWalkerChip, setChipActive, setChipState } from '../render/chips.js?v=CBUST';
 import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
 
@@ -62,7 +62,9 @@ export class Game {
     this.menaceGroup = new THREE.Group();
     this.floatieGroup = new THREE.Group();
     this.blessGroup = new THREE.Group();
-    scene.add(this.buildingGroup, this.walkerGroup, this.menaceGroup, this.floatieGroup, this.blessGroup);
+    this.crewGroup = new THREE.Group();
+    scene.add(this.buildingGroup, this.walkerGroup, this.menaceGroup, this.floatieGroup, this.blessGroup, this.crewGroup);
+    this.crews = []; // Deaglán & his dog, out building a road
     this._floaties = [];
     this.menace = null;
 
@@ -87,7 +89,7 @@ export class Game {
 
   showInspectDots(on) { this._inspectDots = on; for (const b of this.buildings) if (b.dot) b.dot.visible = on; }
 
-  // --- The menace: a blighted, unbuildable patrol zone with a Fomorian giant ---
+  // --- The menace: a blighted, unbuildable patrol zone with the Ollphéist serpent ---
   spawnMenace(x, z, w, h) {
     this.clearMenace();
     x = Math.max(0, Math.min(x, this.map.size - w)); z = Math.max(0, Math.min(z, this.map.size - h));
@@ -95,7 +97,7 @@ export class Game {
     this._markMenace(true);
     this._razeInMenace();
     this._drawMenaceZone();
-    const cre = makeWarriorChip('fomor', 3.6); this.menace.creature = cre; this.menaceGroup.add(cre); // the red-and-black Fomor, same figure you march on
+    const cre = makeWarriorChip('olipheist', 3.6); this.menace.creature = cre; this.menaceGroup.add(cre); // the Ollphéist — the great serpent you march on
     this._moveMenaceCreature(0);
   }
   clearMenace() {
@@ -328,6 +330,8 @@ export class Game {
     this.clearMenace();
     for (const c of this.blessGroup.children.slice()) this.blessGroup.remove(c);
     this.blessings = [];
+    for (const c of this.crewGroup.children.slice()) this.crewGroup.remove(c);
+    this.crews = [];
     for (const b of this.buildings.slice()) { this.buildingGroup.remove(b.sprite); if (b.fx) b.fx.dispose(); if (b.fx2) b.fx2.dispose(); }
     this.buildings = [];
     for (const w of this.walkers.slice()) this.walkerGroup.remove(w.sprite);
@@ -701,6 +705,87 @@ export class Game {
     }
   }
 
+  // Deaglán the path-maker and his dog Finn come out when you lay one of his
+  // roads: he walks its length, stops once to dig it in (his shovel), and Finn
+  // races up and down the whole length testing it — then the two slip away.
+  roadCrew(path) {
+    if (!path || path.length < 2) return;
+    const tiles = path.map((p) => ({ x: p.x, z: p.z }));
+    const w0 = this.map.tileToWorld(tiles[0].x, tiles[0].z);
+    const deagWalk = makeWalkerChip('deaglan');
+    const deagDig = makeWalkerChip('deaglan_dig'); deagDig.visible = false;
+    const finn = makeWalkerChip('finn_run');
+    for (const c of [deagWalk, deagDig, finn]) { c.position.set(w0.x, 0.05, w0.z); this.crewGroup.add(c); }
+    this.crews.push({ tiles, deagWalk, deagDig, finn, di: 0, dt: 0,
+      digAt: 1 + ((Math.random() * Math.max(1, tiles.length - 1)) | 0), dug: false, digging: false, digT: 0,
+      fi: 0, fdir: 1, ft: 0, leaving: false, fade: 0 });
+  }
+  _crewMove(chip, a, b, k) {
+    const wa = this.map.tileToWorld(a.x, a.z), wb = this.map.tileToWorld(b.x, b.z);
+    chip.position.set(wa.x + (wb.x - wa.x) * k, 0.05, wa.z + (wb.z - wa.z) * k);
+    if (chip.faceWorld && (b.x !== a.x || b.z !== a.z)) chip.faceWorld(b.x - a.x, b.z - a.z);
+  }
+  _updateCrews(dt) {
+    const DEAG_SPEED = 2.0, FINN_SPEED = 4.5;
+    for (let i = this.crews.length - 1; i >= 0; i--) {
+      const cr = this.crews[i], T = cr.tiles, last = T.length - 1;
+      // The dog runs the whole length, up and down, always at a run.
+      cr.ft += dt * FINN_SPEED;
+      while (cr.ft >= 1) { cr.ft -= 1; cr.fi += cr.fdir; if (cr.fi >= last) { cr.fi = last; cr.fdir = -1; } else if (cr.fi <= 0) { cr.fi = 0; cr.fdir = 1; } }
+      this._crewMove(cr.finn, T[cr.fi], T[Math.max(0, Math.min(last, cr.fi + cr.fdir))], cr.ft);
+      if (cr.finn.animate) cr.finn.animate(dt, true);
+      cr.deagWalk.visible = !cr.digging; cr.deagDig.visible = cr.digging;
+      if (cr.leaving) {
+        cr.fade += dt;
+        const o = Math.max(0, 1 - cr.fade * 1.3);
+        for (const c of [cr.deagWalk, cr.deagDig, cr.finn]) if (c.material) { c.material.transparent = true; c.material.opacity = o; }
+        if (cr.deagWalk.animate) cr.deagWalk.animate(dt, true);
+        if (cr.fade >= 0.85) { for (const c of [cr.deagWalk, cr.deagDig, cr.finn]) this.crewGroup.remove(c); this.crews.splice(i, 1); }
+        continue;
+      }
+      if (cr.digging) {
+        const wt = this.map.tileToWorld(T[cr.di].x, T[cr.di].z);
+        cr.deagDig.position.set(wt.x, 0.05, wt.z);
+        if (cr.deagDig.animate) cr.deagDig.animate(dt, true);
+        cr.digT -= dt;
+        if (cr.digT <= 0) { cr.digging = false; cr.dug = true; }
+        continue;
+      }
+      if (cr.di >= last) { cr.leaving = true; continue; }
+      cr.dt += dt * DEAG_SPEED;
+      this._crewMove(cr.deagWalk, T[cr.di], T[cr.di + 1], Math.min(cr.dt, 1));
+      if (cr.deagWalk.animate) cr.deagWalk.animate(dt, true);
+      if (cr.dt >= 1) { cr.dt = 0; cr.di += 1; if (!cr.dug && cr.di === cr.digAt) { cr.digging = true; cr.digT = 1.6; } }
+    }
+  }
+
+  // While a warrior keeps vigil at a gallán, a guard patrols a slow ring around
+  // the stone. The patrol chip lives as a child of the stone's own chip, so it
+  // comes and goes with the warden and is cleaned up if the stone is razed.
+  _updateVigils(dt) {
+    for (const b of this.buildings) {
+      if (b.def.role !== 'gallan') continue;
+      if (b.warden && !b._vigil) {
+        const chip = makeWalkerChip('vigil');
+        b.sprite.add(chip);
+        const r = 1.15 * this.map.tile, pts = [];
+        for (let a = 0; a < 6; a++) pts.push({ x: Math.cos((a / 6) * Math.PI * 2) * r, z: Math.sin((a / 6) * Math.PI * 2) * r * 0.7 });
+        b._vigil = { chip, pts, i: 0, t: 0 };
+      } else if (!b.warden && b._vigil) {
+        b.sprite.remove(b._vigil.chip); b._vigil = null;
+      }
+      if (b._vigil) {
+        const v = b._vigil, a = v.pts[v.i], nb = v.pts[(v.i + 1) % v.pts.length];
+        v.t += dt * 0.5; // a slow, watchful round
+        const k = Math.min(v.t, 1);
+        v.chip.position.set(a.x + (nb.x - a.x) * k, 0.05, a.z + (nb.z - a.z) * k);
+        if (v.chip.faceWorld) v.chip.faceWorld(nb.x - a.x, nb.z - a.z);
+        if (v.chip.animate) v.chip.animate(dt, true);
+        if (v.t >= 1) { v.t = 0; v.i = (v.i + 1) % v.pts.length; }
+      }
+    }
+  }
+
   // Altar → druid wanders roads, raising the culture of the dwellings it passes.
   _sendDruid(altar) {
     const entry = entryRoadTile(this.map, altar);
@@ -792,6 +877,8 @@ export class Game {
     }
     if (this.menace) this._moveMenaceCreature(dt);
     if (this.blessings.length) this._updateBlessings(dt);
+    if (this.crews.length) this._updateCrews(dt);
+    this._updateVigils(dt);
   }
 
   // --- Animation, one call per frame (dt already scaled by game speed) ---

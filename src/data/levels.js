@@ -36,7 +36,7 @@ export const LEVELS = [
       title: 'A Shadow from the Sea', ga: 'Scáth ón Fharraige',
       body: [
         'Your túath is renowned; poets sing of it, and a hero has answered your hearth. Yet renown draws darkness as surely as light.',
-        'Out of the northern mist comes a thing of the Fomhóraigh — a giant that levels all in its path, hearth and hall and standing-stone alike, as Balor’s brood once harrowed Ériu.',
+        'Out of the northern mist comes an Ollphéist — a great serpent of the deep places that levels all in its path, hearth and hall and standing-stone alike, as the old worms harrowed Ériu before the saints drove them under.',
         'No walls will hold it. Muster your folk and your summoned champion, and stand between the menace and your people. Hold the ráth, or lose everything you have raised.',
       ],
     },
@@ -45,7 +45,7 @@ export const LEVELS = [
     id: 3, title: 'The Menace', ga: 'An Sceimhle',
     objectives: [
       { text: 'Muster a war-band to meet the menace', check: (g, c) => (c.roster && Object.values(c.roster).reduce((a, b) => a + b, 0) >= 4) },
-      { text: 'Repel the Fomorian menace', check: (g, c) => c._menaceRepelled === true },
+      { text: 'Drive off the Ollphéist', check: (g, c) => c._menaceRepelled === true },
     ],
     next: {
       emoji: '👑', motif: 'linear-gradient(160deg,#3a2f10,#7a5a1e)',

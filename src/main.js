@@ -311,15 +311,15 @@ function placeMenace() {
   let cx = 16, cz = 14;
   if (game.buildings.length) { let sx = 0, sz = 0; for (const b of game.buildings) { sx += b.x; sz += b.z; } cx = Math.round(sx / game.buildings.length) + 5; cz = Math.round(sz / game.buildings.length) - 1; }
   game.spawnMenace(cx, cz, 4, 4);
-  flashNotice('☠️ A Fomorian giant strides out of the mist. Tap the giant when your war-band is ready to march on it.');
+  flashNotice('☠️ An Ollphéist — a great serpent — comes writhing out of the mist. Tap it when your war-band is ready to march on it.');
 }
 function warbandSize() { return campaign.roster ? Object.values(campaign.roster).reduce((a, b) => a + b, 0) : 0; }
 function updateMenaceButton() {} // the menace is now met by tapping it, not a HUD button
-// Tap the Fomor to consider marching on it.
+// Tap the Ollphéist to consider marching on it.
 function menaceHtml() {
   const wb = warbandSize();
-  return `<h3>The Fomor</h3><div class="role">an Fomhórach · the menace</div>` +
-    `<p>A Fomorian giant lays waste to this ground. Nothing may be built where it treads, and its blight creeps outward with every turn of the year.</p>` +
+  return `<h3>The Ollphéist</h3><div class="role">an Ollphéist · the menace</div>` +
+    `<p>A great serpent lays waste to this ground. Nothing may be built where it coils, and its blight creeps outward with every turn of the year.</p>` +
     `<p class="dim">Your war-band numbers ${wb}. You need at least four to march.</p>` +
     `<button id="menace-march" class="continue-btn"${wb >= 4 ? '' : ' disabled'}>⚔ March on the Menace</button>`;
 }
@@ -941,7 +941,10 @@ function commitRoad() {
   for (const p of pendingRoad) {
     if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = opt.kind; changed = true; }
   }
-  if (changed) { view.rebuildRoads(); saveSettlement(); }
+  if (changed) {
+    view.rebuildRoads(); saveSettlement();
+    if (opt.kind === 'deaglan') game.roadCrew(pendingRoad.slice()); // Deaglán & his dog come out to lay his path
+  }
   cancelPending();
 }
 
