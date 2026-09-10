@@ -940,13 +940,13 @@ function commitRoad() {
   const deag = opt.kind === 'deaglan';
   const laid = [];
   for (const p of pendingRoad) {
-    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) { t.roadKind = opt.kind; if (deag) t.roadHidden = true; } laid.push(p); }
+    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = opt.kind; laid.push(p); }
   }
   if (laid.length) {
     view.rebuildRoads(); saveSettlement();
-    // Deaglán & his dog come out to lay his path — the tiles stay hidden until he
-    // digs each one in, appearing behind him as he goes.
-    if (deag) game.roadCrew(laid, (tile) => { const t = map.get(tile.x, tile.z); if (t) t.roadHidden = false; view.rebuildRoads(); });
+    // Deaglán & his dog come out to lay his path — most is built, but he shovels
+    // in the gaps; the crew hides/reveals those squares as he digs.
+    if (deag) game.roadCrew(laid, (tile, hidden) => { const t = map.get(tile.x, tile.z); if (t) t.roadHidden = hidden; view.rebuildRoads(); });
   }
   cancelPending();
 }
@@ -1557,8 +1557,8 @@ if (typeof location !== 'undefined' && /[?&]dev\b/.test(location.search)) {
   window.__ardri = { game, map, view,
     layDeaglanRoad(tiles) {
       const laid = [];
-      for (const p of tiles) { if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) { t.roadKind = 'deaglan'; t.roadHidden = true; } laid.push(p); } }
-      if (laid.length) { view.rebuildRoads(); game.roadCrew(laid, (tile) => { const t = map.get(tile.x, tile.z); if (t) t.roadHidden = false; view.rebuildRoads(); }); }
+      for (const p of tiles) { if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = 'deaglan'; laid.push(p); } }
+      if (laid.length) { view.rebuildRoads(); game.roadCrew(laid, (tile, hidden) => { const t = map.get(tile.x, tile.z); if (t) t.roadHidden = hidden; view.rebuildRoads(); }); }
       return laid.length;
     } };
 }

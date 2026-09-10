@@ -706,11 +706,23 @@ export class Game {
   }
 
   // Deaglán the path-maker and his dog Finn come out when you lay one of his
-  // roads: he walks its length, stops once to dig it in (his shovel), and Finn
-  // races up and down the whole length testing it — then the two slip away.
-  roadCrew(path, onReveal) {
+  // roads. Most of the path is already built — but two or three squares in every
+  // eight are left undug; Deaglán walks the road and shovels each gap in as he
+  // reaches it. Finn runs the length testing it, and stops to watch every time
+  // Deaglán digs. Then the two slip away.
+  roadCrew(path, setHidden) {
     if (!path || path.length < 2) return;
     const tiles = path.map((p) => ({ x: p.x, z: p.z }));
+    // Pick the gaps: 2–3 random squares per window of eight (never the start
+    // tile). Those are hidden now; the rest of the road stands built.
+    const digSet = new Set();
+    for (let w = 0; w < tiles.length; w += 8) {
+      const idxs = [];
+      for (let k = Math.max(w, 1); k < Math.min(w + 8, tiles.length); k++) idxs.push(k);
+      const want = Math.min(idxs.length, 2 + (Math.random() < 0.5 ? 0 : 1));
+      for (let n = 0; n < want && idxs.length; n++) digSet.add(idxs.splice((Math.random() * idxs.length) | 0, 1)[0]);
+    }
+    if (setHidden) for (const k of digSet) setHidden(tiles[k], true);
     const w0 = this.map.tileToWorld(tiles[0].x, tiles[0].z);
     // deaglan/finn have no _f set, so force female:false; Finn the dog rides at
     // half a person's height.
@@ -718,27 +730,23 @@ export class Game {
     const deagDig = makeWalkerChip('deaglan_dig', false); deagDig.visible = false;
     const finn = makeWalkerChip('finn_run', false, 0.65);
     for (const c of [deagWalk, deagDig, finn]) { c.position.set(w0.x, 0.05, w0.z); this.crewGroup.add(c); }
-    this.crews.push({ tiles, onReveal, deagWalk, deagDig, finn, di: 0, dt: 0,
-      digAt: 1 + ((Math.random() * Math.max(1, tiles.length - 1)) | 0), dug: false, digging: false, digT: 0,
-      fi: 0, fdir: 1, ft: 0, revealed: -1, leaving: false, fade: 0 });
+    this.crews.push({ tiles, digSet, setHidden, deagWalk, deagDig, finn, di: 0, dt: 0,
+      digging: false, digT: 0, fi: 0, fdir: 1, ft: 0, leaving: false, fade: 0 });
   }
-  _crewReveal(cr, k) { if (k > cr.revealed && cr.tiles[k]) { cr.revealed = k; if (cr.onReveal) cr.onReveal(cr.tiles[k]); } }
   _crewMove(chip, a, b, k) {
     const wa = this.map.tileToWorld(a.x, a.z), wb = this.map.tileToWorld(b.x, b.z);
     chip.position.set(wa.x + (wb.x - wa.x) * k, 0.05, wa.z + (wb.z - wa.z) * k);
     if (chip.faceWorld && (b.x !== a.x || b.z !== a.z)) chip.faceWorld(b.x - a.x, b.z - a.z);
   }
   _updateCrews(dt) {
-    const DEAG_SPEED = 2.0, FINN_SPEED = 4.5, TS = this.map.tile;
+    const DEAG_SPEED = 1.0, FINN_SPEED = 2.25, DIG_TIME = 2.6; // half the old pace — a calm, watchable build
     for (let i = this.crews.length - 1; i >= 0; i--) {
       const cr = this.crews[i], T = cr.tiles, last = T.length - 1;
-      // Finn sits by Deaglán while he digs; otherwise he runs the length testing it.
+      // Finn runs the length, but stops to watch whenever Deaglán is digging.
       if (cr.digging && !cr.leaving) {
         const wt = this.map.tileToWorld(T[cr.di].x, T[cr.di].z);
-        const fx = wt.x + TS * 0.42, fz = wt.z + TS * 0.30;
-        cr.finn.position.set(fx, 0.05, fz);
-        if (cr.finn.faceWorld) cr.finn.faceWorld(wt.x - fx, wt.z - fz); // look back at his master
-        if (cr.finn.animate) cr.finn.animate(dt, false); // stopped — sits and waits
+        if (cr.finn.faceWorld) cr.finn.faceWorld(wt.x - cr.finn.position.x, wt.z - cr.finn.position.z); // turn and watch
+        if (cr.finn.animate) cr.finn.animate(dt, false); // stopped, watching
       } else {
         cr.ft += dt * FINN_SPEED;
         while (cr.ft >= 1) { cr.ft -= 1; cr.fi += cr.fdir; if (cr.fi >= last) { cr.fi = last; cr.fdir = -1; } else if (cr.fi <= 0) { cr.fi = 0; cr.fdir = 1; } }
@@ -748,10 +756,10 @@ export class Game {
       cr.deagWalk.visible = !cr.digging; cr.deagDig.visible = cr.digging;
       if (cr.leaving) {
         cr.fade += dt;
-        const o = Math.max(0, 1 - cr.fade * 1.3);
+        const o = Math.max(0, 1 - cr.fade * 0.9);
         for (const c of [cr.deagWalk, cr.deagDig, cr.finn]) if (c.material) { c.material.transparent = true; c.material.opacity = o; }
         if (cr.deagWalk.animate) cr.deagWalk.animate(dt, true);
-        if (cr.fade >= 0.85) { for (const c of [cr.deagWalk, cr.deagDig, cr.finn]) this.crewGroup.remove(c); this.crews.splice(i, 1); }
+        if (cr.fade >= 1.2) { for (const c of [cr.deagWalk, cr.deagDig, cr.finn]) this.crewGroup.remove(c); this.crews.splice(i, 1); }
         continue;
       }
       if (cr.digging) {
@@ -759,17 +767,19 @@ export class Game {
         cr.deagDig.position.set(wt.x, 0.05, wt.z);
         if (cr.deagDig.animate) cr.deagDig.animate(dt, true);
         cr.digT -= dt;
-        if (cr.digT <= 0) { cr.digging = false; cr.dug = true; } // the square he dug is revealed as he walks off it
+        if (cr.digT <= 0) { cr.digging = false; cr.digSet.delete(cr.di); if (cr.setHidden) cr.setHidden(T[cr.di], false); } // the gap is dug in
         continue;
       }
-      if (cr.di >= last) { this._crewReveal(cr, last); cr.leaving = true; continue; } // dig in the final square, then go
+      if (cr.di >= last) { // done — fill any gap he somehow skipped, then go
+        if (cr.setHidden) for (const k of cr.digSet) cr.setHidden(T[k], false);
+        cr.digSet.clear(); cr.leaving = true; continue;
+      }
       cr.dt += dt * DEAG_SPEED;
       this._crewMove(cr.deagWalk, T[cr.di], T[cr.di + 1], Math.min(cr.dt, 1));
       if (cr.deagWalk.animate) cr.deagWalk.animate(dt, true);
       if (cr.dt >= 1) {
         cr.dt = 0; cr.di += 1;
-        this._crewReveal(cr, cr.di - 1); // the square he just finished fills in behind him
-        if (!cr.dug && cr.di === cr.digAt) { cr.digging = true; cr.digT = 1.6; }
+        if (cr.digSet.has(cr.di)) { cr.digging = true; cr.digT = DIG_TIME; } // stand on the gap and dig it in
       }
     }
   }
