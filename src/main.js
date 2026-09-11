@@ -201,11 +201,22 @@ function startMission(n) {
 // from the 🗺 map when you choose, and raiders answer in their own time.
 function startCampaign() {
   if (!campaign.home) { openKingdomMap('choose', 'intro'); return; } // first pick a home, then the opening tale
-  if (campaign.nextIsDefend) { campaign.nextIsDefend = false; saveCampaign(); ui.showFestival({ name: 'Raiders on the Wind', emoji: '🔥', sub: 'Word comes two seasons early: a war-band marches on your ráth. Muster the folk and hold the field.', onDone: () => enterBattle('defend') }); return; }
-  enterSettlement();
+  enterSettlement(); // raiders you provoked now give you warning — see the countdown banner; the defence fires when it runs out
 }
 // Drop into the standing ráth — the clock starts because the title is hidden.
-function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); }
+function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); }
+
+// --- Raiders give warning now: a provoked war-band marches on your ráth after a
+// short countdown, so you can muster and ready your defences before they arrive.
+const RAID_WARNING_DAYS = 12; // two months' grace
+let _raidBannerEl = null;
+function updateRaidBanner() {
+  const n = campaign.raidIn || 0;
+  if (!_raidBannerEl) { _raidBannerEl = document.createElement('div'); _raidBannerEl.id = 'raid-banner'; document.getElementById('ui-overlay').appendChild(_raidBannerEl); }
+  if (n > 0) { _raidBannerEl.innerHTML = `⚔ Raiders on the march — <b>${n}</b> day${n === 1 ? '' : 's'} to muster and ready the ráth`; _raidBannerEl.classList.add('show'); }
+  else _raidBannerEl.classList.remove('show');
+}
+function scheduleRaid() { campaign.raidIn = RAID_WARNING_DAYS; campaign.nextIsDefend = false; saveCampaign(); updateRaidBanner(); }
 
 // A brief, non-blocking banner for seasonal news (colony tribute, revolts).
 let _noticeEl = null, _noticeT = 0;
@@ -258,6 +269,8 @@ if (!campaign.hosted) campaign.hosted = {};
 if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won by raiding further afield — each a full ráth of its own
 if (!campaign.active) campaign.active = 'home'; // which settlement is loaded: 'home' or a colony's region id
 if (campaign.yearsElapsed == null) campaign.yearsElapsed = 0; // festivals are announced only for the first three years
+if (campaign.raidIn == null) campaign.raidIn = 0; // days until a provoked war-band arrives (0 = none pending)
+if (campaign.nextIsDefend) { campaign.raidIn = campaign.raidIn || 12; campaign.nextIsDefend = false; } // migrate old instant-defend saves to the countdown
 for (const c of campaign.colonies) { if (c.folk == null) c.folk = 0; if (c.settlement === undefined) c.settlement = null; } // fields for buildable colonies
 if (campaign.raidsWon == null) campaign.raidsWon = 0; // won raids drive the map-era chapter unlocks (levels 4+)
 for (const h of ['cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan']) delete campaign.roster[h]; // heroes/gods are summoned, not owned — clean any legacy grant
@@ -639,7 +652,7 @@ function kingdomAction() {
   if (!kg.sel) return;
   if (kg.mode === 'war') {
     if (kg.enter) { const t = kg.enter; closeKingdomMap(); switchSettlement(t); enterSettlement(); return; } // enter home / a colony to build it
-    campaign.target = kg.sel; campaign._raidFar = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(kg.sel); campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); enterBattle('attack'); return;
+    campaign.target = kg.sel; campaign._raidFar = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(kg.sel); scheduleRaid(); closeKingdomMap(); enterBattle('attack'); return;
   }
   campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery);
   if (kg.then === 'war') { openKingdomMap('war'); return; } // ride out to raid
@@ -702,6 +715,14 @@ function advanceDay() {
   if (game.broke && !wasBroke) triggerAdvisor();
   pushStats();
   updateDate();
+  // Provoked raiders close in: count down the days, then fall on the ráth.
+  if (campaign.raidIn > 0) {
+    campaign.raidIn -= 1; saveCampaign(); updateRaidBanner();
+    if (campaign.raidIn === 0) {
+      pauseGame();
+      ui.showFestival({ name: 'Raiders at the Gate', emoji: '🔥', sub: `The war-band you provoked falls upon your ráth, ${leaderName()}. Muster the folk and hold the field.`, onDone: () => enterBattle('defend') });
+    }
+  }
   if (started) saveSettlement(); // persist the standing ráth (herd growth, economy) each day
 }
 
