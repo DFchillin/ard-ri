@@ -284,9 +284,10 @@ const hurling = new Hurling({
   onClose: () => { resumeGame(); },
 });
 function openHurling() { pauseGame(); ui.hideInspect(); hurling.open(campaign.roster, campaign.hosted); }
+const HURL_CHANCE = 1 / 3; // one in three each season a band comes calling (this runs on the season turn)
 function maybeHurlChallenge() {
   if (campaign.hurlChallenge || !game.hurlingField()) return;
-  if (Math.random() < 0.34) {
+  if (Math.random() < HURL_CHANCE) {
     campaign.hurlChallenge = true; game.setHurlChallenge(true); saveCampaign();
     flashNotice('🏑 A wandering band of hurlers waits at your field, spoiling for a challenge. Tap the hurling field to meet them.');
   }
