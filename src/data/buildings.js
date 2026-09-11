@@ -33,6 +33,8 @@ export const BUILDINGS = {
     desc: 'An fhaiche dála — the assembly-green where the breitheamh gives judgment from the seat of stones under the Fénechas, the old law. Its people walk the roads and settle the streets they pass with the confidence of a just túath.' },
   healer_well: { label: 'Healer’s Well', sprite: 'roundhouse', art: 'healer_well', states: 4, drawW: 4.0, icon: '🌿', footprint: [4, 4], cost: 30, role: 'culture', unlockLevel: 7,
     desc: 'Teach an leighis is an tobar naofa — the healer’s hut beside the sacred well, hung with drying herbs. The lucht leighis carry cure and clean water out along the roads and raise the heart of every home they tend.' },
+  monument: { label: 'Hurling Monument', sprite: 'altar', art: 'gallan', states: 4, drawW: 2.8, icon: '🏆', footprint: [2, 2], cost: 20, role: 'monument', needsWin: true,
+    desc: 'A carved pillar raised for a hurling victory over a wandering band. While it stands, pride in the ráth lifts the harvest — grain and apples come in a fifth more plentiful.' },
   homestead: { label: 'Leader’s Homestead', sprite: 'roundhouse', art: 'longhouse', states: 4, icon: '🐄', footprint: [3, 3], cost: 30, role: 'homestead', unique: true, folk: 2, unlockLevel: 2,
     desc: 'Your own ráth and the seat of your rule. Cattle — the true measure of a king — graze the open pasture around it and multiply. Wealth to send in tribute or trade for what Ériu cannot make, and the prize a raider drives off.' },
 };
@@ -43,7 +45,7 @@ export const CATEGORIES = [
   { id: 'homes', icon: '🏠', label: 'Homes', items: ['homestead', 'roundhouse'] },
   { id: 'farming', icon: '🌾', label: 'Farming', items: ['field', 'orchard', 'granary', 'sciobolmor'] },
   { id: 'services', icon: '🏛️', label: 'Services', items: ['market', 'aonach', 'well', 'altar'] },
-  { id: 'culture', icon: '🎶', label: 'Culture', items: ['feast_hall', 'hurling_field', 'nemeton', 'gallan', 'wrestling_ring', 'brehon_court', 'healer_well'] },
+  { id: 'culture', icon: '🎶', label: 'Culture', items: ['feast_hall', 'hurling_field', 'nemeton', 'gallan', 'wrestling_ring', 'brehon_court', 'healer_well', 'monument'] },
 ];
 
 export const ROAD_ITEM = { key: 'road', label: 'Road', icon: '🛣️', cost: 0,

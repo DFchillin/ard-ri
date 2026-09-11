@@ -189,6 +189,7 @@ export class UI {
     const def = SPECIAL_ITEMS[key] || BUILDINGS[key];
     if (!def) return true;
     if (def.unlockLevel && (this.level || 1) < def.unlockLevel) return true;
+    if (def.needsWin && !this.hurlWon) return true; // the monument is a hurling-challenge prize
     if (def.unique && this.builtCount && this.builtCount(def.role) > 0) return true;
     return false;
   }

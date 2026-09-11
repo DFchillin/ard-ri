@@ -8,6 +8,7 @@ import { UI } from './ui.js?v=CBUST';
 import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=CBUST';
 import { setCamera } from './render/assets.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
+import { Hurling } from './hurling.js?v=CBUST';
 import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById } from './data/kingdoms.js?v=CBUST';
 import { CODEX } from './data/codex.js?v=CBUST';
 import { UNIT_TYPES } from './battle/units.js?v=CBUST';
@@ -204,7 +205,7 @@ function startCampaign() {
   enterSettlement(); // raiders you provoked now give you warning — see the countdown banner; the defence fires when it runs out
 }
 // Drop into the standing ráth — the clock starts because the title is hidden.
-function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); }
+function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); game.setHurlChallenge(campaign.hurlChallenge); }
 
 // --- Raiders give warning now: a provoked war-band marches on your ráth after a
 // short countdown, so you can muster and ready your defences before they arrive.
@@ -270,6 +271,26 @@ if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won
 if (!campaign.active) campaign.active = 'home'; // which settlement is loaded: 'home' or a colony's region id
 if (campaign.yearsElapsed == null) campaign.yearsElapsed = 0; // festivals are announced only for the first three years
 if (campaign.raidIn == null) campaign.raidIn = 0; // days until a provoked war-band arrives (0 = none pending)
+if (campaign.hurlChallenge == null) campaign.hurlChallenge = false; // a wandering band waits at the hurling field
+if (campaign.monumentWon == null) campaign.monumentWon = false; // won the hurling challenge → may raise a monument
+ui.hurlWon = campaign.monumentWon; // the monument is a build-menu prize
+// --- The hurling challenge: a wandering band, a shootout of points, a monument ---
+const hurling = new Hurling({
+  onResolve: (won) => {
+    campaign.hurlChallenge = false; game.setHurlChallenge(false);
+    if (won) { campaign.monumentWon = true; ui.hurlWon = true; ui.refreshBuildMenu(); flashNotice('🏆 The field is yours! Raise a Monument from the Culture menu — while it stands the harvest is a fifth more plentiful.'); }
+    saveCampaign();
+  },
+  onClose: () => { resumeGame(); },
+});
+function openHurling() { pauseGame(); ui.hideInspect(); hurling.open(campaign.roster, campaign.hosted); }
+function maybeHurlChallenge() {
+  if (campaign.hurlChallenge || !game.hurlingField()) return;
+  if (Math.random() < 0.34) {
+    campaign.hurlChallenge = true; game.setHurlChallenge(true); saveCampaign();
+    flashNotice('🏑 A wandering band of hurlers waits at your field, spoiling for a challenge. Tap the hurling field to meet them.');
+  }
+}
 if (campaign.nextIsDefend) { campaign.raidIn = campaign.raidIn || 12; campaign.nextIsDefend = false; } // migrate old instant-defend saves to the countdown
 for (const c of campaign.colonies) { if (c.folk == null) c.folk = 0; if (c.settlement === undefined) c.settlement = null; } // fields for buildable colonies
 if (campaign.raidsWon == null) campaign.raidsWon = 0; // won raids drive the map-era chapter unlocks (levels 4+)
@@ -697,6 +718,7 @@ function advanceDay() {
     const s = seasonOfMonth(cal.month);
     if (s !== curSeason) {
       curSeason = s; applySeason(s); collectColonyTribute(); // colonies render tribute each turn of the year
+      maybeHurlChallenge(); // a wandering band of hurlers may come calling
       if (campaign.level === 3 && game.hasMenace()) { game.expandMenace(); saveSettlement(); flashNotice('☠️ The blight creeps outward, devouring more of your land. Muster and march before it takes all.'); }
     }
     if (cal.month === 0) { campaign.yearsElapsed = (campaign.yearsElapsed || 0) + 1; saveCampaign(); } // a full turn of the year
@@ -1273,6 +1295,11 @@ function inspectAt(e) {
     if (!tile.occupant) { ui.showInspect(terrainHtml(tile), false); return; }
     inst = tile.occupant;
   }
+  if (inst.key === 'hurling_field' && campaign.hurlChallenge) {
+    ui.showInspect(`<h3>Hurling Field</h3><div class="role">A challenge waits</div><p>A wandering band of hurlers has come to test your ráth. Field three strikers and meet them in a shootout of points — win it and raise a monument to the day.</p><button id="hurl-go" class="continue-btn">🏑 Meet the challengers</button>`, false);
+    const b = document.getElementById('hurl-go'); if (b) b.addEventListener('click', openHurling);
+    return;
+  }
   ui.showInspect(buildingHtml(inst), false);
   if (inst.def.role === 'dwelling') _inspectDwelling = inst; // keep its meters live
   if (inst.def.role === 'altar') wireAltar();
@@ -1575,7 +1602,7 @@ frame();
 // Dev-only handle (activated with ?dev in the URL) for testing/inspection — inert
 // for normal players. Exposes the world and a helper to lay a Deaglán road.
 if (typeof location !== 'undefined' && /[?&]dev\b/.test(location.search)) {
-  window.__ardri = { game, map, view,
+  window.__ardri = { game, map, view, hurling, openHurling, campaign,
     layDeaglanRoad(tiles) {
       const laid = [];
       for (const p of tiles) { if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = 'deaglan'; laid.push(p); } }

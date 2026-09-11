@@ -177,6 +177,8 @@ export class Game {
   count(role) { return this.buildings.filter((b) => b.def.role === role).length; }
   anyStock(role) { return this.buildings.some((b) => b.def.role === role && b.stock > 0); }
   _storeHasRoom() { return this.buildings.some((b) => b.def.role === 'granary' && b.stock < GRANARY_CAP); }
+  // A hurling monument lifts the harvest a fifth while it stands (grain & apples).
+  _farmBoost() { return this.buildings.some((b) => b.def.role === 'monument') ? 1.2 : 1; }
 
   // Half the folk are able workers — the rest are children and elders.
   workforce() { return Math.floor(this.folk * 0.5); }
@@ -554,7 +556,7 @@ export class Game {
   _sendGrain(farm) {
     const entry = entryRoadTile(this.map, farm);
     if (!entry) return;
-    let load = farm.def.load;
+    let load = Math.round(farm.def.load * this._farmBoost());
     this._spawn(entry, {
       type: 'grain_carrier', label: 'G', steps: 26, speed: 2.4, source: farm,
       onTile: (x, z) => {
@@ -609,6 +611,24 @@ export class Game {
       const n = b.def.festivalRevellers || 0;
       if (!n || !entryRoadTile(this.map, b) || this.folk <= 0) continue;
       for (let i = 0; i < n; i++) this._sendCultureRaiser(b);
+    }
+  }
+
+  // Show (or clear) the three wandering hurlers waiting at the hurling field when
+  // a challenge is pending — small figures clustered at the near edge of the pitch.
+  hurlingField() { return this.buildings.find((b) => b.key === 'hurling_field') || null; }
+  setHurlChallenge(on) {
+    if (this._hurlChips) { for (const c of this._hurlChips) if (c.parent) c.parent.remove(c); this._hurlChips = null; }
+    const field = on ? this.hurlingField() : null;
+    if (!field || !field.sprite) return;
+    this._hurlChips = [];
+    const TS = this.map.tile;
+    for (let i = 0; i < 3; i++) {
+      const chip = makeWalkerChip('villager', i === 1, 0.95); // a wee waiting band
+      chip.position.set((i - 1) * TS * 0.5, 0.05, -TS * 0.7);
+      if (chip.faceWorld) chip.faceWorld(0, 1);
+      field.sprite.add(chip);
+      this._hurlChips.push(chip);
     }
   }
 
