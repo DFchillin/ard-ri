@@ -177,14 +177,18 @@
     </div>
   </div>
 
-  <div id="hurling-screen" class="modal hidden">
-    <div class="hurl-wrap">
-      <div class="codex-head">
-        <h2>Iomáint · The Hurling Challenge</h2>
-        <button id="hurl-close">✕</button>
-      </div>
-      <div id="hurl-body"></div>
+  <div id="hurling-screen" class="hidden">
+    <div id="hurl-hud" class="hidden">
+      <div id="hurl-score"></div>
+      <button id="hurl-close" title="Leave the match">✕</button>
     </div>
+    <div id="hurl-pick-card"></div>
+    <div id="hurl-bottom" class="hidden">
+      <div id="hurl-status"></div>
+      <div id="hurl-meter" class="hurl-meter"><div class="sweet" id="hurl-sweet"></div><div class="mk" id="hurl-mk"></div></div>
+      <button id="hurl-strike" class="continue-btn">STRIKE!</button>
+    </div>
+    <div id="hurl-result" class="hidden"></div>
   </div>
 
   <div id="kingdoms-screen" class="modal hidden">
