@@ -12,7 +12,7 @@ import { UNIT_TYPES } from './battle/units.js?v=CBUST';
 
 const SWEET = { god: 0.40, hero: 0.36, special: 0.26, seasoned: 0.24, warrior: 0.21, regular: 0.17 };
 const CHALLENGER_ODDS = 0.55;
-const CINE_IN = 1.25, CINE_OUT = 0.85, SET_HOLD = 0.35; // cinematic pan-in, pull-out, and the beat we hold before the strike
+const CINE_IN = 1.2, CINE_OUT = 0.85, SET_HOLD = 1.6; // cinematic pan-in, pull-out, and the beat we settle down there before the strike
 const WALK = { villager: 'villager', water: 'water_carrier', grain: 'grain_carrier', deaglan: 'market_trader', druid: 'druid' };
 const GOD_KEYS = new Set(['dagda', 'morrigan', 'lugh', 'nuada', 'manannan', 'brigid', 'cuchulainn', 'fionn']);
 
@@ -52,7 +52,7 @@ function linesTexture() {
 // A sliotar: the leather ball art, pale hide with dark seams.
 function makeBall() {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('assets/props/sliotar.png'), transparent: true, depthWrite: false }));
-  s.scale.set(0.44, 0.44, 1); s.renderOrder = 3; s.visible = false; return s;
+  s.scale.set(0.82, 0.82, 1); s.renderOrder = 3; s.visible = false; return s;
 }
 
 export class Hurling {
@@ -245,9 +245,12 @@ export class Hurling {
     const fov = 2 * Math.atan(c.userData.viewSize / pos.distanceTo(look)) * 180 / Math.PI;
     return { pos, look, fov };
   }
-  // The over-the-shoulder pose: low behind the shooter, looking along the pitch at the goal.
+  // The over-the-shoulder pose: low behind the shooter and a little to one side (a
+  // slight azimuth offset gives the shot depth and reads the angle to the goal),
+  // looking along the pitch at the posts.
   _otsPose(shooter) {
-    return { pos: new THREE.Vector3(shooter.x * 0.5, 1.75, shooter.z + 2.1), look: new THREE.Vector3(0, BAR_Y + 0.25, GOAL_Z + 1.6), fov: 42 };
+    const side = this._camSide || 0;
+    return { pos: new THREE.Vector3(shooter.x * 0.5 + side * 1.7, 1.7, shooter.z + 2.2), look: new THREE.Vector3(side * 0.5, BAR_Y + 0.25, GOAL_Z + 1.6), fov: 42 };
   }
   _startCine(from, to, dur, onDone) {
     this._pcA.pos.copy(from.pos); this._pcA.look.copy(from.look); this._pcA.fov = from.fov;
@@ -372,6 +375,7 @@ export class Hurling {
     this.meterEl.classList.add('hidden'); this.strikeBtn.classList.add('hidden');
     this.striker.faceWorld && this.striker.faceWorld(0, -1);
     this._pendingHit = hit; this._shooter = this.striker; this._shooterPos = this.striker.position;
+    this._camSide = Math.random() < 0.5 ? -1 : 1; // view a little off to one side for perspective
     // cinematic pan from the iso view down behind the shoulder, THEN take the shot
     this._status('The field falls quiet — line up the shot…');
     this._beginStrikeCam(this.striker.position, () => { this._hold = SET_HOLD; this.phase = 'set'; });
@@ -385,6 +389,7 @@ export class Hurling {
     if (this.challenger.faceWorld) this.challenger.faceWorld(0, -1);
     this._pendingHit = Math.random() < CHALLENGER_ODDS;
     this._shooter = this.challenger; this._shooterPos = this.challenger.position; this._replying = true;
+    this._camSide = Math.random() < 0.5 ? -1 : 1;
     this._status('The challenger steps up to reply…');
     this._beginStrikeCam(this.challenger.position, () => { this._hold = SET_HOLD; this.phase = 'set'; });
     this.phase = 'cine';
@@ -404,7 +409,7 @@ export class Hurling {
     else if (Math.random() < 0.5) target = new THREE.Vector3((Math.random() < 0.5 ? -1 : 1) * (POST_X + 0.8), BAR_Y + 0.4, GOAL_Z);
     else target = new THREE.Vector3((Math.random() - 0.5) * 1.4, 0.6, GOAL_Z + 3.2);
     this._ballFrom = new THREE.Vector3(from.x, 1.3, from.z - 0.3);
-    this._ballTo = target; this._ballT = 0; this._ballDur = 0.95; this._ballPeak = 2.6;
+    this._ballTo = target; this._ballT = 0; this._ballDur = 1.15; this._ballPeak = 2.6;
     this.ball.visible = true; this.ball.position.copy(this._ballFrom);
     this.phase = 'fly';
   }
@@ -414,7 +419,7 @@ export class Hurling {
     const p = this._ballFrom.clone().lerp(this._ballTo, t);
     p.y += this._ballPeak * 4 * t * (1 - t);
     this.ball.position.copy(p);
-    this.ball.material.rotation += dt * 12;
+    this.ball.material.rotation += dt * 8;
     if (this._ballT >= 1) { this.ball.visible = false; this._onLand(); }
   }
   _onLand() {
