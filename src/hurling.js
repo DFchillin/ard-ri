@@ -52,7 +52,7 @@ function linesTexture() {
 // A sliotar: the leather ball art, pale hide with dark seams.
 function makeBall() {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('assets/props/sliotar.png'), transparent: true, depthWrite: false }));
-  s.scale.set(0.82, 0.82, 1); s.renderOrder = 3; s.visible = false; return s;
+  s.scale.set(0.55, 0.55, 1); s.renderOrder = 3; s.visible = false; return s;
 }
 
 export class Hurling {
@@ -249,8 +249,11 @@ export class Hurling {
   // slight azimuth offset gives the shot depth and reads the angle to the goal),
   // looking along the pitch at the posts.
   _otsPose(shooter) {
-    const side = this._camSide || 0;
-    return { pos: new THREE.Vector3(shooter.x * 0.5 + side * 1.7, 1.7, shooter.z + 2.2), look: new THREE.Vector3(side * 0.5, BAR_Y + 0.25, GOAL_Z + 1.6), fov: 42 };
+    const side = this._camSide || 1;
+    // Well off to one side and a little higher, looking at the goal centre. Perspective
+    // then parallaxes the near striker into the corner of frame (even a tall god only
+    // takes the corner), keeping a clear sightline to the posts and the ball's flight.
+    return { pos: new THREE.Vector3(shooter.x * 0.5 + side * 2.9, 2.15, shooter.z + 2.7), look: new THREE.Vector3(0, BAR_Y + 0.35, GOAL_Z + 1.6), fov: 42 };
   }
   _startCine(from, to, dur, onDone) {
     this._pcA.pos.copy(from.pos); this._pcA.look.copy(from.look); this._pcA.fov = from.fov;
