@@ -378,7 +378,8 @@ export class Hurling {
     this.meterEl.classList.add('hidden'); this.strikeBtn.classList.add('hidden');
     this.striker.faceWorld && this.striker.faceWorld(0, -1);
     this._pendingHit = hit; this._shooter = this.striker; this._shooterPos = this.striker.position;
-    this._camSide = Math.random() < 0.5 ? -1 : 1; // view a little off to one side for perspective
+    this._camSide = Math.random() < 0.5 ? -1 : 1; // view off to one side for perspective
+    this.team.forEach((m) => { m.chip.visible = (m.chip === this.striker); }); // solo the shooter so no team-mate's head blocks the goal
     // cinematic pan from the iso view down behind the shoulder, THEN take the shot
     this._status('The field falls quiet — line up the shot…');
     this._beginStrikeCam(this.striker.position, () => { this._hold = SET_HOLD; this.phase = 'set'; });
@@ -387,7 +388,7 @@ export class Hurling {
 
   _challengerShoot() {
     this.striker && (this.striker.visible = false);
-    // keep the current striker's team on the bench, bring the challenger to the spot
+    this.team.forEach((m) => { m.chip.visible = false; }); // solo the challenger — clear the field for a clean sightline
     this.challenger.visible = true; this.challenger.position.set(0, 0.05, SPOT_Z);
     if (this.challenger.faceWorld) this.challenger.faceWorld(0, -1);
     this._pendingHit = Math.random() < CHALLENGER_ODDS;
