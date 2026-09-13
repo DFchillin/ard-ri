@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { createIsoCamera, resizeIsoCamera } from './iso_camera.js?v=CBUST';
+import { createIsoCamera, resizeIsoCamera, panIsoCamera, zoomIsoCamera } from './iso_camera.js?v=CBUST';
 import { makeWarriorChip, makeWalkerChip } from './render/chips.js?v=CBUST';
+import { tex } from './render/assets.js?v=CBUST';
 import { UNIT_TYPES } from './battle/units.js?v=CBUST';
 
 // The hurling challenge — a penalty-shootout minigame on a small isometric pitch,
@@ -14,7 +15,9 @@ const CHALLENGER_ODDS = 0.55;
 const WALK = { villager: 'villager', water: 'water_carrier', grain: 'grain_carrier', deaglan: 'market_trader', druid: 'druid' };
 const GOD_KEYS = new Set(['dagda', 'morrigan', 'lugh', 'nuada', 'manannan', 'brigid', 'cuchulainn', 'fionn']);
 
-const SPOT_Z = 5.5, GOAL_Z = -6.5, POST_X = 1.7, BAR_Y = 2.0, POST_H = 4.0;
+const PITCH_W = 9, PITCH_L = 18;                 // world size (X, Z)
+const SPOT_Z = 5.5, GOAL_Z = -8.2;               // striker spot; goal line (near the far edge)
+const POST_X = 1.3, BAR_Y = 1.35, POST_H = 2.7;  // a smaller goal that sits in the small box
 
 function spriteSrc(type) {
   const t = UNIT_TYPES[type];
@@ -29,35 +32,38 @@ function chipFor(type) {
   return makeWalkerChip((t && t.sprite) || WALK[type] || 'villager', false);
 }
 
-function pitchTexture() {
+// A transparent line overlay laid just above the grass: mown stripes + white
+// markings + the goal boxes at the far (top) end, matching the world layout.
+function linesTexture() {
   const c = document.createElement('canvas'); c.width = 256; c.height = 512;
   const x = c.getContext('2d');
-  const g = x.createLinearGradient(0, 0, 0, 512); g.addColorStop(0, '#356a2e'); g.addColorStop(1, '#2b5626');
-  x.fillStyle = g; x.fillRect(0, 0, 256, 512);
-  // mown stripes down the pitch
-  x.fillStyle = 'rgba(255,255,255,0.04)';
-  for (let i = 0; i < 512; i += 40) x.fillRect(0, i, 256, 20);
-  x.strokeStyle = 'rgba(240,244,230,0.8)'; x.lineWidth = 3;
-  x.strokeRect(12, 12, 232, 488);            // sideline box
+  for (let i = 0; i < 512; i += 44) { x.fillStyle = (i / 44) % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'; x.fillRect(0, i, 256, 22); }
+  x.strokeStyle = 'rgba(244,248,234,0.85)'; x.lineWidth = 3; x.lineJoin = 'round';
+  x.strokeRect(12, 10, 232, 492);                 // sideline box
   x.beginPath(); x.moveTo(12, 256); x.lineTo(244, 256); x.stroke(); // halfway line
-  // small square + large rectangle at the goal end (top)
-  x.strokeRect(78, 12, 100, 34);
-  x.strokeRect(44, 12, 168, 80);
+  x.strokeRect(88, 12, 80, 40);                   // small square at the goal
+  x.strokeRect(60, 12, 136, 74);                  // large rectangle
   x.beginPath(); x.moveTo(12, 120); x.lineTo(244, 120); x.stroke(); // 45 line
-  // point spot
-  x.fillStyle = 'rgba(240,244,230,0.85)'; x.beginPath(); x.arc(128, 150, 4, 0, Math.PI * 2); x.fill();
+  x.fillStyle = 'rgba(244,248,234,0.9)'; x.beginPath(); x.arc(128, 150, 4, 0, Math.PI * 2); x.fill(); // point spot
   const tx = new THREE.CanvasTexture(c); tx.anisotropy = 4; return tx;
 }
 
+// A sliotar: pale leather with a raised rust seam and stitching.
 function makeBall() {
-  const c = document.createElement('canvas'); c.width = c.height = 24;
+  const c = document.createElement('canvas'); c.width = c.height = 40;
   const x = c.getContext('2d');
-  x.fillStyle = '#f4efe2'; x.beginPath(); x.arc(12, 12, 10, 0, Math.PI * 2); x.fill();
-  x.strokeStyle = '#c9b98a'; x.lineWidth = 1.5; x.beginPath(); x.arc(12, 12, 10, 0, Math.PI * 2); x.stroke();
-  x.beginPath(); x.moveTo(5, 8); x.quadraticCurveTo(12, 12, 19, 8); x.stroke();
+  const g = x.createRadialGradient(15, 13, 3, 20, 20, 19);
+  g.addColorStop(0, '#fbf6ea'); g.addColorStop(0.7, '#eadfc6'); g.addColorStop(1, '#c9b78e');
+  x.fillStyle = g; x.beginPath(); x.arc(20, 20, 18, 0, Math.PI * 2); x.fill();
+  x.strokeStyle = '#b7a373'; x.lineWidth = 1.5; x.beginPath(); x.arc(20, 20, 18, 0, Math.PI * 2); x.stroke();
+  // the seam
+  x.strokeStyle = '#a6432a'; x.lineWidth = 2.4; x.beginPath(); x.moveTo(6, 14); x.quadraticCurveTo(20, 24, 34, 14); x.stroke();
+  // stitches across the seam
+  x.strokeStyle = '#7c2f1e'; x.lineWidth = 1.1;
+  for (let i = 0; i <= 6; i++) { const t = i / 6, px = 6 + (34 - 6) * t, py = 14 + Math.sin(Math.PI * t) * 5; x.beginPath(); x.moveTo(px, py - 2.6); x.lineTo(px, py + 2.6); x.stroke(); }
   const tx = new THREE.CanvasTexture(c);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true }));
-  s.scale.set(0.42, 0.42, 1); s.visible = false; return s;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true, depthWrite: false }));
+  s.scale.set(0.4, 0.4, 1); s.visible = false; return s;
 }
 
 export class Hurling {
@@ -69,6 +75,8 @@ export class Hurling {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1c2a17);
     this.camera = createIsoCamera(9.5, this.aspect);
+    this.home = { vs: 9.5, px: 0, pz: 0 };   // the resting framing (follows the player's own pan/zoom)
+    this.camGoal = { ...this.home };          // what the camera is easing toward
     this.scene.add(new THREE.HemisphereLight(0xcfe0c4, 0x3a4a2c, 1.25));
     const sun = new THREE.DirectionalLight(0xf6f2e2, 1.2); sun.position.set(30, 60, 20); this.scene.add(sun);
     this._buildPitch();
@@ -95,21 +103,49 @@ export class Hurling {
   }
 
   _buildPitch() {
-    const g = new THREE.Group();
-    const pitch = new THREE.Mesh(
-      new THREE.PlaneGeometry(9, 18),
-      new THREE.MeshLambertMaterial({ map: pitchTexture() })
-    );
-    pitch.rotation.x = -Math.PI / 2; pitch.position.y = 0.01; g.add(pitch);
-    // goal: two posts + crossbar at the far end
+    const g = new THREE.Group(); this.scene.add(g);
+    // grass: the pasture terrain tile, repeated. Load an independent copy (not the
+    // shared cached one) so setting repeat/wrap here can't disturb the settlement.
+    const grassTex = new THREE.TextureLoader().load('assets/terrain/tiles/pasture.png');
+    grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping; grassTex.repeat.set(4, 8); grassTex.anisotropy = 4;
+    const grass = new THREE.Mesh(new THREE.PlaneGeometry(PITCH_W, PITCH_L),
+      new THREE.MeshLambertMaterial({ map: grassTex, color: 0x8fb070 }));
+    grass.rotation.x = -Math.PI / 2; grass.position.y = 0; g.add(grass);
+    // painted lines, just above the grass
+    const lines = new THREE.Mesh(new THREE.PlaneGeometry(PITCH_W, PITCH_L),
+      new THREE.MeshBasicMaterial({ map: linesTexture(), transparent: true, depthWrite: false }));
+    lines.rotation.x = -Math.PI / 2; lines.position.y = 0.02; g.add(lines);
+    // goal: two posts + crossbar at the goal line, sitting in the small box
     const white = new THREE.MeshLambertMaterial({ color: 0xeee6d0 });
-    const post = () => new THREE.Mesh(new THREE.BoxGeometry(0.16, POST_H, 0.16), white);
+    const post = () => new THREE.Mesh(new THREE.BoxGeometry(0.13, POST_H, 0.13), white);
     const pl = post(), pr = post();
     pl.position.set(-POST_X, POST_H / 2, GOAL_Z); pr.position.set(POST_X, POST_H / 2, GOAL_Z);
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(POST_X * 2 + 0.16, 0.14, 0.14), white);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(POST_X * 2 + 0.13, 0.12, 0.12), white);
     bar.position.set(0, BAR_Y, GOAL_Z);
     g.add(pl, pr, bar);
-    this.scene.add(g);
+    this._buildCrowd(g);
+  }
+
+  // A small crowd of townsfolk, single stand-frames, ringing the pitch so it looks
+  // like the whole túath has turned out. Static, and they share a few textures so
+  // the whole ring is cheap.
+  _buildCrowd(parent) {
+    const faces = ['s', 'se', 'sw'];
+    const bases = ['villager', 'villager_f', 'grain_carrier', 'water_carrier', 'market_trader', 'druid'];
+    const mats = [];
+    for (const b of bases) for (const d of faces) mats.push(new THREE.SpriteMaterial({ map: tex(`assets/walkers/${b}/${d}_stand.png`), transparent: true, alphaTest: 0.12 }));
+    const pick = () => mats[(Math.random() * mats.length) | 0];
+    const place = (x, z) => {
+      const s = new THREE.Sprite(pick()); s.center.set(0.5, 0);
+      s.scale.set(0.8, 1.0, 1); s.position.set(x + (Math.random() - 0.5) * 0.3, 0.02, z + (Math.random() - 0.5) * 0.3);
+      parent.add(s);
+    };
+    const halfW = PITCH_W / 2 + 0.7, halfL = PITCH_L / 2 + 0.6;
+    for (let r = 0; r < 2; r++) {
+      const ox = halfW + r * 0.85, oz = halfL + r * 0.85;
+      for (let z = -halfL; z <= halfL; z += 0.95) { place(-ox, z); place(ox, z); }        // sidelines
+      for (let x = -halfW; x <= halfW; x += 0.95) { place(x, -oz); place(x, oz); }          // ends
+    }
   }
 
   // --- lifecycle ---
@@ -117,7 +153,7 @@ export class Hurling {
     this.avail = this._shooters(roster, hosted);
     this.picks = []; this.pScore = 0; this.cScore = 0; this.round = 0;
     this.active = true; this.phase = 'pick';
-    this.resize(window.innerWidth / window.innerHeight);
+    this.aspect = window.innerWidth / window.innerHeight; this._resetCam();
     this.screen.classList.remove('hidden');
     document.body.classList.add('in-hurling');
     this.hud.classList.add('hidden'); this.bottom.classList.add('hidden'); this.resultEl.classList.add('hidden');
@@ -135,6 +171,32 @@ export class Hurling {
   }
   resize(aspect) { this.aspect = aspect; resizeIsoCamera(this.camera, aspect); }
   render(renderer) { renderer.render(this.scene, this.camera); }
+
+  // --- camera: drag to scroll, wheel/± to zoom, and a smooth ease each frame ---
+  _resetCam() {
+    const c = this.camera; c.userData.pan.x = 0; c.userData.pan.z = 0; c.userData.viewSize = 9.5;
+    resizeIsoCamera(c, this.aspect);
+    this.home = { vs: 9.5, px: 0, pz: 0 }; this.camGoal = { ...this.home };
+  }
+  pointerDown(e) { this._drag = { x: e.clientX, y: e.clientY }; }
+  pointerMove(e) { if (!this._drag) return; this._pan(e.clientX - this._drag.x, e.clientY - this._drag.y); this._drag = { x: e.clientX, y: e.clientY }; }
+  pointerUp() { this._drag = null; }
+  zoom(factor) { zoomIsoCamera(this.camera, factor, this.aspect); this.home.vs = this.camGoal.vs = this.camera.userData.viewSize; }
+  _pan(dx, dy) {
+    const cam = this.camera;
+    const f = new THREE.Vector3(); cam.getWorldDirection(f); f.y = 0; f.normalize();
+    const r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize();
+    const wpp = (2 * cam.userData.viewSize) / window.innerHeight;
+    const mx = -dx * wpp, my = dy * wpp;
+    panIsoCamera(cam, r.x * mx + f.x * my, r.z * mx + f.z * my);
+    const p = cam.userData.pan; this.home = { vs: cam.userData.viewSize, px: p.x, pz: p.z }; this.camGoal = { ...this.home };
+  }
+  _applyCam(dt) {
+    const cam = this.camera, g = this.camGoal, k = Math.min(1, dt * 4.2);
+    if (Math.abs(g.vs - cam.userData.viewSize) > 0.01) { cam.userData.viewSize += (g.vs - cam.userData.viewSize) * k; resizeIsoCamera(cam, this.aspect); }
+    const p = cam.userData.pan, dx = (g.px - p.x) * k, dz = (g.pz - p.z) * k;
+    if (Math.abs(dx) > 0.0004 || Math.abs(dz) > 0.0004) panIsoCamera(cam, dx, dz);
+  }
 
   _clearChips() {
     for (const c of this.chipGroup.children.slice()) this.chipGroup.remove(c);
@@ -215,6 +277,7 @@ export class Hurling {
     this.striker.faceWorld && this.striker.faceWorld(0, -1);
     if (this.striker.strike) this.striker.strike();
     this._pendingHit = hit; this._launchIn = 0.26; this._shooterPos = this.striker.position;
+    this.camGoal = { vs: 5.0, px: 0, pz: 2.6 }; // ease in behind the striker's shoulder to show the angle
     this.phase = 'wind';
   }
 
@@ -253,6 +316,7 @@ export class Hurling {
   }
   _onLand() {
     const hit = this._pendingHit;
+    this.camGoal = { ...this.home }; // ease back out to the wide pitch view
     if (this._replying) { if (hit) this.cScore++; this._replying = false; this._updateScore(); this._status(hit ? 'Over the bar — a point to them.' : 'Wide! No score to the challengers.'); this._gap = 1.1; this._after = () => { this.round++; this._nextRound(); }; }
     else { if (hit) this.pScore++; this._updateScore(); this._status(hit ? 'OVER THE BAR — a point!' : 'Wide! It drifts past the post.'); this._gap = 0.9; this._after = () => this._challengerShoot(); }
     this.phase = 'gap';
@@ -278,6 +342,7 @@ export class Hurling {
   // --- driven by the main render loop while active ---
   update(dt) {
     if (!this.active) return;
+    this._applyCam(dt);
     for (const c of this.chipGroup.children) if (c.animate) c.animate(dt, false);
     if (this.phase === 'aim') {
       this.mkT += this.mkDir * this.mkSpeed * dt;
