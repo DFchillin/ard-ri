@@ -1588,7 +1588,7 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
   if (battle.active) { setCamera(battle.camera); battle.update(dt); battle.render(renderer); return; }
-  if (hurling.active) { setCamera(hurling.camera); hurling.update(dt); hurling.render(renderer); return; }
+  if (hurling.active) { setCamera(hurling.renderCam()); hurling.update(dt); hurling.render(renderer); return; }
   setCamera(camera);
   // The world-clock runs whenever the settlement is the scene you're looking at
   // (title hidden, not in battle). Festivals/menus still pause via sim.speed.
