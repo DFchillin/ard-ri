@@ -12,6 +12,7 @@ import { UNIT_TYPES } from './battle/units.js?v=CBUST';
 
 const SWEET = { god: 0.40, hero: 0.36, special: 0.26, seasoned: 0.24, warrior: 0.21, regular: 0.17 };
 const CHALLENGER_ODDS = 0.55;
+const CINE_IN = 1.25, CINE_OUT = 0.85, SET_HOLD = 0.35; // cinematic pan-in, pull-out, and the beat we hold before the strike
 const WALK = { villager: 'villager', water: 'water_carrier', grain: 'grain_carrier', deaglan: 'market_trader', druid: 'druid' };
 const GOD_KEYS = new Set(['dagda', 'morrigan', 'lugh', 'nuada', 'manannan', 'brigid', 'cuchulainn', 'fionn']);
 
@@ -48,22 +49,10 @@ function linesTexture() {
   const tx = new THREE.CanvasTexture(c); tx.anisotropy = 4; return tx;
 }
 
-// A sliotar: pale leather with a raised rust seam and stitching.
+// A sliotar: the leather ball art, pale hide with dark seams.
 function makeBall() {
-  const c = document.createElement('canvas'); c.width = c.height = 40;
-  const x = c.getContext('2d');
-  const g = x.createRadialGradient(15, 13, 3, 20, 20, 19);
-  g.addColorStop(0, '#fbf6ea'); g.addColorStop(0.7, '#eadfc6'); g.addColorStop(1, '#c9b78e');
-  x.fillStyle = g; x.beginPath(); x.arc(20, 20, 18, 0, Math.PI * 2); x.fill();
-  x.strokeStyle = '#b7a373'; x.lineWidth = 1.5; x.beginPath(); x.arc(20, 20, 18, 0, Math.PI * 2); x.stroke();
-  // the seam
-  x.strokeStyle = '#a6432a'; x.lineWidth = 2.4; x.beginPath(); x.moveTo(6, 14); x.quadraticCurveTo(20, 24, 34, 14); x.stroke();
-  // stitches across the seam
-  x.strokeStyle = '#7c2f1e'; x.lineWidth = 1.1;
-  for (let i = 0; i <= 6; i++) { const t = i / 6, px = 6 + (34 - 6) * t, py = 14 + Math.sin(Math.PI * t) * 5; x.beginPath(); x.moveTo(px, py - 2.6); x.lineTo(px, py + 2.6); x.stroke(); }
-  const tx = new THREE.CanvasTexture(c);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true, depthWrite: false }));
-  s.scale.set(0.4, 0.4, 1); s.renderOrder = 3; s.visible = false; return s;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('assets/props/sliotar.png'), transparent: true, depthWrite: false }));
+  s.scale.set(0.44, 0.44, 1); s.renderOrder = 3; s.visible = false; return s;
 }
 
 export class Hurling {
@@ -77,14 +66,16 @@ export class Hurling {
     this.camera = createIsoCamera(9.5, this.aspect);
     this.home = { vs: 9.5, px: 0, pz: 0 };   // the resting framing (follows the player's own pan/zoom)
     this.camGoal = { ...this.home };          // what the camera is easing toward
-    // A real 3D camera used only for the shot: it swings in behind the striker and
-    // looks down the pitch at the goal, so the billboards turn to show the strike.
+    // A real 3D camera used only for the shot. It starts matched to the iso framing,
+    // then makes one continuous cinematic move down behind the striker's shoulder,
+    // looking along the pitch at the goal — so the swing reads as a smooth pan, not a
+    // cut, and the billboards turn to show the strike.
     this.persp = new THREE.PerspectiveCamera(42, this.aspect, 0.1, 1000);
     this._strikeCam = false;
-    this._pc = { pos: new THREE.Vector3(), look: new THREE.Vector3() };
-    this._pcFrom = { pos: new THREE.Vector3(), look: new THREE.Vector3() };
-    this._pcTo = { pos: new THREE.Vector3(), look: new THREE.Vector3() };
-    this._pcT = 1;
+    this._pc = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 42 };
+    this._pcA = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 42 };
+    this._pcB = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 42 };
+    this._cine = null; // { t, dur, ease, onDone }
     this.scene.add(new THREE.HemisphereLight(0xcdd8c6, 0x445536, 1.15));
     const sun = new THREE.DirectionalLight(0xf6f2e2, 1.15); sun.position.set(30, 60, 20); this.scene.add(sun);
     this._buildPitch();
@@ -245,31 +236,56 @@ export class Hurling {
     panIsoCamera(cam, r.x * mx + f.x * my, r.z * mx + f.z * my);
     const p = cam.userData.pan; this.home = { vs: cam.userData.viewSize, px: p.x, pz: p.z }; this.camGoal = { ...this.home };
   }
-  // Swing the 3D strike camera in behind the shooter, aimed down the pitch at the goal.
-  _beginStrikeCam(shooter) {
-    this._strikeCam = true;
-    const sx = shooter.x * 0.5;
-    this._pcFrom.pos.set(sx, 3.3, shooter.z + 4.4);   // wide and high, just behind
-    this._pcTo.pos.set(sx, 1.75, shooter.z + 2.1);    // low, over the shoulder
-    const look = new THREE.Vector3(0, BAR_Y + 0.25, GOAL_Z + 1.6);
-    this._pcFrom.look.copy(look); this._pcTo.look.copy(look);
-    this._pc.pos.copy(this._pcFrom.pos); this._pc.look.copy(this._pcFrom.look);
-    this._pcT = 0; this._applyPersp();
+  // A perspective pose that reproduces the current iso framing, so the cinematic
+  // move can begin from exactly what the player is already looking at (no cut).
+  _isoMatchPose() {
+    const c = this.camera; c.updateMatrixWorld(true);
+    const pos = c.position.clone();
+    const look = new THREE.Vector3(c.userData.pan.x, 0, c.userData.pan.z);
+    const fov = 2 * Math.atan(c.userData.viewSize / pos.distanceTo(look)) * 180 / Math.PI;
+    return { pos, look, fov };
   }
-  _endStrikeCam() { this._strikeCam = false; }
-  _applyPersp() { this.persp.position.copy(this._pc.pos); this.persp.lookAt(this._pc.look); }
+  // The over-the-shoulder pose: low behind the shooter, looking along the pitch at the goal.
+  _otsPose(shooter) {
+    return { pos: new THREE.Vector3(shooter.x * 0.5, 1.75, shooter.z + 2.1), look: new THREE.Vector3(0, BAR_Y + 0.25, GOAL_Z + 1.6), fov: 42 };
+  }
+  _startCine(from, to, dur, onDone) {
+    this._pcA.pos.copy(from.pos); this._pcA.look.copy(from.look); this._pcA.fov = from.fov;
+    this._pcB.pos.copy(to.pos); this._pcB.look.copy(to.look); this._pcB.fov = to.fov;
+    this._pc.pos.copy(from.pos); this._pc.look.copy(from.look); this._pc.fov = from.fov;
+    this._applyPersp();
+    this._cine = { t: 0, dur, onDone: onDone || null };
+  }
+  _stepCine(dt) {
+    const cn = this._cine; if (!cn) return;
+    cn.t = Math.min(cn.dur, cn.t + dt);
+    const x = cn.t / cn.dur, e = x * x * (3 - 2 * x); // smoothstep ease-in-out
+    this._pc.pos.lerpVectors(this._pcA.pos, this._pcB.pos, e);
+    this._pc.look.lerpVectors(this._pcA.look, this._pcB.look, e);
+    this._pc.fov = this._pcA.fov + (this._pcB.fov - this._pcA.fov) * e;
+    this._applyPersp();
+    if (cn.t >= cn.dur) { this._cine = null; if (cn.onDone) cn.onDone(); }
+  }
+  _applyPersp() {
+    this.persp.position.copy(this._pc.pos); this.persp.lookAt(this._pc.look);
+    if (Math.abs(this.persp.fov - this._pc.fov) > 0.001) { this.persp.fov = this._pc.fov; this.persp.updateProjectionMatrix(); }
+  }
+  // Begin the shot: switch to the 3D camera matched to the iso view, then pan smoothly
+  // down behind the shooter. `onArrive` fires once the pan settles (then we take the shot).
+  _beginStrikeCam(shooter, onArrive) {
+    this._strikeCam = true;
+    const from = this._isoMatchPose();
+    this.persp.fov = from.fov; this.persp.updateProjectionMatrix();
+    this._startCine(from, this._otsPose(shooter), CINE_IN, onArrive);
+  }
+  // Pull the 3D camera back to the iso framing, then hand control to the ortho camera.
+  _endStrikeCam() {
+    const from = { pos: this._pc.pos.clone(), look: this._pc.look.clone(), fov: this._pc.fov };
+    this._startCine(from, this._isoMatchPose(), CINE_OUT, () => { this._strikeCam = false; });
+  }
 
   _applyCam(dt) {
-    if (this._strikeCam) {
-      if (this._pcT < 1) {
-        this._pcT = Math.min(1, this._pcT + dt * 1.05);
-        const e = this._pcT * this._pcT * (3 - 2 * this._pcT); // smoothstep dolly-in
-        this._pc.pos.lerpVectors(this._pcFrom.pos, this._pcTo.pos, e);
-        this._pc.look.lerpVectors(this._pcFrom.look, this._pcTo.look, e);
-        this._applyPersp();
-      }
-      return;
-    }
+    if (this._strikeCam) { this._stepCine(dt); return; }
     const cam = this.camera, g = this.camGoal, k = Math.min(1, dt * 4.2);
     if (Math.abs(g.vs - cam.userData.viewSize) > 0.01) { cam.userData.viewSize += (g.vs - cam.userData.viewSize) * k; resizeIsoCamera(cam, this.aspect); }
     const p = cam.userData.pan, dx = (g.px - p.x) * k, dz = (g.pz - p.z) * k;
@@ -355,10 +371,11 @@ export class Hurling {
     const hit = Math.abs(this.mkT - this.swC) <= this.sw / 2;
     this.meterEl.classList.add('hidden'); this.strikeBtn.classList.add('hidden');
     this.striker.faceWorld && this.striker.faceWorld(0, -1);
-    if (this.striker.strike) this.striker.strike();
-    this._pendingHit = hit; this._launchIn = 0.26; this._shooterPos = this.striker.position;
-    this._beginStrikeCam(this.striker.position); // swing the 3D camera in to show the shot at goal
-    this.phase = 'wind';
+    this._pendingHit = hit; this._shooter = this.striker; this._shooterPos = this.striker.position;
+    // cinematic pan from the iso view down behind the shoulder, THEN take the shot
+    this._status('The field falls quiet — line up the shot…');
+    this._beginStrikeCam(this.striker.position, () => { this._hold = SET_HOLD; this.phase = 'set'; });
+    this.phase = 'cine';
   }
 
   _challengerShoot() {
@@ -366,12 +383,17 @@ export class Hurling {
     // keep the current striker's team on the bench, bring the challenger to the spot
     this.challenger.visible = true; this.challenger.position.set(0, 0.05, SPOT_Z);
     if (this.challenger.faceWorld) this.challenger.faceWorld(0, -1);
-    if (this.challenger.strike) this.challenger.strike();
-    this._pendingHit = Math.random() < CHALLENGER_ODDS; this._launchIn = 0.26;
-    this._shooterPos = this.challenger.position; this._replying = true;
-    this._beginStrikeCam(this.challenger.position); // same 3D shot cam as our team
-    this._status('The challenger strikes from the same spot…');
-    this.phase = 'wind';
+    this._pendingHit = Math.random() < CHALLENGER_ODDS;
+    this._shooter = this.challenger; this._shooterPos = this.challenger.position; this._replying = true;
+    this._status('The challenger steps up to reply…');
+    this._beginStrikeCam(this.challenger.position, () => { this._hold = SET_HOLD; this.phase = 'set'; });
+    this.phase = 'cine';
+  }
+
+  // the pan has settled — swing the hurley, then the ball launches a beat later
+  _release() {
+    if (this._shooter && this._shooter.strike) this._shooter.strike();
+    this._launchIn = 0.3; this.phase = 'wind';
   }
 
   _launchBall() {
@@ -430,6 +452,8 @@ export class Hurling {
       if (this.mkT >= 1) { this.mkT = 1; this.mkDir = -1; } else if (this.mkT <= 0) { this.mkT = 0; this.mkDir = 1; }
       const j = this.shaky ? (Math.random() - 0.5) * 0.04 : 0;
       this.mkEl.style.left = Math.max(0, Math.min(1, this.mkT + j)) * 100 + '%';
+    } else if (this.phase === 'set') {
+      this._hold -= dt; if (this._hold <= 0) this._release();
     } else if (this.phase === 'wind') {
       this._launchIn -= dt; if (this._launchIn <= 0) this._launchBall();
     } else if (this.phase === 'fly') {
