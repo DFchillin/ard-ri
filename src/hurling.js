@@ -77,8 +77,8 @@ export class Hurling {
     this.camera = createIsoCamera(9.5, this.aspect);
     this.home = { vs: 9.5, px: 0, pz: 0 };   // the resting framing (follows the player's own pan/zoom)
     this.camGoal = { ...this.home };          // what the camera is easing toward
-    this.scene.add(new THREE.HemisphereLight(0xcfe0c4, 0x3a4a2c, 1.25));
-    const sun = new THREE.DirectionalLight(0xf6f2e2, 1.2); sun.position.set(30, 60, 20); this.scene.add(sun);
+    this.scene.add(new THREE.HemisphereLight(0xcdd8c6, 0x445536, 1.15));
+    const sun = new THREE.DirectionalLight(0xf6f2e2, 1.15); sun.position.set(30, 60, 20); this.scene.add(sun);
     this._buildPitch();
     this.chipGroup = new THREE.Group(); this.scene.add(this.chipGroup);
     this.ball = makeBall(); this.scene.add(this.ball);
@@ -107,9 +107,11 @@ export class Hurling {
     // grass: the pasture terrain tile, repeated. Load an independent copy (not the
     // shared cached one) so setting repeat/wrap here can't disturb the settlement.
     const grassTex = new THREE.TextureLoader().load('assets/terrain/tiles/pasture.png');
-    grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping; grassTex.repeat.set(4, 8); grassTex.anisotropy = 4;
+    grassTex.colorSpace = THREE.SRGBColorSpace;                    // tag as sRGB or it washes out to flat lime
+    grassTex.magFilter = grassTex.minFilter = THREE.NearestFilter; grassTex.generateMipmaps = false;  // crisp pixel-art, matching the battlefield turf
+    grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping; grassTex.repeat.set(4, 8);
     const grass = new THREE.Mesh(new THREE.PlaneGeometry(PITCH_W, PITCH_L),
-      new THREE.MeshLambertMaterial({ map: grassTex, color: 0x8fb070 }));
+      new THREE.MeshLambertMaterial({ map: grassTex }));
     grass.rotation.x = -Math.PI / 2; grass.position.y = 0; g.add(grass);
     // painted lines, just above the grass
     const lines = new THREE.Mesh(new THREE.PlaneGeometry(PITCH_W, PITCH_L),
@@ -117,10 +119,10 @@ export class Hurling {
     lines.rotation.x = -Math.PI / 2; lines.position.y = 0.02; g.add(lines);
     // goal: two posts + crossbar at the goal line, sitting in the small box
     const white = new THREE.MeshLambertMaterial({ color: 0xeee6d0 });
-    const post = () => new THREE.Mesh(new THREE.BoxGeometry(0.13, POST_H, 0.13), white);
+    const post = () => new THREE.Mesh(new THREE.BoxGeometry(0.17, POST_H, 0.17), white);
     const pl = post(), pr = post();
     pl.position.set(-POST_X, POST_H / 2, GOAL_Z); pr.position.set(POST_X, POST_H / 2, GOAL_Z);
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(POST_X * 2 + 0.13, 0.12, 0.12), white);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(POST_X * 2 + 0.17, 0.15, 0.15), white);
     bar.position.set(0, BAR_Y, GOAL_Z);
     g.add(pl, pr, bar);
     this._buildCrowd(g);
