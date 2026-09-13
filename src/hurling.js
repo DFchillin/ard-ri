@@ -196,15 +196,41 @@ export class Hurling {
     this._clearChips();
     this.onClose();
   }
-  resize(aspect) { this.aspect = aspect; resizeIsoCamera(this.camera, aspect); this.persp.aspect = aspect; this.persp.updateProjectionMatrix(); }
+  resize(aspect) {
+    this.aspect = aspect;
+    resizeIsoCamera(this.camera, aspect);
+    this.persp.aspect = aspect; this.persp.updateProjectionMatrix();
+    // Re-frame to fit the new screen shape (e.g. the phone turned portrait ↔ landscape),
+    // easing there rather than snapping — but never yank the camera mid-shot.
+    if (this.active && !this._strikeCam) { const vs = this._fitViewSize(aspect); this.home = { vs, px: 0, pz: 0 }; this.camGoal = { ...this.home }; }
+  }
   renderCam() { return this._strikeCam ? this.persp : this.camera; }
   render(renderer) { renderer.render(this.scene, this.renderCam()); }
 
   // --- camera: drag to scroll, wheel/± to zoom, and a smooth ease each frame ---
   _resetCam() {
-    const c = this.camera; c.userData.pan.x = 0; c.userData.pan.z = 0; c.userData.viewSize = 9.5;
-    resizeIsoCamera(c, this.aspect);
-    this.home = { vs: 9.5, px: 0, pz: 0 }; this.camGoal = { ...this.home };
+    const c = this.camera; c.userData.dir = 0; c.userData.pan.x = 0; c.userData.pan.z = 0;
+    panIsoCamera(c, 0, 0); // reapply the pose at pan 0 and refresh matrices
+    const vs = this._fitViewSize(this.aspect);
+    c.userData.viewSize = vs; resizeIsoCamera(c, this.aspect);
+    this.home = { vs, px: 0, pz: 0 }; this.camGoal = { ...this.home };
+  }
+  // Zoom the iso camera so the whole pitch, goal and crowd fit the current aspect.
+  // Portrait phones need a far wider view than landscape or the pitch runs off-screen,
+  // so we project the pitch's extreme points into camera space and size to enclose them.
+  _fitViewSize(aspect) {
+    const c = this.camera, saved = { x: c.userData.pan.x, z: c.userData.pan.z };
+    c.userData.pan.x = 0; c.userData.pan.z = 0; panIsoCamera(c, 0, 0); c.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(c.matrixWorld).invert(), p = new THREE.Vector3();
+    // Fit the playing area + goal (not the outer crowd) so the strikers stay as large
+    // as possible; the decorative crowd is allowed to bleed off the screen edges.
+    const ex = PITCH_W / 2 + 0.6, ez = PITCH_L / 2 + 0.8, pts = [];
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { pts.push([sx * ex, 0, sz * ez], [sx * ex, 1.7, sz * ez]); }
+    pts.push([0, POST_H, GOAL_Z], [POST_X, POST_H, GOAL_Z], [-POST_X, POST_H, GOAL_Z]);
+    let u = 0, v = 0;
+    for (const q of pts) { p.set(q[0], q[1], q[2]).applyMatrix4(inv); u = Math.max(u, Math.abs(p.x)); v = Math.max(v, Math.abs(p.y)); }
+    c.userData.pan.x = saved.x; c.userData.pan.z = saved.z; panIsoCamera(c, 0, 0);
+    return Math.max(3.5, Math.min(38, Math.max(v, u / aspect) * 1.03));
   }
   pointerDown(e) { this._drag = { x: e.clientX, y: e.clientY }; }
   pointerMove(e) { if (!this._drag) return; this._pan(e.clientX - this._drag.x, e.clientY - this._drag.y); this._drag = { x: e.clientX, y: e.clientY }; }
