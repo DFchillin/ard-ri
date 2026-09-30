@@ -23,6 +23,18 @@ const PIP_TEX = (() => {
   x.strokeStyle = 'rgba(35,22,12,0.55)'; x.lineWidth = 2.5; x.beginPath(); x.arc(24, 24, 20, 0, Math.PI * 2); x.stroke();
   const t = new THREE.CanvasTexture(c); return t;
 })();
+// A diamond bead — for grain arriving at a store or market, so the harvest coming
+// in off the fields reads differently from the round pips a home receives.
+const PIP_TEX_DIAMOND = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 48;
+  const x = c.getContext('2d');
+  x.translate(24, 24); x.rotate(Math.PI / 4);
+  const g = x.createLinearGradient(-16, -16, 16, 16);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0.85)');
+  x.fillStyle = g; x.fillRect(-15, -15, 30, 30);
+  x.strokeStyle = 'rgba(35,22,12,0.6)'; x.lineWidth = 3; x.strokeRect(-15, -15, 30, 30);
+  const t = new THREE.CanvasTexture(c); return t;
+})();
 import { entryRoadTile, adjacentBuildings, roadConnected, roadNeighbors } from './roads.js?v=CBUST';
 import { randomName } from '../data/names.js?v=CBUST';
 import { personFor } from '../data/phrases.js?v=CBUST';
@@ -559,12 +571,12 @@ export class Game {
     let load = Math.round(farm.def.load * this._farmBoost());
     this._spawn(entry, {
       type: 'grain_carrier', label: 'G', steps: 26, speed: 2.4, source: farm,
-      onTile: (x, z) => {
+      onTile: (x, z, w) => {
         if (load <= 0) return;
         for (const inst of adjacentBuildings(this.map, x, z)) {
           if (inst.def.role === 'granary' && inst.stock < GRANARY_CAP) { // stores fill to a cap
             const add = Math.min(load, GRANARY_CAP - inst.stock);
-            inst.stock += add; load -= add;
+            inst.stock += add; load -= add; this._storeFx(inst, w); // show the harvest landing in the store
             if (load <= 0) break;
           }
         }
@@ -857,6 +869,7 @@ export class Game {
         const take = Math.min(g.stock, MARKET_CAP - market.stock);
         g.stock -= take;
         market.stock += take;
+        if (take > 0) this._storeFx(market, null); // goods arriving at the market
         if (market.stock >= MARKET_CAP) break;
       }
     }
@@ -881,8 +894,8 @@ export class Game {
   }
 
   // One floating chip — a small soft coloured bead. `over` draws it above the smoke.
-  _floatie(x, y, z, kind, { sz = 0.1, vx = 0, vy = 1.0, vz = 0, life = 1.2, over = false } = {}) {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: PIP_TEX, color: PIP_COLOR[kind] || 0xffffff,
+  _floatie(x, y, z, kind, { sz = 0.1, vx = 0, vy = 1.0, vz = 0, life = 1.2, over = false, shape } = {}) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: shape === 'diamond' ? PIP_TEX_DIAMOND : PIP_TEX, color: PIP_COLOR[kind] || 0xffffff,
       transparent: true, opacity: 1, depthTest: !over, depthWrite: false }));
     if (over) s.renderOrder = 20; // drawn over the smoke, never occluded by it
     s.center.set(0.5, 0.5); s.scale.set(sz, sz, 1);
@@ -904,6 +917,23 @@ export class Game {
       for (let i = 0; i < 3; i++) {
         const b = Math.random() * Math.PI * 2, r = 0.4 + Math.random() * 0.5;
         this._floatie(w.x, 0.9 + Math.random() * 0.3, w.z, kind, { sz: 0.2, vx: Math.cos(b) * r, vz: Math.sin(b) * r, vy: 0.35, life: 0.7, over: true });
+      }
+    }
+  }
+
+  // A delivery of grain to a store or market — tiny yellow diamond chips, about
+  // half a home's pip, so the harvest coming in off the fields is visible on the
+  // roads. `walker` is the carrier that brought it (omitted for a store→market pull).
+  _storeFx(inst, walker) {
+    if (!inst.sprite || (inst._popCd || 0) > 0) return;
+    inst._popCd = 0.5;
+    const p = inst.sprite.position, a = Math.random() * Math.PI * 2;
+    this._floatie(p.x + Math.cos(a) * 0.5, 1.8, p.z + Math.sin(a) * 0.5, 'food', { sz: 0.14, vy: 0.9, life: 1.1, over: true, shape: 'diamond' });
+    if (walker && walker.sprite) {
+      const w = walker.sprite.position;
+      for (let i = 0; i < 2; i++) {
+        const b = Math.random() * Math.PI * 2, r = 0.3 + Math.random() * 0.4;
+        this._floatie(w.x, 0.9, w.z, 'food', { sz: 0.1, vx: Math.cos(b) * r, vz: Math.sin(b) * r, vy: 0.3, life: 0.6, over: true, shape: 'diamond' });
       }
     }
   }

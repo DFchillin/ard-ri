@@ -160,6 +160,11 @@ const battle = new Battle({
     ui.showFestival({ name: campaign._colonyWin ? 'A New Dál' : 'Victory!', emoji: campaign._colonyWin ? '🏴' : '🏆', sub });
     campaign._colonyWin = false;
   },
+  onDefeat: (info) => {
+    battleWon = false;
+    const sub = (info && info.sub) || 'Your slua is broken and scattered.';
+    ui.showFestival({ name: 'Defeat', emoji: '💀', sub: `${sub} The day is lost, ${leaderName()} — but a ráth can be raised again.`, onDone: () => { battle.exit(); } });
+  },
   onTruce: (cattle) => {
     battle.exit();
     if (cattle) setCattle(campaign.cattle - cattle);

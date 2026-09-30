@@ -73,11 +73,12 @@ const SCENARIOS = {
 let _uid = 0;
 
 export class Battle {
-  constructor({ onVictory, onExit, onTruce, onResolve } = {}) {
+  constructor({ onVictory, onExit, onTruce, onResolve, onDefeat } = {}) {
     this.onVictory = onVictory || (() => {});
     this.onExit = onExit || (() => {});
     this.onTruce = onTruce || (() => {});
     this.onResolve = onResolve || (() => {});
+    this.onDefeat = onDefeat || (() => {});
     this.fallen = [];
     this.active = false; this.phase = 'idle'; this.started = false;
     this.units = []; this.companies = []; this.buildings = []; this.selected = new Set();
@@ -705,7 +706,11 @@ export class Battle {
     document.querySelectorAll('#bs-formations [data-form]').forEach((b) => b.classList.toggle('on', arr.length === 1 && b.dataset.form === arr[0].formation));
   }
   _flashMuster(msg) { const el = document.getElementById('bs-flash'); el.textContent = msg; el.classList.remove('hidden'); clearTimeout(this._ft); this._ft = setTimeout(() => el.classList.add('hidden'), 2200); }
-  _defeat(msg) { const info = document.getElementById('bs-sel-info'); info.innerHTML = `<span class="rout">${msg}</span> <a id="bs-retry">Try again</a>`; document.getElementById('bs-retry').addEventListener('click', () => this.enter(this.scenario)); }
+  _defeat(msg) {
+    const info = document.getElementById('bs-sel-info'); info.innerHTML = `<span class="rout">${msg}</span> <a id="bs-retry">Try again</a>`; document.getElementById('bs-retry').addEventListener('click', () => this.enter(this.scenario));
+    // Make the loss unmistakable: a full-screen notice, not just an inline line.
+    this.onDefeat({ sub: msg, scenario: this.scenario });
+  }
 }
 
 // ---- visuals ----
