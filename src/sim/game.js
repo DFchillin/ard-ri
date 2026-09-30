@@ -232,8 +232,19 @@ export class Game {
     if (this.silver >= wages) { this.silver -= wages; this.broke = false; }
     else { this.silver = 0; this.broke = wages > 0; } // payroll unmet — public folk go unpaid
     for (const b of this.buildings) if (b.def.role === 'dwelling') this._dwellingDay(b, festival, newMonth);
+    for (const b of this.buildings) if (b.def.role === 'hall') this._hallDay(b);
     return { rent, wages, net: rent - wages, festival, broke: this.broke };
   }
+
+  // The Hall of Hosting drinks twice a dwelling's share of every offering. While
+  // all three flow it flourishes, and a hosted god will answer the muster.
+  _hallDay(b) {
+    b.food = Math.max(0, b.food - FOOD_DECAY * 2);
+    b.water = Math.max(0, b.water - WATER_DECAY * 2);
+    b.culture = Math.max(0, b.culture - CULTURE_DECAY * 2);
+  }
+  hall() { return this.buildings.find((b) => b.def.role === 'hall'); }
+  hallFlourishing() { const h = this.hall(); return !!(h && h.food > 0 && h.water > 0 && h.culture > 0); }
 
   // A home, once a day: its supply drains, it may lose a family to lasting want,
   // and its prosperity tier steps up at a festival (if it's thriving) or slips at
@@ -408,7 +419,9 @@ export class Game {
     const person = { name: randomName(female), female, ...personFor(opts.personType || opts.type) };
     const w = new Walker(this.map, entry, { ...opts, person });
     w.source = opts.source || null;
+    if (opts.tag) w.tag = opts.tag;
     if (opts.tint != null && w.sprite && w.sprite.material) w.sprite.material.color.setHex(opts.tint); // war-colour the hurling players
+    if (opts.opacity != null && w.sprite && w.sprite.material) { w.sprite.material.transparent = true; w.sprite.material.opacity = opts.opacity; } // spectral risen-dead
     this.walkers.push(w);
     this.walkerGroup.add(w.sprite);
   }
@@ -592,7 +605,7 @@ export class Game {
       type: 'water_carrier', label: 'W', steps: 24, speed: 2.6, source: well,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.water < HOUSE_CAP) { inst.water = HOUSE_CAP; this._deliverFx(inst, w, 'water'); } // one visit fills the home (~10 days)
+          if ((inst.def.role === 'dwelling' || inst.def.role === 'hall') && inst.water < HOUSE_CAP) { inst.water = HOUSE_CAP; this._deliverFx(inst, w, 'water'); } // one visit fills the home (~10 days)
         }
       },
     });
@@ -610,7 +623,7 @@ export class Game {
       tint: cw.war ? this.warTint : null,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) { inst.culture = HOUSE_CAP; this._deliverFx(inst, w, 'culture'); }
+          if ((inst.def.role === 'dwelling' || inst.def.role === 'hall') && inst.culture < HOUSE_CAP) { inst.culture = HOUSE_CAP; this._deliverFx(inst, w, 'culture'); }
         }
       },
     });
@@ -851,7 +864,7 @@ export class Game {
       type: 'druid', label: 'D', steps: 26, speed: 2.2, source: altar,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) { inst.culture = HOUSE_CAP; this._deliverFx(inst, w, 'culture'); } // one visit lifts the home (~5 days)
+          if ((inst.def.role === 'dwelling' || inst.def.role === 'hall') && inst.culture < HOUSE_CAP) { inst.culture = HOUSE_CAP; this._deliverFx(inst, w, 'culture'); } // one visit lifts the home (~5 days)
         }
       },
     });
@@ -883,7 +896,7 @@ export class Game {
       type: 'market_trader', label: 'M', steps: 24, speed: 2.6, source: market,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && market.stock > 0 && inst.food < HOUSE_CAP) {
+          if ((inst.def.role === 'dwelling' || inst.def.role === 'hall') && market.stock > 0 && inst.food < HOUSE_CAP) {
             inst.food = HOUSE_CAP; // fill the larder in one visit (~10 days)
             market.stock -= 1;
             this._deliverFx(inst, w, 'food');
@@ -957,7 +970,25 @@ export class Game {
   }
 
   // --- Animation, one call per frame (dt already scaled by game speed) ---
+  // For the seven days from Samhain the dead walk the ráth: risen warriors, pale
+  // and half-there, wander the roads. `deadWalk` is set from the calendar.
+  _spawnRisen() {
+    const homes = this.buildings.filter((b) => b.def.role === 'dwelling');
+    const src = homes.length ? homes[(Math.random() * homes.length) | 0] : this.buildings.find((b) => b.def.role);
+    if (!src) return;
+    const entry = entryRoadTile(this.map, src);
+    if (!entry) return;
+    this._spawn(entry, { type: 'vigil', personType: 'villager', steps: 46, speed: 1.35, tint: 0x9fb8ff, opacity: 0.55, tag: 'risen' });
+  }
+
   update(dt) {
+    if (this.deadWalk) {
+      this._deadWalkT = (this._deadWalkT || 0) - dt;
+      if (this._deadWalkT <= 0) {
+        this._deadWalkT = 2.4 + Math.random() * 2.6;
+        if (this.walkers.filter((w) => w.tag === 'risen').length < 6) this._spawnRisen();
+      }
+    }
     for (const w of this.walkers) w.update(dt);
     const alive = [];
     for (const w of this.walkers) {

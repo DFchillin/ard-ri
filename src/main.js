@@ -210,7 +210,7 @@ function startCampaign() {
   enterSettlement(); // raiders you provoked now give you warning — see the countdown banner; the defence fires when it runs out
 }
 // Drop into the standing ráth — the clock starts because the title is hidden.
-function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); game.setHurlChallenge(campaign.hurlChallenge); }
+function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); game.setHurlChallenge(campaign.hurlChallenge); game.deadWalk = (cal.month === 10 && cal.day <= 7); }
 
 // --- Raiders give warning now: a provoked war-band marches on your ráth after a
 // short countdown, so you can muster and ready your defences before they arrive.
@@ -234,6 +234,25 @@ function flashNotice(msg) {
 
 // --- Colonies: land won by raiding further afield (a Dál Riata), sending tribute home ---
 const NEIGHBOURS_OF = (id) => NEIGHBOURS[id] || [];
+
+// A named rival lord for each over-kingdom. One is always "rising" — his host
+// grows, notices name him, and he is the one whose war-band comes to the gate.
+const RIVALS = {
+  ailech: 'Muirchertach Mac Lochlainn', ulaid: 'Eochaid of the Ulaid', airgialla: 'Donnchadh Ua Cerbaill',
+  connacht: 'Ruaidrí Ua Conchobair', breifne: 'Tigernán Ua Ruairc', mide: 'Murchad Ua Máel Sechlainn',
+  laigin: 'Diarmait Mac Murchada', tuadmumu: 'Toirdelbach Ua Briain', desmumu: 'Cormac Mac Carthaig',
+};
+function heldRegions() { const held = new Set(); if (campaign.home) held.add(campaign.home); for (const c of (campaign.colonies || [])) held.add(c.region); return held; }
+function rivalFor(id) { const k = kingdomById(id); return k ? { id, name: RIVALS[id] || `the lord of ${k.en}`, region: k.en } : null; }
+// Raise up a rising rival in a province you do not hold, and name him.
+function riseRival() {
+  const held = heldRegions();
+  const pool = KINGDOMS.filter((k) => !held.has(k.id));
+  if (!pool.length) return null;
+  campaign.rival = rivalFor(pool[(Math.random() * pool.length) | 0].id);
+  saveCampaign();
+  return campaign.rival;
+}
 function isColony(region) { return campaign.colonies.some((c) => c.region === region); }
 function foundColony(region) {
   if (isColony(region)) return null;
@@ -426,7 +445,19 @@ function musterFavour() {
   return Math.min(0.97, f);
 }
 function enterBattle(scenario) {
-  battle.loadWarband({ roster: campaign.roster, ghosts: campaign.ghosts, hosted: campaign.hosted, favour: musterFavour() });
+  // A deity only takes the field if a flourishing Hall of Hosting stands to seat
+  // it; heroes (mortal) answer regardless. Strip un-seated gods from the muster.
+  let hosted = campaign.hosted;
+  if (!game.hallFlourishing()) {
+    hosted = {}; let heldBack = null;
+    for (const k in campaign.hosted) {
+      if (!campaign.hosted[k]) continue;
+      if (UNIT_TYPES[k] && UNIT_TYPES[k].cat === 'god') { heldBack = UNIT_TYPES[k].label || k; continue; }
+      hosted[k] = campaign.hosted[k];
+    }
+    if (heldBack) flashNotice(`⛩️ ${heldBack} will not take the field — no flourishing Hall of Hosting seats the god.`);
+  }
+  battle.loadWarband({ roster: campaign.roster, ghosts: campaign.ghosts, hosted, favour: musterFavour() });
   battle.enter(scenario);
   announceSummons(battle.summoned || []); // heroes/gods that answered this muster
 }
@@ -679,7 +710,7 @@ function kingdomAction() {
   if (!kg.sel) return;
   if (kg.mode === 'war') {
     if (kg.enter) { const t = kg.enter; closeKingdomMap(); switchSettlement(t); enterSettlement(); return; } // enter home / a colony to build it
-    campaign.target = kg.sel; campaign._raidFar = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(kg.sel); scheduleRaid(); closeKingdomMap(); enterBattle('attack'); return;
+    campaign.target = kg.sel; campaign._raidFar = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(kg.sel); if (!isColony(kg.sel)) campaign.rival = rivalFor(kg.sel) || campaign.rival; scheduleRaid(); closeKingdomMap(); enterBattle('attack'); return;
   }
   campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery);
   if (kg.then === 'war') { openKingdomMap('war'); return; } // ride out to raid
@@ -725,6 +756,10 @@ function advanceDay() {
     if (s !== curSeason) {
       curSeason = s; applySeason(s); collectColonyTribute(); // colonies render tribute each turn of the year
       maybeHurlChallenge(); // a wandering band of hurlers may come calling
+      if (campaign.home && (campaign.raidIn || 0) === 0 && Math.random() < 0.5) { // no war pending — a rival stirs in the provinces
+        const r = riseRival();
+        if (r) flashNotice(`⚔ ${r.name} is rising in ${r.region} — his host grows, and his eye turns toward your ráth.`);
+      }
       if (campaign.level === 3 && game.hasMenace()) { game.expandMenace(); saveSettlement(); flashNotice('☠️ The blight creeps outward, devouring more of your land. Muster and march before it takes all.'); }
     }
     if (cal.month === 0) { campaign.yearsElapsed = (campaign.yearsElapsed || 0) + 1; saveCampaign(); } // a full turn of the year
@@ -736,8 +771,9 @@ function advanceDay() {
       if ((campaign.yearsElapsed || 0) < 3) triggerFestival(fest);
       game.festivalRevels(); // the feast halls pour their revellers onto the roads
     }
-    if (festivalToday && cal.month === 10) resurrectPrayed(); // Samhain — the prayed-for rise from the dead
+    if (festivalToday && cal.month === 10) { resurrectPrayed(); flashNotice('🎃 Samhain — the veil thins. For seven nights the risen dead walk the ráth.'); } // Samhain — the prayed-for rise from the dead
   }
+  game.deadWalk = (cal.month === 10 && cal.day <= 7); // Samhain and the six nights after — risen warriors walk the streets
   const wasBroke = game.broke;
   game.settleDay({ festival: festivalToday, newMonth }); // rents in, wages out, homes drain & evolve
   if (game.broke && !wasBroke) triggerAdvisor();
@@ -748,7 +784,7 @@ function advanceDay() {
     campaign.raidIn -= 1; saveCampaign(); updateRaidBanner();
     if (campaign.raidIn === 0) {
       pauseGame();
-      ui.showFestival({ name: 'Raiders at the Gate', emoji: '🔥', sub: `The war-band you provoked falls upon your ráth, ${leaderName()}. Muster the folk and hold the field.`, onDone: () => enterBattle('defend') });
+      ui.showFestival({ name: 'Raiders at the Gate', emoji: '🔥', sub: `${campaign.rival ? `The war-band of ${campaign.rival.name}, risen in ${campaign.rival.region}, falls upon your ráth` : 'The war-band you provoked falls upon your ráth'}, ${leaderName()}. Muster the folk and hold the field.`, onDone: () => enterBattle('defend') });
     }
   }
   if (started) saveSettlement(); // persist the standing ráth (herd growth, economy) each day
@@ -1050,6 +1086,12 @@ function buildingHtml(inst) {
   if (d.role === 'dwelling') extra = dwellingRankHtml(inst);
   if (d.role === 'altar') extra = altarHtml();
   if (d.role === 'gallan') extra = gallanHtml(inst);
+  if (d.role === 'hall') {
+    const ok = (v) => v > 0 ? '✓' : '—';
+    const flourish = inst.food > 0 && inst.water > 0 && inst.culture > 0;
+    extra = `<p>Offerings — 🌾 food ${ok(inst.food)} · 💧 water ${ok(inst.water)} · 🎶 culture ${ok(inst.culture)}</p>` +
+      `<p class="${flourish ? '' : 'dim'}">${flourish ? '⛩️ The hall flourishes — a hosted god will take the field.' : 'Keep all three offerings flowing (it drinks twice a dwelling’s share) for a god to answer your muster.'}</p>`;
+  }
   if (d.role === 'homestead') { const graze = game._grazing(inst); const cap = 20 + graze * 4; extra = `<p>Herd: 🐄 ${inst.herd} / ${cap} · Grazing land: ${graze} tiles</p><p class="dim">Leave open pasture around the ráth and the herd grows faster. Cattle is your wealth in the wider world — and what a raider carries off.</p><button id="trade-btn" class="continue-btn">🌍 Trade in the wider world</button>`; }
   return `<h3>${d.label}</h3><div class="role">${d.role === 'homestead' ? 'Your seat' : 'Building'}</div><p>${d.desc}</p>${pipelineNote(inst)}${extra}`;
 }
