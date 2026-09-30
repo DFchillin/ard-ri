@@ -582,10 +582,12 @@ export class Game {
     const entry = entryRoadTile(this.map, farm);
     if (!entry) return;
     let load = Math.round(farm.def.load * this._farmBoost());
+    this._storeFx(farm, null); // a diamond lifts off the field as the hand takes up the grain
     this._spawn(entry, {
       type: 'grain_carrier', label: 'G', steps: 26, speed: 2.4, source: farm,
       onTile: (x, z, w) => {
         if (load <= 0) return;
+        if (w && w.sprite) this._floatie(w.sprite.position.x, 0.95, w.sprite.position.z, 'food', { sz: 0.12, vy: 0.25, life: 0.55, over: true, shape: 'diamond' }); // grain they carry — follow the trail to the store
         for (const inst of adjacentBuildings(this.map, x, z)) {
           if (inst.def.role === 'granary' && inst.stock < GRANARY_CAP) { // stores fill to a cap
             const add = Math.min(load, GRANARY_CAP - inst.stock);
@@ -978,15 +980,15 @@ export class Game {
     if (!src) return;
     const entry = entryRoadTile(this.map, src);
     if (!entry) return;
-    this._spawn(entry, { type: 'vigil', personType: 'villager', steps: 46, speed: 1.35, tint: 0x9fb8ff, opacity: 0.55, tag: 'risen' });
+    this._spawn(entry, { type: 'vigil', personType: 'risen', steps: 46, speed: 1.35, tint: 0x9fb8ff, opacity: 0.55, tag: 'risen' });
   }
 
   update(dt) {
     if (this.deadWalk) {
       this._deadWalkT = (this._deadWalkT || 0) - dt;
       if (this._deadWalkT <= 0) {
-        this._deadWalkT = 2.4 + Math.random() * 2.6;
-        if (this.walkers.filter((w) => w.tag === 'risen').length < 6) this._spawnRisen();
+        this._deadWalkT = 4 + Math.random() * 4;
+        if (this.walkers.filter((w) => w.tag === 'risen').length < 4) this._spawnRisen();
       }
     }
     for (const w of this.walkers) w.update(dt);

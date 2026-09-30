@@ -210,7 +210,7 @@ function startCampaign() {
   enterSettlement(); // raiders you provoked now give you warning — see the countdown banner; the defence fires when it runs out
 }
 // Drop into the standing ráth — the clock starts because the title is hidden.
-function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); game.setHurlChallenge(campaign.hurlChallenge); game.deadWalk = (cal.month === 10 && cal.day <= 7); }
+function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); game.setHurlChallenge(campaign.hurlChallenge); game.deadWalk = (cal.month === 10); }
 
 // --- Raiders give warning now: a provoked war-band marches on your ráth after a
 // short countdown, so you can muster and ready your defences before they arrive.
@@ -455,7 +455,7 @@ function enterBattle(scenario) {
       if (UNIT_TYPES[k] && UNIT_TYPES[k].cat === 'god') { heldBack = UNIT_TYPES[k].label || k; continue; }
       hosted[k] = campaign.hosted[k];
     }
-    if (heldBack) flashNotice(`⛩️ ${heldBack} will not take the field — no flourishing Hall of Hosting seats the god.`);
+    if (heldBack) flashNotice(`⛩️ ${heldBack} will not take the field — no flourishing Hall of the Gods seats the god.`);
   }
   battle.loadWarband({ roster: campaign.roster, ghosts: campaign.ghosts, hosted, favour: musterFavour() });
   battle.enter(scenario);
@@ -771,9 +771,9 @@ function advanceDay() {
       if ((campaign.yearsElapsed || 0) < 3) triggerFestival(fest);
       game.festivalRevels(); // the feast halls pour their revellers onto the roads
     }
-    if (festivalToday && cal.month === 10) { resurrectPrayed(); flashNotice('🎃 Samhain — the veil thins. For seven nights the risen dead walk the ráth.'); } // Samhain — the prayed-for rise from the dead
+    if (festivalToday && cal.month === 10) { resurrectPrayed(); flashNotice('🎃 Samhain — the veil thins. Until winter deepens, the risen dead walk the ráth.'); } // Samhain — the prayed-for rise from the dead
   }
-  game.deadWalk = (cal.month === 10 && cal.day <= 7); // Samhain and the six nights after — risen warriors walk the streets
+  game.deadWalk = (cal.month === 10); // from Samhain to the turn of December — the veil is thin
   const wasBroke = game.broke;
   game.settleDay({ festival: festivalToday, newMonth }); // rents in, wages out, homes drain & evolve
   if (game.broke && !wasBroke) triggerAdvisor();

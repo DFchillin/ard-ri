@@ -29,7 +29,7 @@ export const LEVELS = [
       { text: 'Raise your Leader’s Homestead', check: (g) => g.count('homestead') >= 1 },
       { text: 'Keep two shrines', check: (g) => g.count('altar') >= 2 },
       { text: 'Cultivate three cultured homes', check: (g) => g.buildings.filter((b) => b.def.role === 'dwelling' && b.culture > 0).length >= 3 },
-      { text: 'Host a hero or god', check: (g, c) => Object.keys(c.hosted || {}).length >= 1 },
+      { text: 'Host a hero or god — open Trade from your Homestead', check: (g, c) => Object.keys(c.hosted || {}).length >= 1 },
     ],
     next: {
       emoji: '☠️', motif: 'linear-gradient(160deg,#2a1c2e,#5a2a30)',
