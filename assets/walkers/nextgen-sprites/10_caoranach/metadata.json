@@ -1,0 +1,185 @@
+{
+  "group_id": "f5d13592-d1f7-4088-bf78-6f80b7e6f101",
+  "states": [
+    {
+      "character": {
+        "id": "9263d096-b00c-4173-ab1a-944c02edc0f7",
+        "name": "Idle",
+        "prompt": "Caor\u00e1nach, the mother of demons, a monstrous Irish serpent-demon. A huge coiling serpent with dark blackish-green scales, a pale sickly underbelly, rows of small bony spines along its back, glowing venomous yellow eyes and a fanged maw dripping venom. Legless, sinuous, coiled and menacing.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-09-30T02:58:31.973580+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Strike": {
+            "north-west": [
+              "Idle/animations/Strike/north-west/frame_000.png",
+              "Idle/animations/Strike/north-west/frame_001.png",
+              "Idle/animations/Strike/north-west/frame_002.png",
+              "Idle/animations/Strike/north-west/frame_003.png",
+              "Idle/animations/Strike/north-west/frame_004.png",
+              "Idle/animations/Strike/north-west/frame_005.png",
+              "Idle/animations/Strike/north-west/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Strike/east/frame_000.png",
+              "Idle/animations/Strike/east/frame_001.png",
+              "Idle/animations/Strike/east/frame_002.png",
+              "Idle/animations/Strike/east/frame_003.png",
+              "Idle/animations/Strike/east/frame_004.png",
+              "Idle/animations/Strike/east/frame_005.png",
+              "Idle/animations/Strike/east/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Strike/north-east/frame_000.png",
+              "Idle/animations/Strike/north-east/frame_001.png",
+              "Idle/animations/Strike/north-east/frame_002.png",
+              "Idle/animations/Strike/north-east/frame_003.png",
+              "Idle/animations/Strike/north-east/frame_004.png",
+              "Idle/animations/Strike/north-east/frame_005.png",
+              "Idle/animations/Strike/north-east/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Strike/south/frame_000.png",
+              "Idle/animations/Strike/south/frame_001.png",
+              "Idle/animations/Strike/south/frame_002.png",
+              "Idle/animations/Strike/south/frame_003.png",
+              "Idle/animations/Strike/south/frame_004.png",
+              "Idle/animations/Strike/south/frame_005.png",
+              "Idle/animations/Strike/south/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Strike/south-east/frame_000.png",
+              "Idle/animations/Strike/south-east/frame_001.png",
+              "Idle/animations/Strike/south-east/frame_002.png",
+              "Idle/animations/Strike/south-east/frame_003.png",
+              "Idle/animations/Strike/south-east/frame_004.png",
+              "Idle/animations/Strike/south-east/frame_005.png",
+              "Idle/animations/Strike/south-east/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Strike/north/frame_000.png",
+              "Idle/animations/Strike/north/frame_001.png",
+              "Idle/animations/Strike/north/frame_002.png",
+              "Idle/animations/Strike/north/frame_003.png",
+              "Idle/animations/Strike/north/frame_004.png",
+              "Idle/animations/Strike/north/frame_005.png",
+              "Idle/animations/Strike/north/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Strike/south-west/frame_000.png",
+              "Idle/animations/Strike/south-west/frame_001.png",
+              "Idle/animations/Strike/south-west/frame_002.png",
+              "Idle/animations/Strike/south-west/frame_003.png",
+              "Idle/animations/Strike/south-west/frame_004.png",
+              "Idle/animations/Strike/south-west/frame_005.png",
+              "Idle/animations/Strike/south-west/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Strike/west/frame_000.png",
+              "Idle/animations/Strike/west/frame_001.png",
+              "Idle/animations/Strike/west/frame_002.png",
+              "Idle/animations/Strike/west/frame_003.png",
+              "Idle/animations/Strike/west/frame_004.png",
+              "Idle/animations/Strike/west/frame_005.png",
+              "Idle/animations/Strike/west/frame_006.png"
+            ]
+          },
+          "Slither": {
+            "north-east": [
+              "Idle/animations/Slither/north-east/frame_000.png",
+              "Idle/animations/Slither/north-east/frame_001.png",
+              "Idle/animations/Slither/north-east/frame_002.png",
+              "Idle/animations/Slither/north-east/frame_003.png",
+              "Idle/animations/Slither/north-east/frame_004.png",
+              "Idle/animations/Slither/north-east/frame_005.png",
+              "Idle/animations/Slither/north-east/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Slither/south-east/frame_000.png",
+              "Idle/animations/Slither/south-east/frame_001.png",
+              "Idle/animations/Slither/south-east/frame_002.png",
+              "Idle/animations/Slither/south-east/frame_003.png",
+              "Idle/animations/Slither/south-east/frame_004.png",
+              "Idle/animations/Slither/south-east/frame_005.png",
+              "Idle/animations/Slither/south-east/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Slither/north-west/frame_000.png",
+              "Idle/animations/Slither/north-west/frame_001.png",
+              "Idle/animations/Slither/north-west/frame_002.png",
+              "Idle/animations/Slither/north-west/frame_003.png",
+              "Idle/animations/Slither/north-west/frame_004.png",
+              "Idle/animations/Slither/north-west/frame_005.png",
+              "Idle/animations/Slither/north-west/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Slither/south-west/frame_000.png",
+              "Idle/animations/Slither/south-west/frame_001.png",
+              "Idle/animations/Slither/south-west/frame_002.png",
+              "Idle/animations/Slither/south-west/frame_003.png",
+              "Idle/animations/Slither/south-west/frame_004.png",
+              "Idle/animations/Slither/south-west/frame_005.png",
+              "Idle/animations/Slither/south-west/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Slither/south/frame_000.png",
+              "Idle/animations/Slither/south/frame_001.png",
+              "Idle/animations/Slither/south/frame_002.png",
+              "Idle/animations/Slither/south/frame_003.png",
+              "Idle/animations/Slither/south/frame_004.png",
+              "Idle/animations/Slither/south/frame_005.png",
+              "Idle/animations/Slither/south/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Slither/north/frame_000.png",
+              "Idle/animations/Slither/north/frame_001.png",
+              "Idle/animations/Slither/north/frame_002.png",
+              "Idle/animations/Slither/north/frame_003.png",
+              "Idle/animations/Slither/north/frame_004.png",
+              "Idle/animations/Slither/north/frame_005.png",
+              "Idle/animations/Slither/north/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Slither/west/frame_000.png",
+              "Idle/animations/Slither/west/frame_001.png",
+              "Idle/animations/Slither/west/frame_002.png",
+              "Idle/animations/Slither/west/frame_003.png",
+              "Idle/animations/Slither/west/frame_004.png",
+              "Idle/animations/Slither/west/frame_005.png",
+              "Idle/animations/Slither/west/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Slither/east/frame_000.png",
+              "Idle/animations/Slither/east/frame_001.png",
+              "Idle/animations/Slither/east/frame_002.png",
+              "Idle/animations/Slither/east/frame_003.png",
+              "Idle/animations/Slither/east/frame_004.png",
+              "Idle/animations/Slither/east/frame_005.png",
+              "Idle/animations/Slither/east/frame_006.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-02T04:09:29.525224"
+}

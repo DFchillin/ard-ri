@@ -1,0 +1,185 @@
+{
+  "group_id": "dd3b4557-1219-4982-a423-0d5fa8cc9565",
+  "states": [
+    {
+      "character": {
+        "id": "b6ac8da9-22f6-4e37-b46f-7b6601a50077",
+        "name": "Idle",
+        "prompt": "Somhairl\u00edn, a female Gaelic builder \u2014 a young woman with fair skin, a warm friendly smile and long jet-black wavy hair pulled half-back. She wears a practical knee-length l\u00e9ine tunic with a leather apron and a tool belt, and holds a wooden builder's mallet in one hand. A capable, cheerful craftswoman.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-02T03:33:17.719324+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Carefree_walk": {
+            "east": [
+              "Idle/animations/Carefree_walk/east/frame_000.png",
+              "Idle/animations/Carefree_walk/east/frame_001.png",
+              "Idle/animations/Carefree_walk/east/frame_002.png",
+              "Idle/animations/Carefree_walk/east/frame_003.png",
+              "Idle/animations/Carefree_walk/east/frame_004.png",
+              "Idle/animations/Carefree_walk/east/frame_005.png",
+              "Idle/animations/Carefree_walk/east/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Carefree_walk/north-west/frame_000.png",
+              "Idle/animations/Carefree_walk/north-west/frame_001.png",
+              "Idle/animations/Carefree_walk/north-west/frame_002.png",
+              "Idle/animations/Carefree_walk/north-west/frame_003.png",
+              "Idle/animations/Carefree_walk/north-west/frame_004.png",
+              "Idle/animations/Carefree_walk/north-west/frame_005.png",
+              "Idle/animations/Carefree_walk/north-west/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Carefree_walk/north/frame_000.png",
+              "Idle/animations/Carefree_walk/north/frame_001.png",
+              "Idle/animations/Carefree_walk/north/frame_002.png",
+              "Idle/animations/Carefree_walk/north/frame_003.png",
+              "Idle/animations/Carefree_walk/north/frame_004.png",
+              "Idle/animations/Carefree_walk/north/frame_005.png",
+              "Idle/animations/Carefree_walk/north/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Carefree_walk/south-west/frame_000.png",
+              "Idle/animations/Carefree_walk/south-west/frame_001.png",
+              "Idle/animations/Carefree_walk/south-west/frame_002.png",
+              "Idle/animations/Carefree_walk/south-west/frame_003.png",
+              "Idle/animations/Carefree_walk/south-west/frame_004.png",
+              "Idle/animations/Carefree_walk/south-west/frame_005.png",
+              "Idle/animations/Carefree_walk/south-west/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Carefree_walk/west/frame_000.png",
+              "Idle/animations/Carefree_walk/west/frame_001.png",
+              "Idle/animations/Carefree_walk/west/frame_002.png",
+              "Idle/animations/Carefree_walk/west/frame_003.png",
+              "Idle/animations/Carefree_walk/west/frame_004.png",
+              "Idle/animations/Carefree_walk/west/frame_005.png",
+              "Idle/animations/Carefree_walk/west/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Carefree_walk/north-east/frame_000.png",
+              "Idle/animations/Carefree_walk/north-east/frame_001.png",
+              "Idle/animations/Carefree_walk/north-east/frame_002.png",
+              "Idle/animations/Carefree_walk/north-east/frame_003.png",
+              "Idle/animations/Carefree_walk/north-east/frame_004.png",
+              "Idle/animations/Carefree_walk/north-east/frame_005.png",
+              "Idle/animations/Carefree_walk/north-east/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Carefree_walk/south/frame_000.png",
+              "Idle/animations/Carefree_walk/south/frame_001.png",
+              "Idle/animations/Carefree_walk/south/frame_002.png",
+              "Idle/animations/Carefree_walk/south/frame_003.png",
+              "Idle/animations/Carefree_walk/south/frame_004.png",
+              "Idle/animations/Carefree_walk/south/frame_005.png",
+              "Idle/animations/Carefree_walk/south/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Carefree_walk/south-east/frame_000.png",
+              "Idle/animations/Carefree_walk/south-east/frame_001.png",
+              "Idle/animations/Carefree_walk/south-east/frame_002.png",
+              "Idle/animations/Carefree_walk/south-east/frame_003.png",
+              "Idle/animations/Carefree_walk/south-east/frame_004.png",
+              "Idle/animations/Carefree_walk/south-east/frame_005.png",
+              "Idle/animations/Carefree_walk/south-east/frame_006.png"
+            ]
+          },
+          "Hammering": {
+            "west": [
+              "Idle/animations/Hammering/west/frame_000.png",
+              "Idle/animations/Hammering/west/frame_001.png",
+              "Idle/animations/Hammering/west/frame_002.png",
+              "Idle/animations/Hammering/west/frame_003.png",
+              "Idle/animations/Hammering/west/frame_004.png",
+              "Idle/animations/Hammering/west/frame_005.png",
+              "Idle/animations/Hammering/west/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Hammering/north/frame_000.png",
+              "Idle/animations/Hammering/north/frame_001.png",
+              "Idle/animations/Hammering/north/frame_002.png",
+              "Idle/animations/Hammering/north/frame_003.png",
+              "Idle/animations/Hammering/north/frame_004.png",
+              "Idle/animations/Hammering/north/frame_005.png",
+              "Idle/animations/Hammering/north/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Hammering/south-east/frame_000.png",
+              "Idle/animations/Hammering/south-east/frame_001.png",
+              "Idle/animations/Hammering/south-east/frame_002.png",
+              "Idle/animations/Hammering/south-east/frame_003.png",
+              "Idle/animations/Hammering/south-east/frame_004.png",
+              "Idle/animations/Hammering/south-east/frame_005.png",
+              "Idle/animations/Hammering/south-east/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Hammering/south/frame_000.png",
+              "Idle/animations/Hammering/south/frame_001.png",
+              "Idle/animations/Hammering/south/frame_002.png",
+              "Idle/animations/Hammering/south/frame_003.png",
+              "Idle/animations/Hammering/south/frame_004.png",
+              "Idle/animations/Hammering/south/frame_005.png",
+              "Idle/animations/Hammering/south/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Hammering/north-west/frame_000.png",
+              "Idle/animations/Hammering/north-west/frame_001.png",
+              "Idle/animations/Hammering/north-west/frame_002.png",
+              "Idle/animations/Hammering/north-west/frame_003.png",
+              "Idle/animations/Hammering/north-west/frame_004.png",
+              "Idle/animations/Hammering/north-west/frame_005.png",
+              "Idle/animations/Hammering/north-west/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Hammering/north-east/frame_000.png",
+              "Idle/animations/Hammering/north-east/frame_001.png",
+              "Idle/animations/Hammering/north-east/frame_002.png",
+              "Idle/animations/Hammering/north-east/frame_003.png",
+              "Idle/animations/Hammering/north-east/frame_004.png",
+              "Idle/animations/Hammering/north-east/frame_005.png",
+              "Idle/animations/Hammering/north-east/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Hammering/south-west/frame_000.png",
+              "Idle/animations/Hammering/south-west/frame_001.png",
+              "Idle/animations/Hammering/south-west/frame_002.png",
+              "Idle/animations/Hammering/south-west/frame_003.png",
+              "Idle/animations/Hammering/south-west/frame_004.png",
+              "Idle/animations/Hammering/south-west/frame_005.png",
+              "Idle/animations/Hammering/south-west/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Hammering/east/frame_000.png",
+              "Idle/animations/Hammering/east/frame_001.png",
+              "Idle/animations/Hammering/east/frame_002.png",
+              "Idle/animations/Hammering/east/frame_003.png",
+              "Idle/animations/Hammering/east/frame_004.png",
+              "Idle/animations/Hammering/east/frame_005.png",
+              "Idle/animations/Hammering/east/frame_006.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-02T04:09:03.285705"
+}

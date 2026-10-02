@@ -1,0 +1,177 @@
+{
+  "group_id": "782d05c9-1294-46e8-9c65-e8de5d3dff8e",
+  "states": [
+    {
+      "character": {
+        "id": "4859279f-7b98-4dea-a833-20114d91a93b",
+        "name": "Idle",
+        "prompt": "Balor of the Evil Eye, a towering Fomorian giant, hulking and heavily muscular with sickly grey-green mottled skin. A single enormous baleful glowing eye in the centre of his brow, wild matted dark hair and beard, crude dark iron armour plates and furs. He wields a massive crude iron cleaver-club. Monstrous, ancient and terrifying boss enemy.",
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-09-27T12:07:06.211814+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "Attacking_with_cleaver-club": {
+            "south": [
+              "Idle/animations/Attacking_with_cleaver-club/south/frame_000.png",
+              "Idle/animations/Attacking_with_cleaver-club/south/frame_001.png",
+              "Idle/animations/Attacking_with_cleaver-club/south/frame_002.png",
+              "Idle/animations/Attacking_with_cleaver-club/south/frame_003.png",
+              "Idle/animations/Attacking_with_cleaver-club/south/frame_004.png",
+              "Idle/animations/Attacking_with_cleaver-club/south/frame_005.png",
+              "Idle/animations/Attacking_with_cleaver-club/south/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Attacking_with_cleaver-club/west/frame_000.png",
+              "Idle/animations/Attacking_with_cleaver-club/west/frame_001.png",
+              "Idle/animations/Attacking_with_cleaver-club/west/frame_002.png",
+              "Idle/animations/Attacking_with_cleaver-club/west/frame_003.png",
+              "Idle/animations/Attacking_with_cleaver-club/west/frame_004.png",
+              "Idle/animations/Attacking_with_cleaver-club/west/frame_005.png",
+              "Idle/animations/Attacking_with_cleaver-club/west/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Attacking_with_cleaver-club/north/frame_000.png",
+              "Idle/animations/Attacking_with_cleaver-club/north/frame_001.png",
+              "Idle/animations/Attacking_with_cleaver-club/north/frame_002.png",
+              "Idle/animations/Attacking_with_cleaver-club/north/frame_003.png",
+              "Idle/animations/Attacking_with_cleaver-club/north/frame_004.png",
+              "Idle/animations/Attacking_with_cleaver-club/north/frame_005.png",
+              "Idle/animations/Attacking_with_cleaver-club/north/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Attacking_with_cleaver-club/north-east/frame_000.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-east/frame_001.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-east/frame_002.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-east/frame_003.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-east/frame_004.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-east/frame_005.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-east/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Attacking_with_cleaver-club/south-east/frame_000.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-east/frame_001.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-east/frame_002.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-east/frame_003.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-east/frame_004.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-east/frame_005.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-east/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Attacking_with_cleaver-club/north-west/frame_000.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-west/frame_001.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-west/frame_002.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-west/frame_003.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-west/frame_004.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-west/frame_005.png",
+              "Idle/animations/Attacking_with_cleaver-club/north-west/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Attacking_with_cleaver-club/east/frame_000.png",
+              "Idle/animations/Attacking_with_cleaver-club/east/frame_001.png",
+              "Idle/animations/Attacking_with_cleaver-club/east/frame_002.png",
+              "Idle/animations/Attacking_with_cleaver-club/east/frame_003.png",
+              "Idle/animations/Attacking_with_cleaver-club/east/frame_004.png",
+              "Idle/animations/Attacking_with_cleaver-club/east/frame_005.png",
+              "Idle/animations/Attacking_with_cleaver-club/east/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Attacking_with_cleaver-club/south-west/frame_000.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-west/frame_001.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-west/frame_002.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-west/frame_003.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-west/frame_004.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-west/frame_005.png",
+              "Idle/animations/Attacking_with_cleaver-club/south-west/frame_006.png"
+            ]
+          },
+          "walk": {
+            "south-west": [
+              "Idle/animations/walk/south-west/frame_000.png",
+              "Idle/animations/walk/south-west/frame_001.png",
+              "Idle/animations/walk/south-west/frame_002.png",
+              "Idle/animations/walk/south-west/frame_003.png",
+              "Idle/animations/walk/south-west/frame_004.png",
+              "Idle/animations/walk/south-west/frame_005.png"
+            ],
+            "north-west": [
+              "Idle/animations/walk/north-west/frame_000.png",
+              "Idle/animations/walk/north-west/frame_001.png",
+              "Idle/animations/walk/north-west/frame_002.png",
+              "Idle/animations/walk/north-west/frame_003.png",
+              "Idle/animations/walk/north-west/frame_004.png",
+              "Idle/animations/walk/north-west/frame_005.png"
+            ],
+            "west": [
+              "Idle/animations/walk/west/frame_000.png",
+              "Idle/animations/walk/west/frame_001.png",
+              "Idle/animations/walk/west/frame_002.png",
+              "Idle/animations/walk/west/frame_003.png",
+              "Idle/animations/walk/west/frame_004.png",
+              "Idle/animations/walk/west/frame_005.png"
+            ],
+            "north": [
+              "Idle/animations/walk/north/frame_000.png",
+              "Idle/animations/walk/north/frame_001.png",
+              "Idle/animations/walk/north/frame_002.png",
+              "Idle/animations/walk/north/frame_003.png",
+              "Idle/animations/walk/north/frame_004.png",
+              "Idle/animations/walk/north/frame_005.png"
+            ],
+            "east": [
+              "Idle/animations/walk/east/frame_000.png",
+              "Idle/animations/walk/east/frame_001.png",
+              "Idle/animations/walk/east/frame_002.png",
+              "Idle/animations/walk/east/frame_003.png",
+              "Idle/animations/walk/east/frame_004.png",
+              "Idle/animations/walk/east/frame_005.png"
+            ],
+            "south-east": [
+              "Idle/animations/walk/south-east/frame_000.png",
+              "Idle/animations/walk/south-east/frame_001.png",
+              "Idle/animations/walk/south-east/frame_002.png",
+              "Idle/animations/walk/south-east/frame_003.png",
+              "Idle/animations/walk/south-east/frame_004.png",
+              "Idle/animations/walk/south-east/frame_005.png"
+            ],
+            "north-east": [
+              "Idle/animations/walk/north-east/frame_000.png",
+              "Idle/animations/walk/north-east/frame_001.png",
+              "Idle/animations/walk/north-east/frame_002.png",
+              "Idle/animations/walk/north-east/frame_003.png",
+              "Idle/animations/walk/north-east/frame_004.png",
+              "Idle/animations/walk/north-east/frame_005.png"
+            ],
+            "south": [
+              "Idle/animations/walk/south/frame_000.png",
+              "Idle/animations/walk/south/frame_001.png",
+              "Idle/animations/walk/south/frame_002.png",
+              "Idle/animations/walk/south/frame_003.png",
+              "Idle/animations/walk/south/frame_004.png",
+              "Idle/animations/walk/south/frame_005.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-02T04:08:56.849258"
+}

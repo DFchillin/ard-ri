@@ -1,0 +1,193 @@
+{
+  "group_id": "3816db77-48d6-4fed-a4d4-3d607a875245",
+  "states": [
+    {
+      "character": {
+        "id": "aa094dd4-ac60-454a-ae23-4f014cb72de9",
+        "name": "Idle",
+        "prompt": "The Dobhar-ch\u00fa, the 'water hound' of Irish myth. A giant vicious otter-beast with sleek dark brown wet fur, a pale underbelly, a long sinuous body, webbed clawed feet, a flat rudder-like tail, and a snarling fanged muzzle. A fierce semi-aquatic predator.",
+        "size": {
+          "width": 80,
+          "height": 80
+        },
+        "template_id": "dog",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-09-30T02:58:31.436235+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "walk": {
+            "east": [
+              "Idle/animations/walk/east/frame_000.png",
+              "Idle/animations/walk/east/frame_001.png",
+              "Idle/animations/walk/east/frame_002.png",
+              "Idle/animations/walk/east/frame_003.png",
+              "Idle/animations/walk/east/frame_004.png",
+              "Idle/animations/walk/east/frame_005.png",
+              "Idle/animations/walk/east/frame_006.png",
+              "Idle/animations/walk/east/frame_007.png"
+            ],
+            "south-east": [
+              "Idle/animations/walk/south-east/frame_000.png",
+              "Idle/animations/walk/south-east/frame_001.png",
+              "Idle/animations/walk/south-east/frame_002.png",
+              "Idle/animations/walk/south-east/frame_003.png",
+              "Idle/animations/walk/south-east/frame_004.png",
+              "Idle/animations/walk/south-east/frame_005.png",
+              "Idle/animations/walk/south-east/frame_006.png",
+              "Idle/animations/walk/south-east/frame_007.png"
+            ],
+            "west": [
+              "Idle/animations/walk/west/frame_000.png",
+              "Idle/animations/walk/west/frame_001.png",
+              "Idle/animations/walk/west/frame_002.png",
+              "Idle/animations/walk/west/frame_003.png",
+              "Idle/animations/walk/west/frame_004.png",
+              "Idle/animations/walk/west/frame_005.png",
+              "Idle/animations/walk/west/frame_006.png",
+              "Idle/animations/walk/west/frame_007.png"
+            ],
+            "south-west": [
+              "Idle/animations/walk/south-west/frame_000.png",
+              "Idle/animations/walk/south-west/frame_001.png",
+              "Idle/animations/walk/south-west/frame_002.png",
+              "Idle/animations/walk/south-west/frame_003.png",
+              "Idle/animations/walk/south-west/frame_004.png",
+              "Idle/animations/walk/south-west/frame_005.png",
+              "Idle/animations/walk/south-west/frame_006.png",
+              "Idle/animations/walk/south-west/frame_007.png"
+            ],
+            "north": [
+              "Idle/animations/walk/north/frame_000.png",
+              "Idle/animations/walk/north/frame_001.png",
+              "Idle/animations/walk/north/frame_002.png",
+              "Idle/animations/walk/north/frame_003.png",
+              "Idle/animations/walk/north/frame_004.png",
+              "Idle/animations/walk/north/frame_005.png",
+              "Idle/animations/walk/north/frame_006.png",
+              "Idle/animations/walk/north/frame_007.png"
+            ],
+            "north-east": [
+              "Idle/animations/walk/north-east/frame_000.png",
+              "Idle/animations/walk/north-east/frame_001.png",
+              "Idle/animations/walk/north-east/frame_002.png",
+              "Idle/animations/walk/north-east/frame_003.png",
+              "Idle/animations/walk/north-east/frame_004.png",
+              "Idle/animations/walk/north-east/frame_005.png",
+              "Idle/animations/walk/north-east/frame_006.png",
+              "Idle/animations/walk/north-east/frame_007.png"
+            ],
+            "south": [
+              "Idle/animations/walk/south/frame_000.png",
+              "Idle/animations/walk/south/frame_001.png",
+              "Idle/animations/walk/south/frame_002.png",
+              "Idle/animations/walk/south/frame_003.png",
+              "Idle/animations/walk/south/frame_004.png",
+              "Idle/animations/walk/south/frame_005.png",
+              "Idle/animations/walk/south/frame_006.png",
+              "Idle/animations/walk/south/frame_007.png"
+            ],
+            "north-west": [
+              "Idle/animations/walk/north-west/frame_000.png",
+              "Idle/animations/walk/north-west/frame_001.png",
+              "Idle/animations/walk/north-west/frame_002.png",
+              "Idle/animations/walk/north-west/frame_003.png",
+              "Idle/animations/walk/north-west/frame_004.png",
+              "Idle/animations/walk/north-west/frame_005.png",
+              "Idle/animations/walk/north-west/frame_006.png",
+              "Idle/animations/walk/north-west/frame_007.png"
+            ]
+          },
+          "Bite_attack": {
+            "west": [
+              "Idle/animations/Bite_attack/west/frame_000.png",
+              "Idle/animations/Bite_attack/west/frame_001.png",
+              "Idle/animations/Bite_attack/west/frame_002.png",
+              "Idle/animations/Bite_attack/west/frame_003.png",
+              "Idle/animations/Bite_attack/west/frame_004.png",
+              "Idle/animations/Bite_attack/west/frame_005.png",
+              "Idle/animations/Bite_attack/west/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Bite_attack/south/frame_000.png",
+              "Idle/animations/Bite_attack/south/frame_001.png",
+              "Idle/animations/Bite_attack/south/frame_002.png",
+              "Idle/animations/Bite_attack/south/frame_003.png",
+              "Idle/animations/Bite_attack/south/frame_004.png",
+              "Idle/animations/Bite_attack/south/frame_005.png",
+              "Idle/animations/Bite_attack/south/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Bite_attack/east/frame_000.png",
+              "Idle/animations/Bite_attack/east/frame_001.png",
+              "Idle/animations/Bite_attack/east/frame_002.png",
+              "Idle/animations/Bite_attack/east/frame_003.png",
+              "Idle/animations/Bite_attack/east/frame_004.png",
+              "Idle/animations/Bite_attack/east/frame_005.png",
+              "Idle/animations/Bite_attack/east/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Bite_attack/north/frame_000.png",
+              "Idle/animations/Bite_attack/north/frame_001.png",
+              "Idle/animations/Bite_attack/north/frame_002.png",
+              "Idle/animations/Bite_attack/north/frame_003.png",
+              "Idle/animations/Bite_attack/north/frame_004.png",
+              "Idle/animations/Bite_attack/north/frame_005.png",
+              "Idle/animations/Bite_attack/north/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Bite_attack/north-east/frame_000.png",
+              "Idle/animations/Bite_attack/north-east/frame_001.png",
+              "Idle/animations/Bite_attack/north-east/frame_002.png",
+              "Idle/animations/Bite_attack/north-east/frame_003.png",
+              "Idle/animations/Bite_attack/north-east/frame_004.png",
+              "Idle/animations/Bite_attack/north-east/frame_005.png",
+              "Idle/animations/Bite_attack/north-east/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/Bite_attack/south-west/frame_000.png",
+              "Idle/animations/Bite_attack/south-west/frame_001.png",
+              "Idle/animations/Bite_attack/south-west/frame_002.png",
+              "Idle/animations/Bite_attack/south-west/frame_003.png",
+              "Idle/animations/Bite_attack/south-west/frame_004.png",
+              "Idle/animations/Bite_attack/south-west/frame_005.png",
+              "Idle/animations/Bite_attack/south-west/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Bite_attack/north-west/frame_000.png",
+              "Idle/animations/Bite_attack/north-west/frame_001.png",
+              "Idle/animations/Bite_attack/north-west/frame_002.png",
+              "Idle/animations/Bite_attack/north-west/frame_003.png",
+              "Idle/animations/Bite_attack/north-west/frame_004.png",
+              "Idle/animations/Bite_attack/north-west/frame_005.png",
+              "Idle/animations/Bite_attack/north-west/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Bite_attack/south-east/frame_000.png",
+              "Idle/animations/Bite_attack/south-east/frame_001.png",
+              "Idle/animations/Bite_attack/south-east/frame_002.png",
+              "Idle/animations/Bite_attack/south-east/frame_003.png",
+              "Idle/animations/Bite_attack/south-east/frame_004.png",
+              "Idle/animations/Bite_attack/south-east/frame_005.png",
+              "Idle/animations/Bite_attack/south-east/frame_006.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-02T04:08:50.610437"
+}

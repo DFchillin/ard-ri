@@ -1,0 +1,177 @@
+{
+  "group_id": "c78384eb-5201-4a4e-9e77-1d3a33f5882c",
+  "states": [
+    {
+      "character": {
+        "id": "27ebb94f-df25-4436-accf-1e84bcc4ef7e",
+        "name": "Idle",
+        "prompt": "A gallowglass (gall\u00f3glach), an elite heavily-armoured Gaelic-Norse mercenary warrior, tall and powerful, wearing a long chainmail hauberk and a conical iron helmet with a nasal guard. He wields a huge two-handed sparth axe (long Dane axe). Grim, professional medieval soldier.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-09-27T12:07:06.625496+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "walk": {
+            "north-east": [
+              "Idle/animations/walk/north-east/frame_000.png",
+              "Idle/animations/walk/north-east/frame_001.png",
+              "Idle/animations/walk/north-east/frame_002.png",
+              "Idle/animations/walk/north-east/frame_003.png",
+              "Idle/animations/walk/north-east/frame_004.png",
+              "Idle/animations/walk/north-east/frame_005.png"
+            ],
+            "south": [
+              "Idle/animations/walk/south/frame_000.png",
+              "Idle/animations/walk/south/frame_001.png",
+              "Idle/animations/walk/south/frame_002.png",
+              "Idle/animations/walk/south/frame_003.png",
+              "Idle/animations/walk/south/frame_004.png",
+              "Idle/animations/walk/south/frame_005.png"
+            ],
+            "north-west": [
+              "Idle/animations/walk/north-west/frame_000.png",
+              "Idle/animations/walk/north-west/frame_001.png",
+              "Idle/animations/walk/north-west/frame_002.png",
+              "Idle/animations/walk/north-west/frame_003.png",
+              "Idle/animations/walk/north-west/frame_004.png",
+              "Idle/animations/walk/north-west/frame_005.png"
+            ],
+            "west": [
+              "Idle/animations/walk/west/frame_000.png",
+              "Idle/animations/walk/west/frame_001.png",
+              "Idle/animations/walk/west/frame_002.png",
+              "Idle/animations/walk/west/frame_003.png",
+              "Idle/animations/walk/west/frame_004.png",
+              "Idle/animations/walk/west/frame_005.png"
+            ],
+            "east": [
+              "Idle/animations/walk/east/frame_000.png",
+              "Idle/animations/walk/east/frame_001.png",
+              "Idle/animations/walk/east/frame_002.png",
+              "Idle/animations/walk/east/frame_003.png",
+              "Idle/animations/walk/east/frame_004.png",
+              "Idle/animations/walk/east/frame_005.png"
+            ],
+            "south-east": [
+              "Idle/animations/walk/south-east/frame_000.png",
+              "Idle/animations/walk/south-east/frame_001.png",
+              "Idle/animations/walk/south-east/frame_002.png",
+              "Idle/animations/walk/south-east/frame_003.png",
+              "Idle/animations/walk/south-east/frame_004.png",
+              "Idle/animations/walk/south-east/frame_005.png"
+            ],
+            "north": [
+              "Idle/animations/walk/north/frame_000.png",
+              "Idle/animations/walk/north/frame_001.png",
+              "Idle/animations/walk/north/frame_002.png",
+              "Idle/animations/walk/north/frame_003.png",
+              "Idle/animations/walk/north/frame_004.png",
+              "Idle/animations/walk/north/frame_005.png"
+            ],
+            "south-west": [
+              "Idle/animations/walk/south-west/frame_000.png",
+              "Idle/animations/walk/south-west/frame_001.png",
+              "Idle/animations/walk/south-west/frame_002.png",
+              "Idle/animations/walk/south-west/frame_003.png",
+              "Idle/animations/walk/south-west/frame_004.png",
+              "Idle/animations/walk/south-west/frame_005.png"
+            ]
+          },
+          "Attacking_with_axe": {
+            "south-west": [
+              "Idle/animations/Attacking_with_axe/south-west/frame_000.png",
+              "Idle/animations/Attacking_with_axe/south-west/frame_001.png",
+              "Idle/animations/Attacking_with_axe/south-west/frame_002.png",
+              "Idle/animations/Attacking_with_axe/south-west/frame_003.png",
+              "Idle/animations/Attacking_with_axe/south-west/frame_004.png",
+              "Idle/animations/Attacking_with_axe/south-west/frame_005.png",
+              "Idle/animations/Attacking_with_axe/south-west/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/Attacking_with_axe/north-west/frame_000.png",
+              "Idle/animations/Attacking_with_axe/north-west/frame_001.png",
+              "Idle/animations/Attacking_with_axe/north-west/frame_002.png",
+              "Idle/animations/Attacking_with_axe/north-west/frame_003.png",
+              "Idle/animations/Attacking_with_axe/north-west/frame_004.png",
+              "Idle/animations/Attacking_with_axe/north-west/frame_005.png",
+              "Idle/animations/Attacking_with_axe/north-west/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/Attacking_with_axe/north/frame_000.png",
+              "Idle/animations/Attacking_with_axe/north/frame_001.png",
+              "Idle/animations/Attacking_with_axe/north/frame_002.png",
+              "Idle/animations/Attacking_with_axe/north/frame_003.png",
+              "Idle/animations/Attacking_with_axe/north/frame_004.png",
+              "Idle/animations/Attacking_with_axe/north/frame_005.png",
+              "Idle/animations/Attacking_with_axe/north/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/Attacking_with_axe/south/frame_000.png",
+              "Idle/animations/Attacking_with_axe/south/frame_001.png",
+              "Idle/animations/Attacking_with_axe/south/frame_002.png",
+              "Idle/animations/Attacking_with_axe/south/frame_003.png",
+              "Idle/animations/Attacking_with_axe/south/frame_004.png",
+              "Idle/animations/Attacking_with_axe/south/frame_005.png",
+              "Idle/animations/Attacking_with_axe/south/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/Attacking_with_axe/north-east/frame_000.png",
+              "Idle/animations/Attacking_with_axe/north-east/frame_001.png",
+              "Idle/animations/Attacking_with_axe/north-east/frame_002.png",
+              "Idle/animations/Attacking_with_axe/north-east/frame_003.png",
+              "Idle/animations/Attacking_with_axe/north-east/frame_004.png",
+              "Idle/animations/Attacking_with_axe/north-east/frame_005.png",
+              "Idle/animations/Attacking_with_axe/north-east/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/Attacking_with_axe/west/frame_000.png",
+              "Idle/animations/Attacking_with_axe/west/frame_001.png",
+              "Idle/animations/Attacking_with_axe/west/frame_002.png",
+              "Idle/animations/Attacking_with_axe/west/frame_003.png",
+              "Idle/animations/Attacking_with_axe/west/frame_004.png",
+              "Idle/animations/Attacking_with_axe/west/frame_005.png",
+              "Idle/animations/Attacking_with_axe/west/frame_006.png"
+            ],
+            "east": [
+              "Idle/animations/Attacking_with_axe/east/frame_000.png",
+              "Idle/animations/Attacking_with_axe/east/frame_001.png",
+              "Idle/animations/Attacking_with_axe/east/frame_002.png",
+              "Idle/animations/Attacking_with_axe/east/frame_003.png",
+              "Idle/animations/Attacking_with_axe/east/frame_004.png",
+              "Idle/animations/Attacking_with_axe/east/frame_005.png",
+              "Idle/animations/Attacking_with_axe/east/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/Attacking_with_axe/south-east/frame_000.png",
+              "Idle/animations/Attacking_with_axe/south-east/frame_001.png",
+              "Idle/animations/Attacking_with_axe/south-east/frame_002.png",
+              "Idle/animations/Attacking_with_axe/south-east/frame_003.png",
+              "Idle/animations/Attacking_with_axe/south-east/frame_004.png",
+              "Idle/animations/Attacking_with_axe/south-east/frame_005.png",
+              "Idle/animations/Attacking_with_axe/south-east/frame_006.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-02T04:09:24.462327"
+}
