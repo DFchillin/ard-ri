@@ -33,7 +33,7 @@ export const UNIT_TYPES = {
   ghost:        { label: 'Ghost Warrior',  ga: 'laoch taibhse',     cat: 'warrior', rank: 2, atk: 2.4, hp: 5, build: 0.4, speed: 3.5, morale: 100, aura: 0, spectral: true, battle: { art: 'ghost', h: 1.55 }, piece: { color: 0x9fc8ff, tall: 0.9 } },
   // --- the menace: the Ollphéist, a great serpent, and its lesser brood (foes only) ---
   fomor:        { label: 'The Ollphéist',  ga: 'an Ollphéist',      cat: 'god', rank: 7, atk: 11.0, hp: 70, build: 4.0, speed: 2.2, morale: 100, aura: 0, menace: true, battle: { art: 'olipheist', h: 3.8, tiles: 3 }, piece: { color: 0x2b4a36, tall: 2.4 }, tiles: 3 },
-  fuath:        { label: 'Fuath',          ga: 'a water-fiend',     cat: 'special', rank: 4, atk: 4.0, hp: 14, build: 1.2, speed: 3.0, morale: 100, aura: 0, menace: true, piece: { color: 0x3a5a52, tall: 1.2 } },
+  fuath:        { label: 'Fomórach',       ga: 'a Fomorian of the brood', cat: 'special', rank: 4, atk: 4.0, hp: 14, build: 1.2, speed: 3.0, morale: 100, aura: 0, menace: true, sprite: 'fomorian', piece: { color: 0x3a5a52, tall: 1.2 } },
 };
 
 // Promotion path: a regular who survives a won battle may grow into a warrior,

@@ -26,7 +26,7 @@ const WALK_FILE = {
   deaglan: 'deaglan', deaglan_dig: 'deaglan_dig',
   finn: 'finn', finn_run: 'finn_run', vigil: 'vigil', vigil_f: 'vigil_f',
   // Next-gen character art: hurler (f: camogie player) and the sluagh (restless dead).
-  hurler: 'hurler', sluagh: 'sluagh', somhairlin: 'somhairlin',
+  hurler: 'hurler', sluagh: 'sluagh', somhairlin: 'somhairlin', fomorian: 'fomorian',
 };
 
 const FALLBACK = {
