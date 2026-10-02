@@ -55,6 +55,8 @@ const _mapSeed = _savedCampaign.mapSeed != null ? _savedCampaign.mapSeed : (Math
 const map = new Tilemap(32, 1, _mapSeed);
 const view = new WorldView(scene, map);
 const game = new Game(map, scene);
+// Somhairlín has raised a great work — announce it and refresh the stats/menu.
+game.onBuilt = (inst) => { flashNotice(`🔨 Somhairlín has raised your ${inst.def.label}.`); pushStats(); saveSettlement(); if (inst.def.unique) ui.refreshBuildMenu(); };
 
 const sim = { speed: 1 };
 const cal = { day: 5, month: 0 }; // open in the last days of winter, a breath before Imbolc
@@ -1427,6 +1429,7 @@ function confirmBuild() {
     return;
   }
   if (!pendingBuild || !BUILDINGS[tool]) return;
+  if (game.momentousBlocked(tool)) { flashNotice('🔨 Raise Somhairlín’s House first — she builds the great works.'); cancelPending(); return; }
   const f = footprint(tool, pendingBuild);
   if (game.place(tool, f)) {
     if (tool === 'homestead') { setCattle(campaign.cattle + 25); flashNotice('🐄 Your founding herd settles on the pasture — the wealth of a rí begins.'); } // cattle arrives with the homestead

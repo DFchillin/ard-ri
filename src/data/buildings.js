@@ -39,12 +39,22 @@ export const BUILDINGS = {
     desc: 'A great gallán with a small altar at each corner — a god must be housed here to fight for you. Reach it with a road and keep all three offerings flowing — food, water and culture, and it drinks twice a dwelling’s share — and it flourishes; while it does, a god you have hosted will answer your muster and take the field. Let any offering fail and the god turns away. (Heroes need no hall.)' },
   homestead: { label: 'Leader’s Homestead', sprite: 'roundhouse', art: 'longhouse', states: 4, icon: '🐄', footprint: [3, 3], cost: 30, role: 'homestead', unique: true, folk: 2, unlockLevel: 2,
     desc: 'Your own ráth and the seat of your rule. Cattle — the true measure of a king — graze the open pasture around it and multiply. Wealth to send in tribute or trade for what Ériu cannot make, and the prize a raider drives off.' },
+  somhairlin_house: { label: 'Somhairlín’s House', sprite: 'roundhouse', art: 'longhouse', states: 4, icon: '🔨', footprint: [2, 2], cost: 24, role: 'builder_house', unique: true, folk: 1,
+    desc: 'Teach Shomhairlín — the home of Somhairlín the builder. From here she walks out to raise the great works of the ráth: the leader’s seat, the gallán and every house of culture. Nothing momentous is finished until her hammer falls — and there is only one of her, so the great works wait their turn. (The everyday huts, fields and stores go up without her.)' },
 };
+
+// The great works Somhairlín must raise with her own hammer — placed as an
+// unfinished site, inactive until she walks out and builds it. Everything else
+// goes up at once. (Her house itself is not momentous — build it first.)
+export const MOMENTOUS = new Set([
+  'homestead', 'gallan', 'nemeton', 'hurling_field', 'feast_hall',
+  'wrestling_ring', 'brehon_court', 'healer_well', 'hosting_hall', 'monument',
+]);
 
 // Build-menu categories (Zeus-style tabs). 'road' and 'cros' are special items.
 export const CATEGORIES = [
   { id: 'infra', icon: '🛣️', label: 'Roads', items: ['road', 'cros'] },
-  { id: 'homes', icon: '🏠', label: 'Homes', items: ['homestead', 'roundhouse'] },
+  { id: 'homes', icon: '🏠', label: 'Homes', items: ['homestead', 'somhairlin_house', 'roundhouse'] },
   { id: 'farming', icon: '🌾', label: 'Farming', items: ['field', 'orchard', 'granary', 'sciobolmor'] },
   { id: 'services', icon: '🏛️', label: 'Services', items: ['market', 'aonach', 'well', 'altar'] },
   { id: 'culture', icon: '🎶', label: 'Culture', items: ['feast_hall', 'hurling_field', 'nemeton', 'gallan', 'hosting_hall', 'wrestling_ring', 'brehon_court', 'healer_well', 'monument'] },

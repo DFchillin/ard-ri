@@ -26,7 +26,7 @@ export const LEVELS = [
   {
     id: 2, title: 'The Cultured Túath', ga: 'An Túath Chultúrtha',
     objectives: [
-      { text: 'Raise your Leader’s Homestead', check: (g) => g.count('homestead') >= 1 },
+      { text: 'Raise your Leader’s Homestead', check: (g) => g.countBuilt('homestead') >= 1 },
       { text: 'Keep two shrines', check: (g) => g.count('altar') >= 2 },
       { text: 'Cultivate three cultured homes', check: (g) => g.buildings.filter((b) => b.def.role === 'dwelling' && b.culture > 0).length >= 3 },
       { text: 'Host a hero or god — open Trade from your Homestead', check: (g, c) => Object.keys(c.hosted || {}).length >= 1 },

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../data/buildings.js?v=CBUST';
+import { BUILDINGS, MOMENTOUS } from '../data/buildings.js?v=CBUST';
 import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeWarriorChip, makeWalkerChip, setChipActive, setChipState } from '../render/chips.js?v=CBUST';
 import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
@@ -77,6 +77,7 @@ export class Game {
     this.crewGroup = new THREE.Group();
     scene.add(this.buildingGroup, this.walkerGroup, this.menaceGroup, this.floatieGroup, this.blessGroup, this.crewGroup);
     this.crews = []; // Deaglán & his dog, out building a road
+    this.builder = null; // Somhairlín, out raising a great work (one at a time)
     this._floaties = [];
     this.menace = null;
 
@@ -187,10 +188,11 @@ export class Game {
     while (b.herdGroup.children.length > want) b.herdGroup.remove(b.herdGroup.children[b.herdGroup.children.length - 1]);
   }
   count(role) { return this.buildings.filter((b) => b.def.role === role).length; }
+  countBuilt(role) { return this.buildings.filter((b) => b.def.role === role && !b.building).length; } // finished only — excludes Somhairlín's sites
   anyStock(role) { return this.buildings.some((b) => b.def.role === role && b.stock > 0); }
   _storeHasRoom() { return this.buildings.some((b) => b.def.role === 'granary' && b.stock < GRANARY_CAP); }
   // A hurling monument lifts the harvest a fifth while it stands (grain & apples).
-  _farmBoost() { return this.buildings.some((b) => b.def.role === 'monument') ? 1.2 : 1; }
+  _farmBoost() { return this.buildings.some((b) => b.def.role === 'monument' && !b.building) ? 1.2 : 1; }
 
   // Half the folk are able workers — the rest are children and elders.
   workforce() { return Math.floor(this.folk * 0.5); }
@@ -289,9 +291,20 @@ export class Game {
     const def = BUILDINGS[key];
     if (this.silver < def.cost || !this.map.canPlace(f.x, f.z, f.w, f.h)) return false;
     if (def.unique && this.buildings.some((b) => b.def.role === def.role)) return false; // one homestead only
-    this._spawnBuilding(key, f);
+    if (MOMENTOUS.has(key) && !this._builderHouse()) return false; // the great works need Somhairlín's house first
+    const inst = this._spawnBuilding(key, f);
+    if (MOMENTOUS.has(key)) this._beginBuildSite(inst); // placed as an unfinished site until Somhairlín raises it
     this.silver -= def.cost;
     return true; // dwellings fill via immigrants, not instantly
+  }
+  _builderHouse() { return this.buildings.find((b) => b.def.role === 'builder_house' && !b.building); }
+  // Is this key a momentous build that can't be placed yet (no finished builder house)?
+  momentousBlocked(key) { return MOMENTOUS.has(key) && !this._builderHouse(); }
+  // Mark a building as an unfinished site: inactive, ghosted, waiting for the builder.
+  _beginBuildSite(inst) {
+    inst.building = true;
+    const s = inst.sprite && inst.sprite.userData && inst.sprite.userData.spr;
+    if (s) { s.material.transparent = true; s.material.opacity = 0.4; }
   }
 
   // Build the mesh + instance for a building. Shared by place() and restore().
@@ -302,6 +315,7 @@ export class Game {
       grown: 0, ripe: false, harvestsLeft: 0, connected: false, herd: def.role === 'homestead' ? 10 : 0,
       blessedDays: 0, // days a god's blessing keeps this home at the full of every good
       warden: null, patron: null, // a gallán may dedicate a warrior (warden) and be attributed to a god/hero (patron)
+      building: false, // true while an unfinished momentous site awaits Somhairlín
       growMax: FARM_GROW, harvests: FARM_HARVESTS, yieldTotal: (def.load || 0) * FARM_HARVESTS }; // for the field inspect readout
     this.map.place(f.x, f.z, f.w, f.h, inst);
 
@@ -346,7 +360,7 @@ export class Game {
     const buildings = this.buildings.map((b) => ({ key: b.key, x: b.x, z: b.z,
       pop: b.pop, stock: b.stock, food: b.food, water: b.water, culture: b.culture, herd: b.herd,
       grown: b.grown, ripe: b.ripe, harvestsLeft: b.harvestsLeft, warden: b.warden || null, patron: b.patron || null,
-      blessedDays: b.blessedDays || 0, tier: b.tier || 0 }));
+      blessedDays: b.blessedDays || 0, tier: b.tier || 0, building: !!b.building }));
     const menace = this.menace ? { x: this.menace.x, z: this.menace.z, w: this.menace.w, h: this.menace.h } : null;
     return { silver: this.silver, cattle: this.cattle, folk: this.folk, buildings, roads, cros, menace };
   }
@@ -357,6 +371,7 @@ export class Game {
     this.blessings = [];
     for (const c of this.crewGroup.children.slice()) this.crewGroup.remove(c);
     this.crews = [];
+    this._removeBuilder();
     for (const b of this.buildings.slice()) { this.buildingGroup.remove(b.sprite); if (b.fx) b.fx.dispose(); if (b.fx2) b.fx2.dispose(); }
     this.buildings = [];
     for (const w of this.walkers.slice()) this.walkerGroup.remove(w.sprite);
@@ -377,6 +392,7 @@ export class Game {
       Object.assign(inst, { pop: b.pop || 0, stock: b.stock || 0, food: b.food || 0, water: b.water || 0, culture: b.culture || 0,
         grown: b.grown || 0, ripe: !!b.ripe, harvestsLeft: b.harvestsLeft || 0, warden: b.warden || null, patron: b.patron || null,
         blessedDays: b.blessedDays || 0, tier: b.tier || 0 });
+      if (b.building) this._beginBuildSite(inst); // a site saved mid-build — Somhairlín will resume
       if (def.role === 'dwelling') inst.cap = inst.tier >= PROSPER_TIER ? PROSPER_CAP : (def.folk || 4);
       if (def.role === 'homestead') { inst.herd = b.herd || 10; this._updateHerd(inst); }
     }
@@ -439,7 +455,8 @@ export class Game {
       b.connected = connected;
       if (b.alert) b.alert.visible = !connected && b.def.role !== 'homestead' && b.def.role !== 'gallan'; // homestead and standing-stone need no road
       // dwellings rise when occupied; a field only shows its golden crop when ripe; else road-connected
-      const active = b.def.role === 'dwelling' ? b.pop > 0
+      const active = b.building ? false // an unfinished site produces nothing until Somhairlín raises it
+        : b.def.role === 'dwelling' ? b.pop > 0
         : b.def.role === 'farm' ? b.ripe
         : b.def.role === 'homestead' ? true
         : connected;
@@ -469,6 +486,7 @@ export class Game {
     }
   }
   _tickBuilding(b) {
+    if (b.building) return; // unfinished site — no walkers, no output until it's raised
     switch (b.def.role) {
       case 'farm': {
         // The field ripens on a growth cycle; only a ripe field is golden & harvested.
@@ -858,6 +876,58 @@ export class Game {
     }
   }
 
+  // Somhairlín the builder: she walks out from her house to the next unfinished
+  // great work, hammers it to completion (one at a time), then heads home. Only
+  // one of her ever. `onBuilt(inst)` is fired when a site is raised.
+  _buildTime(site) { return 4 + (site.w * site.h) * 0.45; } // bigger works take longer
+  _nextSite(hc) {
+    let best = null, bd = Infinity;
+    for (const b of this.buildings) {
+      if (!b.building || b._claimed) continue;
+      const c = this._center(b), d = (c.x - hc.x) ** 2 + (c.z - hc.z) ** 2;
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  }
+  _removeBuilder() { if (this.builder) { this.walkerGroup.remove(this.builder.chip); this.builder = null; } }
+  _finishSite(b) {
+    const site = b.site;
+    site.building = false; site._claimed = false;
+    const m = site.sprite && site.sprite.userData && site.sprite.userData.spr && site.sprite.userData.spr.material;
+    if (m) { m.opacity = 1; m.transparent = true; }
+    if (this.onBuilt) this.onBuilt(site);
+    b.state = 'toHouse'; b.to = b.home; // head home, then free for the next
+  }
+  _updateBuilders(dt) {
+    const house = this._builderHouse();
+    if (!house) { this._removeBuilder(); return; } // no finished house → she can't work
+    if (!this.builder) {
+      const hc = this._center(house), site = this._nextSite(hc);
+      if (!site) return;
+      const chip = makeWalkerChip('somhairlin', true, 1.35);
+      chip.position.set(hc.x, 0.05, hc.z); chip.renderOrder = 2; this.walkerGroup.add(chip);
+      site._claimed = true;
+      this.builder = { chip, state: 'toSite', home: hc, to: this._center(site), site, timer: 0, dur: 0, spark: 0 };
+    }
+    const b = this.builder, BSPEED = 2.2;
+    if (b.state === 'toSite' || b.state === 'toHouse') {
+      const dx = b.to.x - b.chip.position.x, dz = b.to.z - b.chip.position.z, dist = Math.hypot(dx, dz);
+      if (b.chip.faceWorld) b.chip.faceWorld(dx, dz);
+      if (b.chip.animate) b.chip.animate(dt, true);
+      if (dist < 0.18) {
+        if (b.state === 'toSite') { b.dur = this._buildTime(b.site); b.timer = b.dur; b.state = 'hammer'; }
+        else this._removeBuilder();
+      } else { const s = Math.min(dist, BSPEED * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s; }
+    } else if (b.state === 'hammer') {
+      if (b.chip.animate) b.chip.animate(dt, false);
+      b.timer -= dt; b.spark -= dt;
+      if (b.spark <= 0) { b.spark = 0.3; this._floatie(b.chip.position.x + (Math.random() - 0.5) * 0.5, 1.2, b.chip.position.z, 'food', { sz: 0.1, vy: 0.7, life: 0.45, over: true }); }
+      const m = b.site.sprite && b.site.sprite.userData && b.site.sprite.userData.spr && b.site.sprite.userData.spr.material;
+      if (m) m.opacity = 0.4 + (1 - Math.max(0, b.timer) / b.dur) * 0.6; // ghost firms up as it nears done
+      if (b.timer <= 0) this._finishSite(b);
+    }
+  }
+
   // Altar → druid wanders roads, raising the culture of the dwellings it passes.
   _sendDruid(altar) {
     const entry = entryRoadTile(this.map, altar);
@@ -968,6 +1038,7 @@ export class Game {
     if (this.menace) this._moveMenaceCreature(dt);
     if (this.blessings.length) this._updateBlessings(dt);
     if (this.crews.length) this._updateCrews(dt);
+    this._updateBuilders(dt);
     this._updateVigils(dt);
   }
 
