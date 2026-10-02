@@ -415,7 +415,7 @@ export class Game {
   }
 
   _spawn(entry, opts) {
-    const female = Math.random() < 0.5;
+    const female = opts.female != null ? opts.female : Math.random() < 0.5; // single-gender roles pass female:false
     const person = { name: randomName(female), female, ...personFor(opts.personType || opts.type) };
     const w = new Walker(this.map, entry, { ...opts, person });
     w.source = opts.source || null;
@@ -980,7 +980,7 @@ export class Game {
     if (!src) return;
     const entry = entryRoadTile(this.map, src);
     if (!entry) return;
-    this._spawn(entry, { type: 'vigil', personType: 'risen', steps: 46, speed: 1.35, tint: 0x9fb8ff, opacity: 0.55, tag: 'risen' });
+    this._spawn(entry, { type: 'sluagh', personType: 'risen', female: false, steps: 46, speed: 1.35, opacity: 0.85, tag: 'risen' });
   }
 
   update(dt) {

@@ -25,6 +25,8 @@ const WALK_FILE = {
   // same figure's alternate animation played as its walk cycle.
   deaglan: 'deaglan', deaglan_dig: 'deaglan_dig',
   finn: 'finn', finn_run: 'finn_run', vigil: 'vigil', vigil_f: 'vigil_f',
+  // Next-gen character art: hurler (f: camogie player) and the sluagh (restless dead).
+  hurler: 'hurler', sluagh: 'sluagh',
 };
 
 const FALLBACK = {
