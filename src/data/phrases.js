@@ -1,7 +1,7 @@
 // Role labels and spoken lines, in Irish (ga) with English (en). Keyed by walker
 // type. Grow mission by mission, unit by unit. Irish welcome to be refined.
 export const ROLE_LABELS = {
-  grain_carrier: { en: 'Farm Hand', ga: 'Oibrí Feirme' },
+  grain_carrier: { en: 'Goods Carrier', ga: 'Iompróir Earraí' },
   market_trader: { en: 'Trader', ga: 'Ceannaí' },
   water_carrier: { en: 'Water Carrier', ga: 'Iompróir Uisce' },
   druid: { en: 'Druid', ga: 'Draoi' },

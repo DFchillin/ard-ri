@@ -595,26 +595,32 @@ export class Game {
     this.walkerGroup.add(tr.sprite);
   }
 
-  // Farm → grain_carrier wanders roads, deposits its load in the first granary it passes.
+  // --- Directed deliveries: a goods carrier walks straight from source to target
+  // (field → store → market), carrying the goods, so it never wanders or flickers.
+  _tileOf(b) { return { x: b.x + (b.w >> 1), z: b.z + (b.h >> 1) }; }
+  _nearestTo(from, list) {
+    const fc = this._center(from); let best = null, bd = Infinity;
+    for (const b of list) { const c = this._center(b), d = (c.x - fc.x) ** 2 + (c.z - fc.z) ** 2; if (d < bd) { bd = d; best = b; } }
+    return best;
+  }
+  _deliver(fromB, toB, type, carrying, onArrive) {
+    const person = { name: randomName(false), female: false, carrying, ...personFor(type) };
+    const tr = new Traveler(this.map, this._tileOf(fromB), this._tileOf(toB), { type, speed: 2.3, person, onArrive });
+    tr.source = fromB; // so _walkersFrom() still caps how many a building has on the roads
+    this.walkers.push(tr); this.walkerGroup.add(tr.sprite);
+    return tr;
+  }
+
+  // Farm → nearest grain store: the carrier walks straight there and drops its load.
   _sendGrain(farm) {
-    const entry = entryRoadTile(this.map, farm);
-    if (!entry) return;
     let load = Math.round(farm.def.load * this._farmBoost());
-    this._storeFx(farm, null); // a diamond lifts off the field as the hand takes up the grain
-    this._spawn(entry, {
-      type: 'grain_carrier', label: 'G', steps: 26, speed: 2.4, source: farm,
-      onTile: (x, z, w) => {
-        if (load <= 0) return;
-        if (w && w.sprite) this._floatie(w.sprite.position.x, 0.95, w.sprite.position.z, 'food', { sz: 0.12, vy: 0.25, life: 0.55, over: true, shape: 'diamond' }); // grain they carry — follow the trail to the store
-        for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'granary' && inst.stock < GRANARY_CAP) { // stores fill to a cap
-            const add = Math.min(load, GRANARY_CAP - inst.stock);
-            inst.stock += add; load -= add; this._storeFx(inst, w); // show the harvest landing in the store
-            if (load <= 0) break;
-          }
-        }
-      },
-    });
+    if (load <= 0) return;
+    const stores = this.buildings.filter((b) => b.def.role === 'granary' && !b.building && b.stock < GRANARY_CAP);
+    if (!stores.length) return; // nowhere to store — the field holds its ripe grain
+    const store = this._nearestTo(farm, stores);
+    const add = Math.min(load, GRANARY_CAP - store.stock);
+    this._storeFx(farm, null); // grain taken up off the field
+    this._deliver(farm, store, 'grain_carrier', '🌾 grain', () => { store.stock = Math.min(GRANARY_CAP, store.stock + add); this._storeFx(store, null); });
   }
 
   // Well → water_carrier wanders roads, refilling the dwellings it passes.
@@ -904,27 +910,33 @@ export class Game {
     if (!this.builder) {
       const hc = this._center(house), site = this._nextSite(hc);
       if (!site) return;
-      const chip = makeWalkerChip('somhairlin', true, 1.35);
+      const chip = makeWalkerChip('somhairlin', false, 1.35); // her own art — not the female fallback (there is no _f set)
       chip.position.set(hc.x, 0.05, hc.z); chip.renderOrder = 2; this.walkerGroup.add(chip);
       site._claimed = true;
-      this.builder = { chip, state: 'toSite', home: hc, to: this._center(site), site, timer: 0, dur: 0, spark: 0 };
+      const c = this._center(site), ix = (site.w * this.map.tile) / 2 - 0.5, iz = (site.h * this.map.tile) / 2 - 0.5;
+      const corners = [{ x: c.x - ix, z: c.z - iz }, { x: c.x + ix, z: c.z - iz }, { x: c.x + ix, z: c.z + iz }, { x: c.x - ix, z: c.z + iz }];
+      this.builder = { chip, state: 'toCorner', home: hc, site, corners, ci: 0, to: corners[0], cornerDur: this._buildTime(site) / 4, timer: 0, spark: 0 };
     }
     const b = this.builder, BSPEED = 2.2;
-    if (b.state === 'toSite' || b.state === 'toHouse') {
+    if (b.state === 'toCorner' || b.state === 'toHouse') {
       const dx = b.to.x - b.chip.position.x, dz = b.to.z - b.chip.position.z, dist = Math.hypot(dx, dz);
       if (b.chip.faceWorld) b.chip.faceWorld(dx, dz);
       if (b.chip.animate) b.chip.animate(dt, true);
       if (dist < 0.18) {
-        if (b.state === 'toSite') { b.dur = this._buildTime(b.site); b.timer = b.dur; b.state = 'hammer'; }
-        else this._removeBuilder();
+        if (b.state === 'toHouse') { this._removeBuilder(); return; }
+        b.state = 'hammer'; b.timer = b.cornerDur; // reached a corner — hammer it
       } else { const s = Math.min(dist, BSPEED * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s; }
     } else if (b.state === 'hammer') {
       if (b.chip.animate) b.chip.animate(dt, false);
       b.timer -= dt; b.spark -= dt;
-      if (b.spark <= 0) { b.spark = 0.3; this._floatie(b.chip.position.x + (Math.random() - 0.5) * 0.5, 1.2, b.chip.position.z, 'food', { sz: 0.1, vy: 0.7, life: 0.45, over: true }); }
+      if (b.spark <= 0) { b.spark = 0.28; this._floatie(b.chip.position.x + (Math.random() - 0.5) * 0.4, 1.1, b.chip.position.z, 'food', { sz: 0.1, vy: 0.7, life: 0.45, over: true }); }
       const m = b.site.sprite && b.site.sprite.userData && b.site.sprite.userData.spr && b.site.sprite.userData.spr.material;
-      if (m) m.opacity = 0.4 + (1 - Math.max(0, b.timer) / b.dur) * 0.6; // ghost firms up as it nears done
-      if (b.timer <= 0) this._finishSite(b);
+      if (m) m.opacity = 0.4 + Math.min(1, (b.ci + (1 - Math.max(0, b.timer) / b.cornerDur)) / 4) * 0.6; // firms up corner by corner
+      if (b.timer <= 0) {
+        b.ci += 1;
+        if (b.ci >= 4) this._finishSite(b); // all four corners hammered — raised
+        else { b.state = 'toCorner'; b.to = b.corners[b.ci]; }
+      }
     }
   }
 
@@ -943,21 +955,16 @@ export class Game {
   }
 
   // Market pulls grain from any road-connected granary into its own stock.
+  // Store → market: a carrier walks a load of grain from the nearest granary to the
+  // market (one trip at a time), so you can follow the goods along the chain.
   _restock(market) {
-    if (market.stock >= MARKET_CAP) return;
-    const mEntry = entryRoadTile(this.map, market);
-    if (!mEntry) return;
-    for (const g of this.buildings) {
-      if (g.def.role !== 'granary' || g.stock <= 0) continue;
-      const gEntry = entryRoadTile(this.map, g);
-      if (gEntry && roadConnected(this.map, mEntry, gEntry)) {
-        const take = Math.min(g.stock, MARKET_CAP - market.stock);
-        g.stock -= take;
-        market.stock += take;
-        if (take > 0) this._storeFx(market, null); // goods arriving at the market
-        if (market.stock >= MARKET_CAP) break;
-      }
-    }
+    if (market.stock >= MARKET_CAP || market._restocking || !market.connected) return;
+    const stores = this.buildings.filter((g) => g.def.role === 'granary' && !g.building && g.stock > 0);
+    if (!stores.length) return;
+    const store = this._nearestTo(market, stores);
+    const take = Math.min(store.stock, MARKET_CAP - market.stock);
+    store.stock -= take; market._restocking = true; // reserved and in transit
+    this._deliver(store, market, 'grain_carrier', '🌾 grain', () => { market.stock = Math.min(MARKET_CAP, market.stock + take); market._restocking = false; this._storeFx(market, null); });
   }
 
   // Market → market_trader wanders roads, feeding dwellings it passes.
@@ -1043,15 +1050,16 @@ export class Game {
   }
 
   // --- Animation, one call per frame (dt already scaled by game speed) ---
-  // For the seven days from Samhain the dead walk the ráth: risen warriors, pale
-  // and half-there, wander the roads. `deadWalk` is set from the calendar.
+  // Through Samhain (all of November) the dead walk the ráth: mostly the risen
+  // village folk, pale and ghostly-tinted; only rarely the skeletal Sluagh.
   _spawnRisen() {
     const homes = this.buildings.filter((b) => b.def.role === 'dwelling');
     const src = homes.length ? homes[(Math.random() * homes.length) | 0] : this.buildings.find((b) => b.def.role);
     if (!src) return;
     const entry = entryRoadTile(this.map, src);
     if (!entry) return;
-    this._spawn(entry, { type: 'sluagh', personType: 'risen', female: false, steps: 46, speed: 1.35, opacity: 0.85, tag: 'risen' });
+    if (Math.random() < 0.05) this._spawn(entry, { type: 'sluagh', personType: 'risen', female: false, steps: 46, speed: 1.3, opacity: 0.85, tag: 'risen' });
+    else this._spawn(entry, { type: 'villager', personType: 'risen', steps: 46, speed: 1.6, tint: 0xbcd6ff, opacity: 0.5, tag: 'risen' });
   }
 
   update(dt) {
@@ -1061,7 +1069,10 @@ export class Game {
         this._deadWalkT = 4 + Math.random() * 4;
         if (this.walkers.filter((w) => w.tag === 'risen').length < 4) this._spawnRisen();
       }
+    } else if (this._wasDeadWalk) { // the window just closed (December) — clear any lingering dead at once
+      for (let i = this.walkers.length - 1; i >= 0; i--) { const w = this.walkers[i]; if (w.tag === 'risen') { this.walkerGroup.remove(w.sprite); if (w.dispose) w.dispose(); this.walkers.splice(i, 1); } }
     }
+    this._wasDeadWalk = this.deadWalk;
     for (const w of this.walkers) w.update(dt);
     const alive = [];
     for (const w of this.walkers) {

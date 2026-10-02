@@ -1079,6 +1079,7 @@ function updatePreview(e) {
 function personHtml(p) {
   const name = p.nick ? `${p.name} ‘${p.nick}’` : p.name;
   return `<h3>${name}</h3><div class="role">${p.roleEn} · ${p.roleGa}</div>` +
+    (p.carrying ? `<p class="carrying">Carrying: ${p.carrying}</p>` : '') +
     `<blockquote>“${p.phraseGa}”<br><span class="en">“${p.phraseEn}”</span></blockquote>`;
 }
 function buildingHtml(inst) {
