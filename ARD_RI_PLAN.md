@@ -293,3 +293,40 @@ lodge, paid) · Summon (heroes/gods). Roster gains from each.
 The walker-service model (market/well/altar dispatch walkers that deliver only
 to adjacent dwellings) is invisible; add delivery pips + clearer inspects so
 players can see food/water/culture reaching (or missing) each home.
+
+---
+
+## 12. Parked ideas — first-person / walk-along modes
+
+**Status: back burner.** Engine-side these are small; the cost is art.
+
+### Stroll your ráth (first/low-person explore mode)
+Swap the ortho iso camera for a `PerspectiveCamera` at eye height with
+mouselook + movement. The scene is already real 3D, so this is only a few
+hundred lines and reuses everything: ground/road meshes render correctly
+underfoot, and the 8-direction character billboards *already* pick the right
+facing via `screenDir()` (the Doom/Wolfenstein trick), so townsfolk look right
+as you walk around them.
+
+- **The blocker is the buildings.** Today each building is one flat billboard
+  drawn from the ¾-overhead iso angle and set to always face the camera — up
+  close it reads as a cardboard standee painted from the wrong viewpoint.
+- **The fix (art dependency):** redraw the iso buildings as **front-on
+  elevation billboards** that **stand upright** (lock them to the Y-axis so they
+  turn horizontally but never tilt). Likely path: feed the existing iso building
+  art to an image model (e.g. ChatGPT / image-gen) and have it produce a
+  front-on standing version of each. This is the real work item and gates the
+  whole mode.
+- **Movement constraint:** the player **strolls the roads only, not the open
+  fields.** Movement follows the `road` tile network the walkers already use, so
+  "where can I go" and collision come almost for free — no need to make every
+  field, wall and water edge solid.
+
+### Ride along with a company (battlefield — the cheap first experiment)
+The battlefield has **no buildings**, so the billboard blocker simply doesn't
+exist there. Units are already 8-direction animated warrior chips
+(idle / walk / strike) on open terrain — exactly the case a first/third-person
+camera handles well. A `PerspectiveCamera` that attaches to (or follows just
+behind) a chosen company's centroid would give a "march / charge with the slua"
+view with almost no new art. **Try this before the settlement stroll** — it
+proves the perspective-camera + sprite-facing feel with zero art dependency.

@@ -21,9 +21,9 @@ export const BUILDINGS = {
     desc: 'A standing-stone shrine to the old powers. Its druid is kept by your treasury, and a hero is far likelier to answer a túath that keeps one.' },
   gallan: { label: 'Gallán', sprite: 'altar', art: 'gallan', states: 4, drawW: 3.3, icon: '🪨', footprint: [3, 3], cost: 16, role: 'gallan', unlockLevel: 3,
     desc: 'A gallán — a great carved standing-stone. Dedicate one of your warriors to keep vigil at it: while they stand watch they cannot take the field, but the old powers look far kinder on your muster, and a hosted hero or god is likelier to answer the horn.' },
-  hurling_field: { label: 'Hurling Field', sprite: 'market', art: 'hurling_field', states: 4, drawW: 4.0, icon: '🏑', footprint: [4, 4], cost: 24, role: 'culture', unlockLevel: 3, cultureWalker: { type: 'villager', war: true, label: 'P' },
+  hurling_field: { label: 'Hurling Field', sprite: 'market', art: 'hurling_field', states: 4, drawW: 4.0, icon: '🏑', footprint: [4, 4], cost: 24, role: 'culture', unlockLevel: 3, cultureWalker: { type: 'villager', war: true, label: 'P', persona: 'hurler' },
     desc: 'A faiche iomána — the hurling green. Young folk match camán and sliotar here, and the whole túath turns out to roar them on. Sends players onto the roads to lift the spirits of the streets they pass.' },
-  feast_hall: { label: 'Feast Hall', sprite: 'longhouse', art: 'feast_hall', states: 4, drawW: 4.0, icon: '🍺', footprint: [4, 4], cost: 30, role: 'culture', unlockLevel: 3,
+  feast_hall: { label: 'Feast Hall', sprite: 'longhouse', art: 'feast_hall', states: 4, drawW: 4.0, icon: '🍺', footprint: [4, 4], cost: 30, role: 'culture', unlockLevel: 3, cultureWalker: { type: 'villager', label: 'R' }, festivalRevellers: 6,
     desc: 'A bruíon — the great feasting-hall, hung with banners and loud with ale and story. Its poets and revellers walk the roads and lift the culture of every home they pass.' },
   nemeton: { label: 'Stone Circle', sprite: 'altar', art: 'nemeton', states: 4, drawW: 3.5, icon: '🌀', footprint: [3, 3], cost: 22, role: 'culture', unlockLevel: 3,
     desc: 'A neimheadh — a ring of carved stones, sacred ground where the túath gathers for the great feasts of the year. Its druids walk the roads and raise the culture of the streets around it.' },
@@ -33,6 +33,10 @@ export const BUILDINGS = {
     desc: 'An fhaiche dála — the assembly-green where the breitheamh gives judgment from the seat of stones under the Fénechas, the old law. Its people walk the roads and settle the streets they pass with the confidence of a just túath.' },
   healer_well: { label: 'Healer’s Well', sprite: 'roundhouse', art: 'healer_well', states: 4, drawW: 4.0, icon: '🌿', footprint: [4, 4], cost: 30, role: 'culture', unlockLevel: 7,
     desc: 'Teach an leighis is an tobar naofa — the healer’s hut beside the sacred well, hung with drying herbs. The lucht leighis carry cure and clean water out along the roads and raise the heart of every home they tend.' },
+  monument: { label: 'Hurling Monument', sprite: 'altar', art: 'gallan', states: 4, drawW: 2.8, icon: '🏆', footprint: [2, 2], cost: 20, role: 'monument', needsWin: true,
+    desc: 'A carved pillar raised for a hurling victory over a wandering band. While it stands, pride in the ráth lifts the harvest — grain and apples come in a fifth more plentiful.' },
+  hosting_hall: { label: 'Hall of the Gods', sprite: 'altar', art: 'gallan', states: 4, drawW: 4.6, icon: '⛩️', footprint: [4, 4], cost: 44, role: 'hall', unique: true, unlockLevel: 5,
+    desc: 'A great gallán with a small altar at each corner — a god must be housed here to fight for you. Reach it with a road and keep all three offerings flowing — food, water and culture, and it drinks twice a dwelling’s share — and it flourishes; while it does, a god you have hosted will answer your muster and take the field. Let any offering fail and the god turns away. (Heroes need no hall.)' },
   homestead: { label: 'Leader’s Homestead', sprite: 'roundhouse', art: 'longhouse', states: 4, icon: '🐄', footprint: [3, 3], cost: 30, role: 'homestead', unique: true, folk: 2, unlockLevel: 2,
     desc: 'Your own ráth and the seat of your rule. Cattle — the true measure of a king — graze the open pasture around it and multiply. Wealth to send in tribute or trade for what Ériu cannot make, and the prize a raider drives off.' },
 };
@@ -43,7 +47,7 @@ export const CATEGORIES = [
   { id: 'homes', icon: '🏠', label: 'Homes', items: ['homestead', 'roundhouse'] },
   { id: 'farming', icon: '🌾', label: 'Farming', items: ['field', 'orchard', 'granary', 'sciobolmor'] },
   { id: 'services', icon: '🏛️', label: 'Services', items: ['market', 'aonach', 'well', 'altar'] },
-  { id: 'culture', icon: '🎶', label: 'Culture', items: ['feast_hall', 'hurling_field', 'nemeton', 'gallan', 'wrestling_ring', 'brehon_court', 'healer_well'] },
+  { id: 'culture', icon: '🎶', label: 'Culture', items: ['feast_hall', 'hurling_field', 'nemeton', 'gallan', 'hosting_hall', 'wrestling_ring', 'brehon_court', 'healer_well', 'monument'] },
 ];
 
 export const ROAD_ITEM = { key: 'road', label: 'Road', icon: '🛣️', cost: 0,

@@ -50,7 +50,18 @@ jobs:
           set net:timeout 20
           set net:max-retries 2
           mkdir -f -p "$TARGET"
+          # Assets are ~60 MB of sprite PNGs that almost never change, but a fresh
+          # checkout resets every file's mtime, so a time-based mirror re-uploaded
+          # them all every deploy (the 20-30 min). Compare assets by SIZE only
+          # (--ignore-time) so unchanged sprites are skipped; only new/changed art
+          # transfers. --delete still prunes art removed from the repo.
+          mirror --reverse --verbose --delete --continue --ignore-time \
+            ./assets "$TARGET/assets"
+          # Everything else (the ~26 stamped JS files + index.html + small configs)
+          # is tiny and gets a fresh cache-bust stamp each deploy, so upload it
+          # normally. assets/ is excluded here so this pass leaves that art alone.
           mirror --reverse --verbose --delete --continue \
+            --exclude assets/ \
             --exclude .git/ \
             --exclude .github/ \
             --exclude node_modules/ \

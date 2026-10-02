@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js?v=CBUST';
-import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeWarriorChip, setChipActive, setChipState } from '../render/chips.js?v=CBUST';
+import { makeBuildingChip, makeAlertMarker, makeInspectDot, makeCowToken, makeWarriorChip, makeWalkerChip, setChipActive, setChipState } from '../render/chips.js?v=CBUST';
 import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
 
@@ -23,7 +23,19 @@ const PIP_TEX = (() => {
   x.strokeStyle = 'rgba(35,22,12,0.55)'; x.lineWidth = 2.5; x.beginPath(); x.arc(24, 24, 20, 0, Math.PI * 2); x.stroke();
   const t = new THREE.CanvasTexture(c); return t;
 })();
-import { entryRoadTile, adjacentBuildings, roadConnected } from './roads.js?v=CBUST';
+// A diamond bead — for grain arriving at a store or market, so the harvest coming
+// in off the fields reads differently from the round pips a home receives.
+const PIP_TEX_DIAMOND = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 48;
+  const x = c.getContext('2d');
+  x.translate(24, 24); x.rotate(Math.PI / 4);
+  const g = x.createLinearGradient(-16, -16, 16, 16);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0.85)');
+  x.fillStyle = g; x.fillRect(-15, -15, 30, 30);
+  x.strokeStyle = 'rgba(35,22,12,0.6)'; x.lineWidth = 3; x.strokeRect(-15, -15, 30, 30);
+  const t = new THREE.CanvasTexture(c); return t;
+})();
+import { entryRoadTile, adjacentBuildings, roadConnected, roadNeighbors } from './roads.js?v=CBUST';
 import { randomName } from '../data/names.js?v=CBUST';
 import { personFor } from '../data/phrases.js?v=CBUST';
 
@@ -62,7 +74,9 @@ export class Game {
     this.menaceGroup = new THREE.Group();
     this.floatieGroup = new THREE.Group();
     this.blessGroup = new THREE.Group();
-    scene.add(this.buildingGroup, this.walkerGroup, this.menaceGroup, this.floatieGroup, this.blessGroup);
+    this.crewGroup = new THREE.Group();
+    scene.add(this.buildingGroup, this.walkerGroup, this.menaceGroup, this.floatieGroup, this.blessGroup, this.crewGroup);
+    this.crews = []; // Deaglán & his dog, out building a road
     this._floaties = [];
     this.menace = null;
 
@@ -87,7 +101,7 @@ export class Game {
 
   showInspectDots(on) { this._inspectDots = on; for (const b of this.buildings) if (b.dot) b.dot.visible = on; }
 
-  // --- The menace: a blighted, unbuildable patrol zone with a Fomorian giant ---
+  // --- The menace: a blighted, unbuildable patrol zone with the Ollphéist serpent ---
   spawnMenace(x, z, w, h) {
     this.clearMenace();
     x = Math.max(0, Math.min(x, this.map.size - w)); z = Math.max(0, Math.min(z, this.map.size - h));
@@ -95,7 +109,7 @@ export class Game {
     this._markMenace(true);
     this._razeInMenace();
     this._drawMenaceZone();
-    const cre = makeWarriorChip('fomor', 3.6); this.menace.creature = cre; this.menaceGroup.add(cre); // the red-and-black Fomor, same figure you march on
+    const cre = makeWarriorChip('olipheist', 3.6); this.menace.creature = cre; this.menaceGroup.add(cre); // the Ollphéist — the great serpent you march on
     this._moveMenaceCreature(0);
   }
   clearMenace() {
@@ -175,6 +189,8 @@ export class Game {
   count(role) { return this.buildings.filter((b) => b.def.role === role).length; }
   anyStock(role) { return this.buildings.some((b) => b.def.role === role && b.stock > 0); }
   _storeHasRoom() { return this.buildings.some((b) => b.def.role === 'granary' && b.stock < GRANARY_CAP); }
+  // A hurling monument lifts the harvest a fifth while it stands (grain & apples).
+  _farmBoost() { return this.buildings.some((b) => b.def.role === 'monument') ? 1.2 : 1; }
 
   // Half the folk are able workers — the rest are children and elders.
   workforce() { return Math.floor(this.folk * 0.5); }
@@ -216,8 +232,19 @@ export class Game {
     if (this.silver >= wages) { this.silver -= wages; this.broke = false; }
     else { this.silver = 0; this.broke = wages > 0; } // payroll unmet — public folk go unpaid
     for (const b of this.buildings) if (b.def.role === 'dwelling') this._dwellingDay(b, festival, newMonth);
+    for (const b of this.buildings) if (b.def.role === 'hall') this._hallDay(b);
     return { rent, wages, net: rent - wages, festival, broke: this.broke };
   }
+
+  // The Hall of Hosting drinks twice a dwelling's share of every offering. While
+  // all three flow it flourishes, and a hosted god will answer the muster.
+  _hallDay(b) {
+    b.food = Math.max(0, b.food - FOOD_DECAY * 2);
+    b.water = Math.max(0, b.water - WATER_DECAY * 2);
+    b.culture = Math.max(0, b.culture - CULTURE_DECAY * 2);
+  }
+  hall() { return this.buildings.find((b) => b.def.role === 'hall'); }
+  hallFlourishing() { const h = this.hall(); return !!(h && h.food > 0 && h.water > 0 && h.culture > 0); }
 
   // A home, once a day: its supply drains, it may lose a family to lasting want,
   // and its prosperity tier steps up at a festival (if it's thriving) or slips at
@@ -328,6 +355,8 @@ export class Game {
     this.clearMenace();
     for (const c of this.blessGroup.children.slice()) this.blessGroup.remove(c);
     this.blessings = [];
+    for (const c of this.crewGroup.children.slice()) this.crewGroup.remove(c);
+    this.crews = [];
     for (const b of this.buildings.slice()) { this.buildingGroup.remove(b.sprite); if (b.fx) b.fx.dispose(); if (b.fx2) b.fx2.dispose(); }
     this.buildings = [];
     for (const w of this.walkers.slice()) this.walkerGroup.remove(w.sprite);
@@ -387,10 +416,12 @@ export class Game {
 
   _spawn(entry, opts) {
     const female = Math.random() < 0.5;
-    const person = { name: randomName(female), female, ...personFor(opts.type) };
+    const person = { name: randomName(female), female, ...personFor(opts.personType || opts.type) };
     const w = new Walker(this.map, entry, { ...opts, person });
     w.source = opts.source || null;
+    if (opts.tag) w.tag = opts.tag;
     if (opts.tint != null && w.sprite && w.sprite.material) w.sprite.material.color.setHex(opts.tint); // war-colour the hurling players
+    if (opts.opacity != null && w.sprite && w.sprite.material) { w.sprite.material.transparent = true; w.sprite.material.opacity = opts.opacity; } // spectral risen-dead
     this.walkers.push(w);
     this.walkerGroup.add(w.sprite);
   }
@@ -550,15 +581,17 @@ export class Game {
   _sendGrain(farm) {
     const entry = entryRoadTile(this.map, farm);
     if (!entry) return;
-    let load = farm.def.load;
+    let load = Math.round(farm.def.load * this._farmBoost());
+    this._storeFx(farm, null); // a diamond lifts off the field as the hand takes up the grain
     this._spawn(entry, {
       type: 'grain_carrier', label: 'G', steps: 26, speed: 2.4, source: farm,
-      onTile: (x, z) => {
+      onTile: (x, z, w) => {
         if (load <= 0) return;
+        if (w && w.sprite) this._floatie(w.sprite.position.x, 0.95, w.sprite.position.z, 'food', { sz: 0.12, vy: 0.25, life: 0.55, over: true, shape: 'diamond' }); // grain they carry — follow the trail to the store
         for (const inst of adjacentBuildings(this.map, x, z)) {
           if (inst.def.role === 'granary' && inst.stock < GRANARY_CAP) { // stores fill to a cap
             const add = Math.min(load, GRANARY_CAP - inst.stock);
-            inst.stock += add; load -= add;
+            inst.stock += add; load -= add; this._storeFx(inst, w); // show the harvest landing in the store
             if (load <= 0) break;
           }
         }
@@ -574,7 +607,7 @@ export class Game {
       type: 'water_carrier', label: 'W', steps: 24, speed: 2.6, source: well,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.water < HOUSE_CAP) { inst.water = HOUSE_CAP; this._deliverFx(inst, w, 'water'); } // one visit fills the home (~10 days)
+          if ((inst.def.role === 'dwelling' || inst.def.role === 'hall') && inst.water < HOUSE_CAP) { inst.water = HOUSE_CAP; this._deliverFx(inst, w, 'water'); } // one visit fills the home (~10 days)
         }
       },
     });
@@ -588,62 +621,239 @@ export class Game {
     const entry = entryRoadTile(this.map, src);
     if (!entry) return;
     this._spawn(entry, {
-      type: cw.type || 'druid', label: cw.label || 'D', steps: 26, speed: 2.2, source: src,
+      type: cw.type || 'druid', personType: cw.persona || null, label: cw.label || 'D', steps: 26, speed: 2.2, source: src,
       tint: cw.war ? this.warTint : null,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) { inst.culture = HOUSE_CAP; this._deliverFx(inst, w, 'culture'); }
+          if ((inst.def.role === 'dwelling' || inst.def.role === 'hall') && inst.culture < HOUSE_CAP) { inst.culture = HOUSE_CAP; this._deliverFx(inst, w, 'culture'); }
         }
       },
     });
   }
 
-  // A patron god, prayed to at a gallán, manifests at the stones and walks among a
-  // few of the nearest homes, blessing each to the full of every good for a good
-  // while (blessedDays) — a divine boon that neither wants nor drains. Returns how
-  // many homes will be visited (0 if there are none to bless).
+  // Each festival, a feast hall pours a burst of revellers onto the roads — more
+  // than its everyday pair — to carry the celebration through the streets.
+  festivalRevels() {
+    for (const b of this.buildings) {
+      const n = b.def.festivalRevellers || 0;
+      if (!n || !entryRoadTile(this.map, b) || this.folk <= 0) continue;
+      for (let i = 0; i < n; i++) this._sendCultureRaiser(b);
+    }
+  }
+
+  // Show (or clear) the three wandering hurlers waiting at the hurling field when
+  // a challenge is pending — small figures clustered at the near edge of the pitch.
+  hurlingField() { return this.buildings.find((b) => b.key === 'hurling_field') || null; }
+  setHurlChallenge(on) {
+    if (this._hurlChips) { for (const c of this._hurlChips) if (c.parent) c.parent.remove(c); this._hurlChips = null; }
+    const field = on ? this.hurlingField() : null;
+    if (!field || !field.sprite) return;
+    this._hurlChips = [];
+    const TS = this.map.tile;
+    for (let i = 0; i < 3; i++) {
+      const chip = makeWalkerChip('villager', i === 1, 0.95); // a wee waiting band
+      chip.position.set((i - 1) * TS * 0.5, 0.05, -TS * 0.7);
+      if (chip.faceWorld) chip.faceWorld(0, 1);
+      field.sprite.add(chip);
+      this._hurlChips.push(chip);
+    }
+  }
+
+  // A patron god, prayed to at a gallán, manifests at the stones and walks the
+  // town's own roads — slowly, at a god's stately pace — blessing the homes it
+  // passes: it stops before a house, faces it and streams coloured light at it,
+  // then leaves it at the full of every good, held for a good while (blessedDays).
+  // Returns roughly how many homes it means to bless (0 if there are none).
   blessDwellings(godArt, fromInst, { count = 3, days = 12, h = 3.6 } = {}) {
     const homes = this.buildings.filter((b) => b.def.role === 'dwelling' && b.pop > 0);
     if (!homes.length) return 0;
-    const c0 = this._center(fromInst);
-    homes.sort((a, b) => {
-      const ca = this._center(a), cb = this._center(b);
-      return Math.hypot(ca.x - c0.x, ca.z - c0.z) - Math.hypot(cb.x - c0.x, cb.z - c0.z);
-    });
-    const targets = homes.slice(0, count);
     const chip = makeWarriorChip(godArt, h);
-    chip.position.set(c0.x, 0.05, c0.z);
+    const entry = entryRoadTile(this.map, fromInst);
+    if (!entry) {
+      // The stone stands off the roads — the god cannot walk them. Bless the
+      // nearest homes on the spot instead so the prayer is never wasted.
+      const c0 = this._center(fromInst);
+      homes.sort((a, b) => { const ca = this._center(a), cb = this._center(b); return Math.hypot(ca.x - c0.x, ca.z - c0.z) - Math.hypot(cb.x - c0.x, cb.z - c0.z); });
+      for (const hme of homes.slice(0, count)) this._applyBlessing(hme, days);
+      return Math.min(count, homes.length);
+    }
+    const w0 = this.map.tileToWorld(entry.x, entry.z);
+    chip.position.set(w0.x, 0.05, w0.z);
     this.blessGroup.add(chip);
-    this.blessings.push({ chip, targets, i: 0, days, hold: 0 });
-    return targets.length;
+    this.blessings.push({ chip, days, need: count, blessed: new Set(),
+      cur: { x: entry.x, z: entry.z }, next: null, prev: null, t: 0, steps: 90,
+      mode: 'walk', target: null, blessT: 0, emitT: 0, hold: 0 });
+    this._blessPickNext(this.blessings[this.blessings.length - 1]);
+    return Math.min(count, homes.length);
   }
+  _applyBlessing(home, days) {
+    if (!home || !home.sprite) return;
+    home.blessedDays = days; home.food = HOUSE_CAP; home.water = HOUSE_CAP; home.culture = HOUSE_CAP;
+    const p = home.sprite.position;
+    this._floatie(p.x, 2.1, p.z, 'food', { sz: 0.3, vy: 1.1, life: 1.3, over: true });
+    this._floatie(p.x + 0.35, 2.0, p.z, 'water', { sz: 0.3, vy: 1.1, life: 1.4, over: true });
+    this._floatie(p.x - 0.35, 2.0, p.z, 'culture', { sz: 0.3, vy: 1.1, life: 1.5, over: true });
+  }
+  _blessPickNext(bl) {
+    let opts = roadNeighbors(this.map, bl.cur.x, bl.cur.z);
+    const open = opts.filter((n) => { const t = this.map.get(n.x, n.z); return t && !t.blocked; });
+    if (open.length) opts = open;
+    const fwd = bl.prev ? opts.filter((n) => !(n.x === bl.prev.x && n.z === bl.prev.z)) : opts;
+    const pool = fwd.length ? fwd : opts;
+    bl.next = pool.length ? pool[(Math.random() * pool.length) | 0] : null;
+    if (bl.next && bl.chip.faceWorld) bl.chip.faceWorld(bl.next.x - bl.cur.x, bl.next.z - bl.cur.z);
+  }
+  _blessColour(i) { return ['food', 'water', 'culture'][i % 3]; }
   _updateBlessings(dt) {
+    const BLESS_SPEED = 0.7; // tiles/sec — a god's slow, deliberate procession
     for (let i = this.blessings.length - 1; i >= 0; i--) {
       const bl = this.blessings[i], chip = bl.chip;
-      const home = bl.targets[bl.i];
-      if (home && (!home.sprite || home.dead)) { bl.i += 1; continue; } // home razed mid-walk — skip on
-      if (home) {
-        const tgt = this._center(home);
-        const dx = tgt.x - chip.position.x, dz = tgt.z - chip.position.z, dist = Math.hypot(dx, dz);
-        if (dist > 0.2) {
-          const k = Math.min(1, (3.4 * dt) / dist);
-          chip.position.x += dx * k; chip.position.z += dz * k;
-          if (chip.faceWorld) chip.faceWorld(dx, dz);
-          if (chip.animate) chip.animate(dt, true);
-        } else {
-          home.blessedDays = bl.days; home.food = HOUSE_CAP; home.water = HOUSE_CAP; home.culture = HOUSE_CAP;
-          const p = home.sprite.position;
-          this._floatie(p.x, 2.1, p.z, 'food', { sz: 0.3, vy: 1.1, life: 1.3, over: true });
-          this._floatie(p.x + 0.35, 2.0, p.z, 'water', { sz: 0.3, vy: 1.1, life: 1.4, over: true });
-          this._floatie(p.x - 0.35, 2.0, p.z, 'culture', { sz: 0.3, vy: 1.1, life: 1.5, over: true });
-          bl.i += 1;
-          if (chip.animate) chip.animate(dt, false);
-        }
-      } else {
-        bl.hold += dt; // all homes blessed — the god fades from the field
-        if (chip.material) { chip.material.transparent = true; chip.material.opacity = Math.max(0, 1 - bl.hold * 1.4); }
+      if (bl.mode === 'bless') {
+        const home = bl.target;
+        if (!home || !home.sprite || home.dead) { bl.mode = 'walk'; this._blessPickNext(bl); continue; }
+        const tp = home.sprite.position;
+        if (chip.faceWorld) chip.faceWorld(tp.x - chip.position.x, tp.z - chip.position.z);
         if (chip.animate) chip.animate(dt, false);
-        if (bl.hold >= 1.0) { this.blessGroup.remove(chip); this.blessings.splice(i, 1); }
+        // Stream coloured light from the god's hands at the house.
+        bl.emitT -= dt;
+        if (bl.emitT <= 0) {
+          bl.emitT = 0.07;
+          const dx = tp.x - chip.position.x, dz = tp.z - chip.position.z, d = Math.hypot(dx, dz) || 1;
+          const kind = this._blessColour((bl._emitN = (bl._emitN || 0) + 1));
+          this._floatie(chip.position.x, 1.7, chip.position.z, kind,
+            { sz: 0.16, vx: (dx / d) * (d / 0.5), vy: 0.5, vz: (dz / d) * (d / 0.5), life: 0.55, over: true });
+        }
+        bl.blessT -= dt;
+        if (bl.blessT <= 0) { this._applyBlessing(home, bl.days); bl.blessed.add(home); bl.need -= 1; bl.target = null; bl.mode = 'walk'; this._blessPickNext(bl); }
+        continue;
+      }
+      if (bl.mode === 'leave') {
+        bl.hold += dt;
+        if (chip.material) { chip.material.transparent = true; chip.material.opacity = Math.max(0, 1 - bl.hold * 1.2); }
+        if (chip.animate) chip.animate(dt, false);
+        if (bl.hold >= 1.2) { this.blessGroup.remove(chip); this.blessings.splice(i, 1); }
+        continue;
+      }
+      // mode 'walk'
+      if (bl.need <= 0 || bl.steps <= 0 || !bl.next) { bl.mode = 'leave'; continue; }
+      const wa = this.map.tileToWorld(bl.cur.x, bl.cur.z), wb = this.map.tileToWorld(bl.next.x, bl.next.z);
+      bl.t += dt * BLESS_SPEED;
+      const k = Math.min(bl.t, 1);
+      chip.position.set(wa.x + (wb.x - wa.x) * k, 0.05, wa.z + (wb.z - wa.z) * k);
+      if (chip.animate) chip.animate(dt, true);
+      if (bl.t >= 1) {
+        bl.t = 0; bl.prev = bl.cur; bl.cur = bl.next; bl.steps -= 1;
+        // Reached a tile — is there an unblessed home to bless beside it?
+        const home = adjacentBuildings(this.map, bl.cur.x, bl.cur.z)
+          .find((inst) => inst.def.role === 'dwelling' && inst.pop > 0 && !bl.blessed.has(inst));
+        if (home && bl.need > 0) { bl.mode = 'bless'; bl.target = home; bl.blessT = 2.4; bl.emitT = 0; }
+        else this._blessPickNext(bl);
+      }
+    }
+  }
+
+  // Deaglán the path-maker and his dog Finn come out when you lay one of his
+  // roads. Most of the path is already built — but two or three squares in every
+  // eight are left undug; Deaglán walks the road and shovels each gap in as he
+  // reaches it. Finn runs the length testing it, and stops to watch every time
+  // Deaglán digs. Then the two slip away.
+  roadCrew(path, setHidden) {
+    if (!path || path.length < 2) return;
+    const tiles = path.map((p) => ({ x: p.x, z: p.z }));
+    // Pick the gaps: 2–3 random squares per window of eight (never the start
+    // tile). Those are hidden now; the rest of the road stands built.
+    const digSet = new Set();
+    for (let w = 0; w < tiles.length; w += 8) {
+      const idxs = [];
+      for (let k = Math.max(w, 1); k < Math.min(w + 8, tiles.length); k++) idxs.push(k);
+      const want = Math.min(idxs.length, 2 + (Math.random() < 0.5 ? 0 : 1));
+      for (let n = 0; n < want && idxs.length; n++) digSet.add(idxs.splice((Math.random() * idxs.length) | 0, 1)[0]);
+    }
+    if (setHidden) for (const k of digSet) setHidden(tiles[k], true);
+    const w0 = this.map.tileToWorld(tiles[0].x, tiles[0].z);
+    // deaglan/finn have no _f set, so force female:false; Finn the dog rides at
+    // half a person's height.
+    const deagWalk = makeWalkerChip('deaglan', false);
+    const deagDig = makeWalkerChip('deaglan_dig', false); deagDig.visible = false;
+    const finn = makeWalkerChip('finn_run', false, 0.65);
+    for (const c of [deagWalk, deagDig, finn]) { c.position.set(w0.x, 0.05, w0.z); this.crewGroup.add(c); }
+    this.crews.push({ tiles, digSet, setHidden, deagWalk, deagDig, finn, di: 0, dt: 0,
+      digging: false, digT: 0, fi: 0, fdir: 1, ft: 0, leaving: false, fade: 0 });
+  }
+  _crewMove(chip, a, b, k) {
+    const wa = this.map.tileToWorld(a.x, a.z), wb = this.map.tileToWorld(b.x, b.z);
+    chip.position.set(wa.x + (wb.x - wa.x) * k, 0.05, wa.z + (wb.z - wa.z) * k);
+    if (chip.faceWorld && (b.x !== a.x || b.z !== a.z)) chip.faceWorld(b.x - a.x, b.z - a.z);
+  }
+  _updateCrews(dt) {
+    const DEAG_SPEED = 1.0, FINN_SPEED = 2.25, DIG_TIME = 2.6; // half the old pace — a calm, watchable build
+    for (let i = this.crews.length - 1; i >= 0; i--) {
+      const cr = this.crews[i], T = cr.tiles, last = T.length - 1;
+      // Finn runs the length, but stops to watch whenever Deaglán is digging.
+      if (cr.digging && !cr.leaving) {
+        const wt = this.map.tileToWorld(T[cr.di].x, T[cr.di].z);
+        if (cr.finn.faceWorld) cr.finn.faceWorld(wt.x - cr.finn.position.x, wt.z - cr.finn.position.z); // turn and watch
+        if (cr.finn.animate) cr.finn.animate(dt, false); // stopped, watching
+      } else {
+        cr.ft += dt * FINN_SPEED;
+        while (cr.ft >= 1) { cr.ft -= 1; cr.fi += cr.fdir; if (cr.fi >= last) { cr.fi = last; cr.fdir = -1; } else if (cr.fi <= 0) { cr.fi = 0; cr.fdir = 1; } }
+        this._crewMove(cr.finn, T[cr.fi], T[Math.max(0, Math.min(last, cr.fi + cr.fdir))], cr.ft);
+        if (cr.finn.animate) cr.finn.animate(dt, true);
+      }
+      cr.deagWalk.visible = !cr.digging; cr.deagDig.visible = cr.digging;
+      if (cr.leaving) {
+        cr.fade += dt;
+        const o = Math.max(0, 1 - cr.fade * 0.9);
+        for (const c of [cr.deagWalk, cr.deagDig, cr.finn]) if (c.material) { c.material.transparent = true; c.material.opacity = o; }
+        if (cr.deagWalk.animate) cr.deagWalk.animate(dt, true);
+        if (cr.fade >= 1.2) { for (const c of [cr.deagWalk, cr.deagDig, cr.finn]) this.crewGroup.remove(c); this.crews.splice(i, 1); }
+        continue;
+      }
+      if (cr.digging) {
+        const wt = this.map.tileToWorld(T[cr.di].x, T[cr.di].z);
+        cr.deagDig.position.set(wt.x, 0.05, wt.z);
+        if (cr.deagDig.animate) cr.deagDig.animate(dt, true);
+        cr.digT -= dt;
+        if (cr.digT <= 0) { cr.digging = false; cr.digSet.delete(cr.di); if (cr.setHidden) cr.setHidden(T[cr.di], false); } // the gap is dug in
+        continue;
+      }
+      if (cr.di >= last) { // done — fill any gap he somehow skipped, then go
+        if (cr.setHidden) for (const k of cr.digSet) cr.setHidden(T[k], false);
+        cr.digSet.clear(); cr.leaving = true; continue;
+      }
+      cr.dt += dt * DEAG_SPEED;
+      this._crewMove(cr.deagWalk, T[cr.di], T[cr.di + 1], Math.min(cr.dt, 1));
+      if (cr.deagWalk.animate) cr.deagWalk.animate(dt, true);
+      if (cr.dt >= 1) {
+        cr.dt = 0; cr.di += 1;
+        if (cr.digSet.has(cr.di)) { cr.digging = true; cr.digT = DIG_TIME; } // stand on the gap and dig it in
+      }
+    }
+  }
+
+  // While a warrior keeps vigil at a gallán, a guard patrols a slow ring around
+  // the stone. The patrol chip lives as a child of the stone's own chip, so it
+  // comes and goes with the warden and is cleaned up if the stone is razed.
+  _updateVigils(dt) {
+    for (const b of this.buildings) {
+      if (b.def.role !== 'gallan') continue;
+      if (b.warden && !b._vigil) {
+        const chip = makeWalkerChip('vigil');
+        b.sprite.add(chip);
+        const r = 1.15 * this.map.tile, pts = [];
+        for (let a = 0; a < 6; a++) pts.push({ x: Math.cos((a / 6) * Math.PI * 2) * r, z: Math.sin((a / 6) * Math.PI * 2) * r * 0.7 });
+        b._vigil = { chip, pts, i: 0, t: 0 };
+      } else if (!b.warden && b._vigil) {
+        b.sprite.remove(b._vigil.chip); b._vigil = null;
+      }
+      if (b._vigil) {
+        const v = b._vigil, a = v.pts[v.i], nb = v.pts[(v.i + 1) % v.pts.length];
+        v.t += dt * 0.5; // a slow, watchful round
+        const k = Math.min(v.t, 1);
+        v.chip.position.set(a.x + (nb.x - a.x) * k, 0.05, a.z + (nb.z - a.z) * k);
+        if (v.chip.faceWorld) v.chip.faceWorld(nb.x - a.x, nb.z - a.z);
+        if (v.chip.animate) v.chip.animate(dt, true);
+        if (v.t >= 1) { v.t = 0; v.i = (v.i + 1) % v.pts.length; }
       }
     }
   }
@@ -656,7 +866,7 @@ export class Game {
       type: 'druid', label: 'D', steps: 26, speed: 2.2, source: altar,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && inst.culture < HOUSE_CAP) { inst.culture = HOUSE_CAP; this._deliverFx(inst, w, 'culture'); } // one visit lifts the home (~5 days)
+          if ((inst.def.role === 'dwelling' || inst.def.role === 'hall') && inst.culture < HOUSE_CAP) { inst.culture = HOUSE_CAP; this._deliverFx(inst, w, 'culture'); } // one visit lifts the home (~5 days)
         }
       },
     });
@@ -674,6 +884,7 @@ export class Game {
         const take = Math.min(g.stock, MARKET_CAP - market.stock);
         g.stock -= take;
         market.stock += take;
+        if (take > 0) this._storeFx(market, null); // goods arriving at the market
         if (market.stock >= MARKET_CAP) break;
       }
     }
@@ -687,7 +898,7 @@ export class Game {
       type: 'market_trader', label: 'M', steps: 24, speed: 2.6, source: market,
       onTile: (x, z, w) => {
         for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'dwelling' && market.stock > 0 && inst.food < HOUSE_CAP) {
+          if ((inst.def.role === 'dwelling' || inst.def.role === 'hall') && market.stock > 0 && inst.food < HOUSE_CAP) {
             inst.food = HOUSE_CAP; // fill the larder in one visit (~10 days)
             market.stock -= 1;
             this._deliverFx(inst, w, 'food');
@@ -698,8 +909,8 @@ export class Game {
   }
 
   // One floating chip — a small soft coloured bead. `over` draws it above the smoke.
-  _floatie(x, y, z, kind, { sz = 0.1, vx = 0, vy = 1.0, vz = 0, life = 1.2, over = false } = {}) {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: PIP_TEX, color: PIP_COLOR[kind] || 0xffffff,
+  _floatie(x, y, z, kind, { sz = 0.1, vx = 0, vy = 1.0, vz = 0, life = 1.2, over = false, shape } = {}) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: shape === 'diamond' ? PIP_TEX_DIAMOND : PIP_TEX, color: PIP_COLOR[kind] || 0xffffff,
       transparent: true, opacity: 1, depthTest: !over, depthWrite: false }));
     if (over) s.renderOrder = 20; // drawn over the smoke, never occluded by it
     s.center.set(0.5, 0.5); s.scale.set(sz, sz, 1);
@@ -725,6 +936,23 @@ export class Game {
     }
   }
 
+  // A delivery of grain to a store or market — tiny yellow diamond chips, about
+  // half a home's pip, so the harvest coming in off the fields is visible on the
+  // roads. `walker` is the carrier that brought it (omitted for a store→market pull).
+  _storeFx(inst, walker) {
+    if (!inst.sprite || (inst._popCd || 0) > 0) return;
+    inst._popCd = 0.5;
+    const p = inst.sprite.position, a = Math.random() * Math.PI * 2;
+    this._floatie(p.x + Math.cos(a) * 0.5, 1.8, p.z + Math.sin(a) * 0.5, 'food', { sz: 0.14, vy: 0.9, life: 1.1, over: true, shape: 'diamond' });
+    if (walker && walker.sprite) {
+      const w = walker.sprite.position;
+      for (let i = 0; i < 2; i++) {
+        const b = Math.random() * Math.PI * 2, r = 0.3 + Math.random() * 0.4;
+        this._floatie(w.x, 0.9, w.z, 'food', { sz: 0.1, vx: Math.cos(b) * r, vz: Math.sin(b) * r, vy: 0.3, life: 0.6, over: true, shape: 'diamond' });
+      }
+    }
+  }
+
   // Ambient particle effects — real time, so they drift even while paused.
   updateFx(dt) {
     for (const b of this.buildings) { if (b.fx) b.fx.update(dt); if (b.fx2) b.fx2.update(dt); if (b._popCd > 0) b._popCd -= dt; }
@@ -739,10 +967,30 @@ export class Game {
     }
     if (this.menace) this._moveMenaceCreature(dt);
     if (this.blessings.length) this._updateBlessings(dt);
+    if (this.crews.length) this._updateCrews(dt);
+    this._updateVigils(dt);
   }
 
   // --- Animation, one call per frame (dt already scaled by game speed) ---
+  // For the seven days from Samhain the dead walk the ráth: risen warriors, pale
+  // and half-there, wander the roads. `deadWalk` is set from the calendar.
+  _spawnRisen() {
+    const homes = this.buildings.filter((b) => b.def.role === 'dwelling');
+    const src = homes.length ? homes[(Math.random() * homes.length) | 0] : this.buildings.find((b) => b.def.role);
+    if (!src) return;
+    const entry = entryRoadTile(this.map, src);
+    if (!entry) return;
+    this._spawn(entry, { type: 'vigil', personType: 'risen', steps: 46, speed: 1.35, tint: 0x9fb8ff, opacity: 0.55, tag: 'risen' });
+  }
+
   update(dt) {
+    if (this.deadWalk) {
+      this._deadWalkT = (this._deadWalkT || 0) - dt;
+      if (this._deadWalkT <= 0) {
+        this._deadWalkT = 4 + Math.random() * 4;
+        if (this.walkers.filter((w) => w.tag === 'risen').length < 4) this._spawnRisen();
+      }
+    }
     for (const w of this.walkers) w.update(dt);
     const alive = [];
     for (const w of this.walkers) {

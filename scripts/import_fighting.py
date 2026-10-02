@@ -25,6 +25,8 @@ ART = {
     'nuada_airgetlam': 'nuada', 'manannan_mac_lir': 'manannan', 'brigid': 'brigid',
     'the_dagda': 'dagda', 'the_morrigan': 'morrigan',
     'common_gaelic_warrior': 'warrior', 'elite_gaelic_champion': 'curadh',
+    'olipheist': 'olipheist',   # the great serpent — the menace on the field (idle-only rotations)
+    'deaglan': 'deaglan',       # the path-maker also takes the field with his shovel
     # (isometric_celtic_warrior is the spare — its heavy armour reads too late-period;
     #  the common warrior is the plainer, more period-true levy figure)
 }

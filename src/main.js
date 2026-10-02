@@ -8,6 +8,7 @@ import { UI } from './ui.js?v=CBUST';
 import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=CBUST';
 import { setCamera } from './render/assets.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
+import { Hurling } from './hurling.js?v=CBUST';
 import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById } from './data/kingdoms.js?v=CBUST';
 import { CODEX } from './data/codex.js?v=CBUST';
 import { UNIT_TYPES } from './battle/units.js?v=CBUST';
@@ -67,8 +68,8 @@ let missionDone = false;
 const ui = new UI({
   onTool: (kind) => { cancelPending(); tool = kind; if (!(tool === 'road' || BUILDINGS[tool])) preview.visible = false; game.showInspectDots(kind === 'inspect'); },
   onSpeed: (s) => { sim.speed = s; savedSpeed = null; },
-  onRotate: (d) => { if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
-  onZoom: (f) => { if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
+  onRotate: (d) => { if (hurling.active) { rotateIsoCamera(hurling.camera, d); return; } if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
+  onZoom: (f) => { if (hurling.active) { hurling.zoom(f); return; } if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
   onInspectClose: () => { _inspectDwelling = null; resumeGame(); },
   onFestivalContinue: () => { if (battleWon) { battleWon = false; battle.exit(); } else resumeGame(); },
   onStartMission: (n) => startMission(n),
@@ -159,6 +160,11 @@ const battle = new Battle({
     ui.showFestival({ name: campaign._colonyWin ? 'A New Dál' : 'Victory!', emoji: campaign._colonyWin ? '🏴' : '🏆', sub });
     campaign._colonyWin = false;
   },
+  onDefeat: (info) => {
+    battleWon = false;
+    const sub = (info && info.sub) || 'Your slua is broken and scattered.';
+    ui.showFestival({ name: 'Defeat', emoji: '💀', sub: `${sub} The day is lost, ${leaderName()} — but a ráth can be raised again.`, onDone: () => { battle.exit(); } });
+  },
   onTruce: (cattle) => {
     battle.exit();
     if (cattle) setCattle(campaign.cattle - cattle);
@@ -201,11 +207,22 @@ function startMission(n) {
 // from the 🗺 map when you choose, and raiders answer in their own time.
 function startCampaign() {
   if (!campaign.home) { openKingdomMap('choose', 'intro'); return; } // first pick a home, then the opening tale
-  if (campaign.nextIsDefend) { campaign.nextIsDefend = false; saveCampaign(); ui.showFestival({ name: 'Raiders on the Wind', emoji: '🔥', sub: 'Word comes two seasons early: a war-band marches on your ráth. Muster the folk and hold the field.', onDone: () => enterBattle('defend') }); return; }
-  enterSettlement();
+  enterSettlement(); // raiders you provoked now give you warning — see the countdown banner; the defence fires when it runs out
 }
 // Drop into the standing ráth — the clock starts because the title is hidden.
-function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); }
+function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); game.setHurlChallenge(campaign.hurlChallenge); game.deadWalk = (cal.month === 10); }
+
+// --- Raiders give warning now: a provoked war-band marches on your ráth after a
+// short countdown, so you can muster and ready your defences before they arrive.
+const RAID_WARNING_DAYS = 12; // two months' grace
+let _raidBannerEl = null;
+function updateRaidBanner() {
+  const n = campaign.raidIn || 0;
+  if (!_raidBannerEl) { _raidBannerEl = document.createElement('div'); _raidBannerEl.id = 'raid-banner'; document.getElementById('ui-overlay').appendChild(_raidBannerEl); }
+  if (n > 0) { _raidBannerEl.innerHTML = `⚔ Raiders on the march — <b>${n}</b> day${n === 1 ? '' : 's'} to muster and ready the ráth`; _raidBannerEl.classList.add('show'); }
+  else _raidBannerEl.classList.remove('show');
+}
+function scheduleRaid() { campaign.raidIn = RAID_WARNING_DAYS; campaign.nextIsDefend = false; saveCampaign(); updateRaidBanner(); }
 
 // A brief, non-blocking banner for seasonal news (colony tribute, revolts).
 let _noticeEl = null, _noticeT = 0;
@@ -217,6 +234,25 @@ function flashNotice(msg) {
 
 // --- Colonies: land won by raiding further afield (a Dál Riata), sending tribute home ---
 const NEIGHBOURS_OF = (id) => NEIGHBOURS[id] || [];
+
+// A named rival lord for each over-kingdom. One is always "rising" — his host
+// grows, notices name him, and he is the one whose war-band comes to the gate.
+const RIVALS = {
+  ailech: 'Muirchertach Mac Lochlainn', ulaid: 'Eochaid of the Ulaid', airgialla: 'Donnchadh Ua Cerbaill',
+  connacht: 'Ruaidrí Ua Conchobair', breifne: 'Tigernán Ua Ruairc', mide: 'Murchad Ua Máel Sechlainn',
+  laigin: 'Diarmait Mac Murchada', tuadmumu: 'Toirdelbach Ua Briain', desmumu: 'Cormac Mac Carthaig',
+};
+function heldRegions() { const held = new Set(); if (campaign.home) held.add(campaign.home); for (const c of (campaign.colonies || [])) held.add(c.region); return held; }
+function rivalFor(id) { const k = kingdomById(id); return k ? { id, name: RIVALS[id] || `the lord of ${k.en}`, region: k.en } : null; }
+// Raise up a rising rival in a province you do not hold, and name him.
+function riseRival() {
+  const held = heldRegions();
+  const pool = KINGDOMS.filter((k) => !held.has(k.id));
+  if (!pool.length) return null;
+  campaign.rival = rivalFor(pool[(Math.random() * pool.length) | 0].id);
+  saveCampaign();
+  return campaign.rival;
+}
 function isColony(region) { return campaign.colonies.some((c) => c.region === region); }
 function foundColony(region) {
   if (isColony(region)) return null;
@@ -257,6 +293,30 @@ if (!campaign.goods) campaign.goods = {};
 if (!campaign.hosted) campaign.hosted = {};
 if (!campaign.colonies) campaign.colonies = []; // Dál Riata-style holdings won by raiding further afield — each a full ráth of its own
 if (!campaign.active) campaign.active = 'home'; // which settlement is loaded: 'home' or a colony's region id
+if (campaign.yearsElapsed == null) campaign.yearsElapsed = 0; // festivals are announced only for the first three years
+if (campaign.raidIn == null) campaign.raidIn = 0; // days until a provoked war-band arrives (0 = none pending)
+if (campaign.hurlChallenge == null) campaign.hurlChallenge = false; // a wandering band waits at the hurling field
+if (campaign.monumentWon == null) campaign.monumentWon = false; // won the hurling challenge → may raise a monument
+ui.hurlWon = campaign.monumentWon; // the monument is a build-menu prize
+// --- The hurling challenge: a wandering band, a shootout of points, a monument ---
+const hurling = new Hurling({
+  onResolve: (won) => {
+    campaign.hurlChallenge = false; game.setHurlChallenge(false);
+    if (won) { campaign.monumentWon = true; ui.hurlWon = true; ui.refreshBuildMenu(); flashNotice('🏆 The field is yours! Raise a Monument from the Culture menu — while it stands the harvest is a fifth more plentiful.'); }
+    saveCampaign();
+  },
+  onClose: () => { resumeGame(); },
+});
+function openHurling() { pauseGame(); ui.hideInspect(); hurling.open(campaign.roster, campaign.hosted); }
+const HURL_CHANCE = 1 / 3; // one in three each season a band comes calling (this runs on the season turn)
+function maybeHurlChallenge() {
+  if (campaign.hurlChallenge || !game.hurlingField()) return;
+  if (Math.random() < HURL_CHANCE) {
+    campaign.hurlChallenge = true; game.setHurlChallenge(true); saveCampaign();
+    flashNotice('🏑 A wandering band of hurlers waits at your field, spoiling for a challenge. Tap the hurling field to meet them.');
+  }
+}
+if (campaign.nextIsDefend) { campaign.raidIn = campaign.raidIn || 12; campaign.nextIsDefend = false; } // migrate old instant-defend saves to the countdown
 for (const c of campaign.colonies) { if (c.folk == null) c.folk = 0; if (c.settlement === undefined) c.settlement = null; } // fields for buildable colonies
 if (campaign.raidsWon == null) campaign.raidsWon = 0; // won raids drive the map-era chapter unlocks (levels 4+)
 for (const h of ['cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan']) delete campaign.roster[h]; // heroes/gods are summoned, not owned — clean any legacy grant
@@ -310,15 +370,15 @@ function placeMenace() {
   let cx = 16, cz = 14;
   if (game.buildings.length) { let sx = 0, sz = 0; for (const b of game.buildings) { sx += b.x; sz += b.z; } cx = Math.round(sx / game.buildings.length) + 5; cz = Math.round(sz / game.buildings.length) - 1; }
   game.spawnMenace(cx, cz, 4, 4);
-  flashNotice('☠️ A Fomorian giant strides out of the mist. Tap the giant when your war-band is ready to march on it.');
+  flashNotice('☠️ An Ollphéist — a great serpent — comes writhing out of the mist. Tap it when your war-band is ready to march on it.');
 }
 function warbandSize() { return campaign.roster ? Object.values(campaign.roster).reduce((a, b) => a + b, 0) : 0; }
 function updateMenaceButton() {} // the menace is now met by tapping it, not a HUD button
-// Tap the Fomor to consider marching on it.
+// Tap the Ollphéist to consider marching on it.
 function menaceHtml() {
   const wb = warbandSize();
-  return `<h3>The Fomor</h3><div class="role">an Fomhórach · the menace</div>` +
-    `<p>A Fomorian giant lays waste to this ground. Nothing may be built where it treads, and its blight creeps outward with every turn of the year.</p>` +
+  return `<h3>The Ollphéist</h3><div class="role">an Ollphéist · the menace</div>` +
+    `<p>A great serpent lays waste to this ground. Nothing may be built where it coils, and its blight creeps outward with every turn of the year.</p>` +
     `<p class="dim">Your war-band numbers ${wb}. You need at least four to march.</p>` +
     `<button id="menace-march" class="continue-btn"${wb >= 4 ? '' : ' disabled'}>⚔ March on the Menace</button>`;
 }
@@ -385,7 +445,19 @@ function musterFavour() {
   return Math.min(0.97, f);
 }
 function enterBattle(scenario) {
-  battle.loadWarband({ roster: campaign.roster, ghosts: campaign.ghosts, hosted: campaign.hosted, favour: musterFavour() });
+  // A deity only takes the field if a flourishing Hall of Hosting stands to seat
+  // it; heroes (mortal) answer regardless. Strip un-seated gods from the muster.
+  let hosted = campaign.hosted;
+  if (!game.hallFlourishing()) {
+    hosted = {}; let heldBack = null;
+    for (const k in campaign.hosted) {
+      if (!campaign.hosted[k]) continue;
+      if (UNIT_TYPES[k] && UNIT_TYPES[k].cat === 'god') { heldBack = UNIT_TYPES[k].label || k; continue; }
+      hosted[k] = campaign.hosted[k];
+    }
+    if (heldBack) flashNotice(`⛩️ ${heldBack} will not take the field — no flourishing Hall of the Gods seats the god.`);
+  }
+  battle.loadWarband({ roster: campaign.roster, ghosts: campaign.ghosts, hosted, favour: musterFavour() });
   battle.enter(scenario);
   announceSummons(battle.summoned || []); // heroes/gods that answered this muster
 }
@@ -638,7 +710,7 @@ function kingdomAction() {
   if (!kg.sel) return;
   if (kg.mode === 'war') {
     if (kg.enter) { const t = kg.enter; closeKingdomMap(); switchSettlement(t); enterSettlement(); return; } // enter home / a colony to build it
-    campaign.target = kg.sel; campaign._raidFar = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(kg.sel); campaign.nextIsDefend = true; saveCampaign(); closeKingdomMap(); enterBattle('attack'); return;
+    campaign.target = kg.sel; campaign._raidFar = campaign.home && !NEIGHBOURS_OF(campaign.home).includes(kg.sel); if (!isColony(kg.sel)) campaign.rival = rivalFor(kg.sel) || campaign.rival; scheduleRaid(); closeKingdomMap(); enterBattle('attack'); return;
   }
   campaign.home = kg.sel; saveCampaign(); battle.setLivery(campaign.livery);
   if (kg.then === 'war') { openKingdomMap('war'); return; } // ride out to raid
@@ -683,17 +755,38 @@ function advanceDay() {
     const s = seasonOfMonth(cal.month);
     if (s !== curSeason) {
       curSeason = s; applySeason(s); collectColonyTribute(); // colonies render tribute each turn of the year
+      maybeHurlChallenge(); // a wandering band of hurlers may come calling
+      if (campaign.home && (campaign.raidIn || 0) === 0 && Math.random() < 0.5) { // no war pending — a rival stirs in the provinces
+        const r = riseRival();
+        if (r) flashNotice(`⚔ ${r.name} is rising in ${r.region} — his host grows, and his eye turns toward your ráth.`);
+      }
       if (campaign.level === 3 && game.hasMenace()) { game.expandMenace(); saveSettlement(); flashNotice('☠️ The blight creeps outward, devouring more of your land. Muster and march before it takes all.'); }
     }
+    if (cal.month === 0) { campaign.yearsElapsed = (campaign.yearsElapsed || 0) + 1; saveCampaign(); } // a full turn of the year
     const fest = FESTIVALS[cal.month];
-    if (fest) { festivalToday = true; triggerFestival(fest); }
-    if (festivalToday && cal.month === 10) resurrectPrayed(); // Samhain — the prayed-for rise from the dead
+    if (fest) {
+      festivalToday = true;
+      // The four festivals are announced for your first three years; after that
+      // the folk keep them without a herald — you'll see the season turn yourself.
+      if ((campaign.yearsElapsed || 0) < 3) triggerFestival(fest);
+      game.festivalRevels(); // the feast halls pour their revellers onto the roads
+    }
+    if (festivalToday && cal.month === 10) { resurrectPrayed(); flashNotice('🎃 Samhain — the veil thins. Until winter deepens, the risen dead walk the ráth.'); } // Samhain — the prayed-for rise from the dead
   }
+  game.deadWalk = (cal.month === 10); // from Samhain to the turn of December — the veil is thin
   const wasBroke = game.broke;
   game.settleDay({ festival: festivalToday, newMonth }); // rents in, wages out, homes drain & evolve
   if (game.broke && !wasBroke) triggerAdvisor();
   pushStats();
   updateDate();
+  // Provoked raiders close in: count down the days, then fall on the ráth.
+  if (campaign.raidIn > 0) {
+    campaign.raidIn -= 1; saveCampaign(); updateRaidBanner();
+    if (campaign.raidIn === 0) {
+      pauseGame();
+      ui.showFestival({ name: 'Raiders at the Gate', emoji: '🔥', sub: `${campaign.rival ? `The war-band of ${campaign.rival.name}, risen in ${campaign.rival.region}, falls upon your ráth` : 'The war-band you provoked falls upon your ráth'}, ${leaderName()}. Muster the folk and hold the field.`, onDone: () => enterBattle('defend') });
+    }
+  }
   if (started) saveSettlement(); // persist the standing ráth (herd growth, economy) each day
 }
 
@@ -929,11 +1022,17 @@ function buildRoadOptions() {
 }
 function commitRoad() {
   const opt = roadOptions[roadOptIdx] || { kind: 'deaglan' };
-  let changed = false;
+  const deag = opt.kind === 'deaglan';
+  const laid = [];
   for (const p of pendingRoad) {
-    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = opt.kind; changed = true; }
+    if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = opt.kind; laid.push(p); }
   }
-  if (changed) { view.rebuildRoads(); saveSettlement(); }
+  if (laid.length) {
+    view.rebuildRoads(); saveSettlement();
+    // Deaglán & his dog come out to lay his path — most is built, but he shovels
+    // in the gaps; the crew hides/reveals those squares as he digs.
+    if (deag) game.roadCrew(laid, (tile, hidden) => { const t = map.get(tile.x, tile.z); if (t) t.roadHidden = hidden; view.rebuildRoads(); });
+  }
   cancelPending();
 }
 
@@ -976,7 +1075,8 @@ function updatePreview(e) {
 
 // --- Inspect ---
 function personHtml(p) {
-  return `<h3>${p.name}</h3><div class="role">${p.roleEn} · ${p.roleGa}</div>` +
+  const name = p.nick ? `${p.name} ‘${p.nick}’` : p.name;
+  return `<h3>${name}</h3><div class="role">${p.roleEn} · ${p.roleGa}</div>` +
     `<blockquote>“${p.phraseGa}”<br><span class="en">“${p.phraseEn}”</span></blockquote>`;
 }
 function buildingHtml(inst) {
@@ -986,6 +1086,12 @@ function buildingHtml(inst) {
   if (d.role === 'dwelling') extra = dwellingRankHtml(inst);
   if (d.role === 'altar') extra = altarHtml();
   if (d.role === 'gallan') extra = gallanHtml(inst);
+  if (d.role === 'hall') {
+    const ok = (v) => v > 0 ? '✓' : '—';
+    const flourish = inst.food > 0 && inst.water > 0 && inst.culture > 0;
+    extra = `<p>Offerings — 🌾 food ${ok(inst.food)} · 💧 water ${ok(inst.water)} · 🎶 culture ${ok(inst.culture)}</p>` +
+      `<p class="${flourish ? '' : 'dim'}">${flourish ? '⛩️ The hall flourishes — a hosted god will take the field.' : 'Keep all three offerings flowing (it drinks twice a dwelling’s share) for a god to answer your muster.'}</p>`;
+  }
   if (d.role === 'homestead') { const graze = game._grazing(inst); const cap = 20 + graze * 4; extra = `<p>Herd: 🐄 ${inst.herd} / ${cap} · Grazing land: ${graze} tiles</p><p class="dim">Leave open pasture around the ráth and the herd grows faster. Cattle is your wealth in the wider world — and what a raider carries off.</p><button id="trade-btn" class="continue-btn">🌍 Trade in the wider world</button>`; }
   return `<h3>${d.label}</h3><div class="role">${d.role === 'homestead' ? 'Your seat' : 'Building'}</div><p>${d.desc}</p>${pipelineNote(inst)}${extra}`;
 }
@@ -1237,6 +1343,11 @@ function inspectAt(e) {
     if (!tile.occupant) { ui.showInspect(terrainHtml(tile), false); return; }
     inst = tile.occupant;
   }
+  if (inst.key === 'hurling_field' && campaign.hurlChallenge) {
+    ui.showInspect(`<h3>Hurling Field</h3><div class="role">A challenge waits</div><p>A wandering band of hurlers has come to test your ráth. Field three strikers and meet them in a shootout of points — win it and raise a monument to the day.</p><button id="hurl-go" class="continue-btn">🏑 Meet the challengers</button>`, false);
+    const b = document.getElementById('hurl-go'); if (b) b.addEventListener('click', openHurling);
+    return;
+  }
   ui.showInspect(buildingHtml(inst), false);
   if (inst.def.role === 'dwelling') _inspectDwelling = inst; // keep its meters live
   if (inst.def.role === 'altar') wireAltar();
@@ -1371,6 +1482,7 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture?.(e.pointerId);
+  if (hurling.active) { hurling.pointerDown(e); return; }
   if (battle.active) { battle.pointerDown(e); return; }
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2) { panLast = null; painting = false; demolishing = false; pinchDist = pointerDist(); return; }
@@ -1396,6 +1508,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  if (hurling.active) { hurling.pointerMove(e); return; }
   if (battle.active) { battle.pointerMove(e); return; }
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2) { const d = pointerDist(); if (pinchDist && d > 0) zoomIsoCamera(camera, pinchDist / d, aspect); pinchDist = d; return; }
@@ -1423,6 +1536,7 @@ canvas.addEventListener('pointermove', (e) => {
 
 function endPointer(e) {
   canvas.releasePointerCapture?.(e.pointerId);
+  if (hurling.active) { hurling.pointerUp(e); return; }
   if (battle.active) { battle.pointerUp(e); return; }
   pointers.delete(e.pointerId);
   if (pointers.size < 2) pinchDist = 0;
@@ -1447,6 +1561,7 @@ canvas.addEventListener('pointerleave', () => { if (!pendingBuild) preview.visib
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  if (hurling.active) { hurling.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   if (battle.active) { battle.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   zoomIsoCamera(camera, e.deltaY > 0 ? 1.1 : 0.9, aspect);
 }, { passive: false });
@@ -1500,6 +1615,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   resizeIsoCamera(camera, aspect);
   battle.resize(aspect);
+  hurling.resize(aspect);
 });
 
 window.ardri = { game, map, view, sim, cal, camera, battle, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
@@ -1519,6 +1635,7 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
   if (battle.active) { setCamera(battle.camera); battle.update(dt); battle.render(renderer); return; }
+  if (hurling.active) { setCamera(hurling.renderCam()); hurling.update(dt); hurling.render(renderer); return; }
   setCamera(camera);
   // The world-clock runs whenever the settlement is the scene you're looking at
   // (title hidden, not in battle). Festivals/menus still pause via sim.speed.
@@ -1535,3 +1652,15 @@ function frame() {
   renderer.render(scene, camera);
 }
 frame();
+
+// Dev-only handle (activated with ?dev in the URL) for testing/inspection — inert
+// for normal players. Exposes the world and a helper to lay a Deaglán road.
+if (typeof location !== 'undefined' && /[?&]dev\b/.test(location.search)) {
+  window.__ardri = { game, map, view, hurling, openHurling, campaign,
+    layDeaglanRoad(tiles) {
+      const laid = [];
+      for (const p of tiles) { if (map.setRoad(p.x, p.z, true)) { const t = map.get(p.x, p.z); if (t) t.roadKind = 'deaglan'; laid.push(p); } }
+      if (laid.length) { view.rebuildRoads(); game.roadCrew(laid, (tile, hidden) => { const t = map.get(tile.x, tile.z); if (t) t.roadHidden = hidden; view.rebuildRoads(); }); }
+      return laid.length;
+    } };
+}
