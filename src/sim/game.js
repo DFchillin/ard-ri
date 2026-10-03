@@ -962,17 +962,22 @@ export class Game {
       if (dist < 0.18) { b.state = 'hammer'; b.timer = b.cornerDur; b.hammerT = 0; } // reached a corner — hammer it
       else { const s = Math.min(dist, BSPEED * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s; }
     } else if (b.state === 'hammer') {
-      // No hammer frame exists in her pack, so she works with a rhythmic strike:
-      // her walk cycle keeps her limbs moving while a vertical bob drops the
-      // hammer, a spark flying off the work on each downbeat.
+      // She faces her work and swings her hammer. With the real swing art loaded
+      // the frames carry the motion; a spark flies on the blow. If the art is
+      // missing we fall back to her walk cycle plus a vertical strike bob.
       const c = this._center(b.site);
       if (b.chip.faceWorld) b.chip.faceWorld(c.x - b.chip.position.x, c.z - b.chip.position.z);
-      if (b.chip.animate) b.chip.animate(dt, true);
-      b.hammerT += dt;
-      const PERIOD = 0.5, p = (b.hammerT % PERIOD) / PERIOD;
-      b.chip.position.y = b.baseY + Math.sin(p * Math.PI) * 0.18; // wind up, then strike down
+      let struck = false;
+      if (b.chip.hasHammer && b.chip.animateHammer) {
+        struck = b.chip.animateHammer(dt);
+      } else {
+        if (b.chip.animate) b.chip.animate(dt, true);
+        b.hammerT += dt;
+        const PERIOD = 0.5, p = (b.hammerT % PERIOD) / PERIOD;
+        b.chip.position.y = b.baseY + Math.sin(p * Math.PI) * 0.18; // wind up, then strike down
+      }
       b.timer -= dt; b.spark -= dt;
-      if (b.spark <= 0) { b.spark = PERIOD; this._floatie(b.chip.position.x + (Math.random() - 0.5) * 0.4, 1.1, b.chip.position.z, 'food', { sz: 0.1, vy: 0.7, life: 0.45, over: true }); }
+      if (struck || b.spark <= 0) { b.spark = 0.5; this._floatie(b.chip.position.x + (Math.random() - 0.5) * 0.4, 1.1, b.chip.position.z, 'food', { sz: 0.1, vy: 0.7, life: 0.45, over: true }); }
       const m = b.site.sprite && b.site.sprite.userData && b.site.sprite.userData.spr && b.site.sprite.userData.spr.material;
       if (m) m.opacity = 0.4 + Math.min(1, (b.ci + (1 - Math.max(0, b.timer) / b.cornerDur)) / 4) * 0.6; // firms up corner by corner
       if (b.timer <= 0) {

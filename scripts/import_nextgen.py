@@ -59,6 +59,23 @@ def convert(src, role):
             put(frame if os.path.exists(frame) else stand, os.path.join(out, f'{short}_walk{i}.png'))  # cardinals repeat idle
     print(f'  {src} -> walkers/{role}/')
 
+# Import an extra named animation (e.g. Hammering) into <short>_<action>N.png for
+# every facing the pack provides. A missing facing repeats the role's idle stand.
+def convert_anim(src, role, anim, action, frames):
+    adir = os.path.join(SRC_ROOT, src, 'Idle', 'animations', anim)
+    out = os.path.join(ROOT, role)
+    os.makedirs(out, exist_ok=True)
+    for long, short in DIRMAP.items():
+        stand = os.path.join(out, f'{short}_stand.png')
+        for i in range(frames):
+            frame = os.path.join(adir, long, f'frame_{i:03d}.png')
+            dst = os.path.join(out, f'{short}_{action}{i}.png')
+            if os.path.exists(frame):
+                put(frame, dst)
+            elif os.path.exists(stand):
+                shutil.copy(stand, dst)  # cardinal with no art repeats idle
+    print(f'  {src}:{anim} -> walkers/{role}/*_{action}0..{frames - 1}.png')
+
 if __name__ == '__main__':
     jobs = [a.split('=') for a in sys.argv[1:]] if len(sys.argv) > 1 else [
         ('01_ancient_hurler', 'hurler'),
@@ -69,3 +86,5 @@ if __name__ == '__main__':
     ]
     for src, role in jobs:
         convert(src, role)
+    # Somhairlín's 8-facing hammer swing (7 frames) — her build animation.
+    convert_anim('13_somhairlin_builder', 'somhairlin', 'Hammering', 'hammer', 7)

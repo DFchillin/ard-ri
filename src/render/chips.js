@@ -120,6 +120,12 @@ const WALKER_COLOR = {
 const WALKER_H = 1.3;   // world height every walker renders at, whatever the art's pixel size
 const WALK_FRAMES = 6;  // walk poses per facing (cardinals repeat their idle)
 const WALK_FPS = 0.11;  // seconds per walk frame
+// Roles that carry an extra 8-facing hammer swing (<dir>_hammer0..N) — the
+// builder's work animation. Only these load it, so no other role 404s on it.
+const HAMMER_FILE = { somhairlin: true };
+const HAMMER_FRAMES = 7;
+const HAMMER_FPS = 0.1;
+const HAMMER_STRIKE = 3; // the frame the hammer falls, for syncing the sparks
 // Regulars have no attack art, so in the clash they jab: a quick lunge toward
 // the foe and back. Cheap, render-side, reads as "having a go".
 const LUNGE_DUR = 0.34;
@@ -180,6 +186,23 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
       s.material.map = fr.stand;
     }
   };
+  // Optional hammer swing for the builder: cycles its own frames (independent of
+  // the walk phase), facing the work. Returns true on the frame the hammer
+  // falls, so the caller can throw a spark in time with the blow.
+  if (HAMMER_FILE[type]) {
+    const H = {};
+    for (const d of DIRS) H[d] = Array.from({ length: HAMMER_FRAMES }, (_, i) => tex(`assets/walkers/${base}/${d}_hammer${i}.png`));
+    s.hasHammer = true; s._hphase = 0; s._ht = 0;
+    s.animateHammer = (dt) => {
+      if (s._failed) return false;
+      let struck = false;
+      s._ht += dt;
+      if (s._ht >= HAMMER_FPS) { s._ht -= HAMMER_FPS; const nx = (s._hphase + 1) % HAMMER_FRAMES; struck = nx === HAMMER_STRIKE; s._hphase = nx; }
+      const fr = H[screenDir(s._dx, s._dz)] || H.s;
+      const m = fr[s._hphase]; if (m) s.material.map = m;
+      return struck;
+    };
+  }
   return s;
 }
 
