@@ -175,7 +175,7 @@ const battle = new Battle({
   onExit: () => { ui.showTitle(); refreshCampaignButton(); },
   onResolve: ({ won, roster, fallen, ransack }) => {
     campaign.ghosts = roster.ghost || 0;
-    const r = { ...roster }; delete r.ghost; campaign.roster = r;
+    const r = { ...roster }; delete r.ghost; delete r.somhairlin; campaign.roster = r; // Somhairlín is drawn from her House each muster, never banked or lost for good
     for (const f of fallen) campaign.fallen.push({ type: f.type, name: DEAD_NAMES[(Math.random() * DEAD_NAMES.length) | 0], season: curSeason });
     if (won && battle.scenario === 'attack') {
       campaign.raidsWon = (campaign.raidsWon || 0) + 1; // a won foray abroad advances the map-era chapters
@@ -459,7 +459,9 @@ function enterBattle(scenario) {
     }
     if (heldBack) flashNotice(`⛩️ ${heldBack} will not take the field — no flourishing Hall of the Gods seats the god.`);
   }
-  battle.loadWarband({ roster: campaign.roster, ghosts: campaign.ghosts, hosted, favour: musterFavour() });
+  const roster = { ...campaign.roster };
+  if (game.countBuilt('builder_house') > 0) roster.somhairlin = 1; // Somhairlín marches only while her House stands
+  battle.loadWarband({ roster, ghosts: campaign.ghosts, hosted, favour: musterFavour() });
   battle.enter(scenario);
   announceSummons(battle.summoned || []); // heroes/gods that answered this muster
 }

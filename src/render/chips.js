@@ -29,6 +29,9 @@ const WALK_FILE = {
   hurler: 'hurler', sluagh: 'sluagh', somhairlin: 'somhairlin', fomorian: 'fomorian',
 };
 
+// Roles drawn as a single figure with no female counterpart (no `<role>_f` set).
+const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluagh', 'somhairlin']);
+
 const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },
   granary: { color: 0xb0894a, h: 1.7 }, market: { color: 0xa8663a, h: 1.0 },
@@ -137,7 +140,10 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
   // `female` ties the sprite to the person's name; omit it for a random pick.
   // (Roles without an _f set, like the dog, must pass female:false.) `h` sets the
   // world height — the dog rides at half a person's height.
-  const useF = female === undefined ? Math.random() < 0.5 : !!female;
+  // Single-figure roles have no `_f` set, so never randomly pick the female
+  // variant for them (it would 404 to the blank fallback) — only an explicit
+  // female:true would, and callers never pass that for these.
+  const useF = female === undefined ? (!SOLO_ROLES.has(role) && Math.random() < 0.5) : !!female;
   const base = useF ? role + '_f' : role;
   const T = {};
   for (const d of DIRS) T[d] = { stand: tex(`assets/walkers/${base}/${d}_stand.png`),

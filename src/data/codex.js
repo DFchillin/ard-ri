@@ -10,6 +10,7 @@ export const CODEX = [
       { icon: '🌾', name: 'Grain-carrier', ga: 'iompróir arbhair', repr: 'the grain-carrier walker', lore: 'Runs grain from field to granary. Also a paid hand, slow to replace once lost.' },
       { icon: '🛤️', name: 'Deaglán', ga: 'the path-maker', repr: 'the market-trader walker', lore: 'A wandering builder of togher and road. Hardier and quicker than the common folk.' },
       { icon: '🌿', name: 'Druid', ga: 'draoi', repr: 'the druid walker', lore: 'Raised at a shrine. Lifts the culture and heart of those near, and steadies a company’s courage.' },
+      { icon: '🔨', name: 'Somhairlín', ga: 'the master-builder', repr: 'the builder walker', lore: 'The raiser of the great works takes the field only while her House stands. No warrior — but her hammer knows how a wall is made, and so how it is broken. Muster her alongside Deaglán and the two craftsfolk form Lucht Ceirde: the company tears down the enemy’s buildings far faster and holds a steadier line. She never grows into a warrior — she is always the builder.' },
     ],
   },
   {

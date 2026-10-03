@@ -70,6 +70,14 @@ const SCENARIOS = {
   },
 };
 
+// The craftsfolk bond: when Somhairlín and Deaglán — the two who build the
+// roads and the great works — stand in one company, it fights as Lucht Ceirde:
+// their know-how tears the enemy's walls down faster and steadies the line.
+const BOND_TYPES = ['somhairlin', 'deaglan'];
+const BOND_PAIR = ['Lucht Ceirde', 'the craftsfolk'];
+const BOND_BUILD = 1.5;  // company build-damage (vs buildings) while both live
+const BOND_MORALE = 8;   // steadier courage while both live
+
 let _uid = 0;
 
 export class Battle {
@@ -269,7 +277,9 @@ export class Battle {
 
   // ---------- companies & units ----------
   _placeCompany(team, name, formation, types, at) {
-    const co = { id: ++_uid, team, name: name || null, formation, units: [], leader: null, morale: 0, target: null, routing: false, lone: types.length === 1 };
+    const bondPair = BOND_TYPES.every((t) => types.includes(t)); // both craftsfolk mustered together
+    if (bondPair) name = BOND_PAIR;                              // they always fly as Lucht Ceirde
+    const co = { id: ++_uid, team, name: name || null, formation, units: [], leader: null, morale: 0, target: null, routing: false, lone: types.length === 1, bondPair };
     const slots = formationSlots(types.length, formation);
     types.forEach((type, i) => {
       const s = slots[i];
@@ -280,7 +290,7 @@ export class Battle {
     const avg = co.units.reduce((n, u) => n + UNIT_TYPES[u.type].morale, 0) / co.units.length;
     const lead = co.lone ? 0 : (UNIT_TYPES[co.leader.type].rank - 1) * 4;
     const aura = Math.max(...co.units.map((u) => UNIT_TYPES[u.type].aura));
-    co.morale = Math.min(100, avg + lead + aura);
+    co.morale = Math.min(100, avg + lead + aura + (bondPair ? BOND_MORALE : 0)); // the master-builders steady the line
     co.morale0 = co.morale;
     co.spectral = co.units.every((u) => UNIT_TYPES[u.type].spectral); // a host of the dead knows no fear
     // a standard borne by the leader marks the company's ground
@@ -423,7 +433,7 @@ export class Battle {
   _dmgTo(att, def) {
     const f = FORMATIONS[att.company.formation];
     const cry = att.company.cryT > 0 ? 1.25 : 1.0;
-    if (def.kind === 'building') return att.build * (att.company.morale / 100) * f.atk * cry * KB;
+    if (def.kind === 'building') return att.build * (att.company.morale / 100) * f.atk * cry * KB * (att.company.bondPair ? BOND_BUILD : 1);
     return att.atk * (att.company.morale / 100) * f.atk * matchup(att.type, def.type) * cry * KU;
   }
 
@@ -472,7 +482,12 @@ export class Battle {
       if (t.hp <= 0) {
         t.dead = true;
         if (t.kind === 'building') { this.buildingGroup.remove(t.chip); this.buildingGroup.remove(t.bar); }
-        else { t.killed = true; if (t.company.leader === t) took.set(t.company, (took.get(t.company) || 0) + t.hp0 * 2); this._killVisual(t); } // a fallen leader shakes the company
+        else {
+          t.killed = true;
+          if (t.company.leader === t) took.set(t.company, (took.get(t.company) || 0) + t.hp0 * 2); // a fallen leader shakes the company
+          if (t.company.bondPair && BOND_TYPES.includes(t.type)) { t.company.bondPair = false; t.company.morale = Math.max(0, t.company.morale - BOND_MORALE); } // the craftsfolk bond lapses when one falls
+          this._killVisual(t);
+        }
       }
     }
     // collective morale per company
@@ -668,7 +683,7 @@ export class Battle {
   _renderMuster() {
     const roster = document.getElementById('bs-roster'); roster.innerHTML = '';
     const inForming = (k) => this.forming.types.filter((x) => x === k).length;
-    const order = ['villager', 'water', 'grain', 'deaglan', 'druid', 'fennid', 'warrior', 'seasoned', 'curadh', 'ghost', 'cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan'];
+    const order = ['villager', 'water', 'grain', 'deaglan', 'somhairlin', 'druid', 'fennid', 'warrior', 'seasoned', 'curadh', 'ghost', 'cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan'];
     for (const key of order) {
       if (!((this.pool[key] || 0) > 0 || inForming(key) > 0)) continue; // only what you have a right to muster
       const t = UNIT_TYPES[key]; const left = (this.pool[key] || 0) - inForming(key);
@@ -700,8 +715,9 @@ export class Battle {
     if (!arr.length) { info.innerHTML = '<span class="dim">Tap a company, or drag a box. Two fingers to pan, pinch to zoom.</span>'; return; }
     if (arr.length === 1) {
       const c = arr[0]; const flag = c.morale > 66 ? '<span class="ok">confident</span>' : c.morale > 33 ? '<span class="warn">wavering</span>' : '<span class="rout">breaking</span>';
+      const bond = c.bondPair ? '<br><span class="ok">Lucht Ceirde — the craftsfolk raise the siege and steady the line</span>' : '';
       info.innerHTML = `<b>${c.name ? c.name[0] : UNIT_TYPES[c.leader.type].label}</b> ${c.name ? `<small>${c.name[1]}</small>` : ''}<br>` +
-        `×${c.units.filter((u) => !u.dead).length} · ${FORMATIONS[c.formation].label} · Misneach ${Math.round(c.morale)} ${flag}`;
+        `×${c.units.filter((u) => !u.dead).length} · ${FORMATIONS[c.formation].label} · Misneach ${Math.round(c.morale)} ${flag}${bond}`;
     } else info.innerHTML = `<b>${arr.length} companies</b> in hand`;
     document.querySelectorAll('#bs-formations [data-form]').forEach((b) => b.classList.toggle('on', arr.length === 1 && b.dataset.form === arr[0].formation));
   }

@@ -12,6 +12,7 @@ export const UNIT_TYPES = {
   grain:        { label: 'Grain-carrier',  ga: 'iompróir arbhair',  cat: 'regular', rank: 1, atk: 1.2, hp: 3, build: 0.3, speed: 3.5, morale: 50, aura: 0, sprite: 'grain_carrier' },
   deaglan:      { label: 'Deaglán',        ga: 'the path-maker',    cat: 'regular', rank: 1, atk: 1.5, hp: 4, build: 0.4, speed: 4.4, morale: 62, aura: 0, sprite: 'market_trader', battle: { art: 'deaglan', h: 1.55 } },
   druid:        { label: 'Druid',          ga: 'draoi',             cat: 'regular', rank: 1, atk: 1.8, hp: 4, build: 0.3, speed: 3.2, morale: 72, aura: 8, sprite: 'druid' },
+  somhairlin:   { label: 'Somhairlín',     ga: 'the master-builder', cat: 'regular', rank: 1, atk: 1.1, hp: 6, build: 1.4, speed: 3.0, morale: 64, aura: 0, sprite: 'somhairlin' },
   // --- trained tiers: folk grow into these by surviving won battles ---
   warrior:      { label: 'Warrior',        ga: 'laoch',             cat: 'warrior', rank: 2, atk: 2.0, hp: 5, build: 0.6, speed: 3.2, morale: 66, aura: 0, battle: { art: 'warrior', h: 1.5 }, piece: { color: 0xb0763a, tall: 0.9 } },
   seasoned:     { label: 'Seasoned Warrior', ga: 'óglach',          cat: 'seasoned', rank: 3, atk: 2.7, hp: 8, build: 0.9, speed: 2.8, morale: 80, aura: 0, battle: { art: 'curadh', h: 1.6 }, piece: { color: 0x4a6fae, tall: 1.05 } },
