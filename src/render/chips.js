@@ -31,11 +31,11 @@ const WALK_FILE = {
 
 // Roles drawn as a single figure with no female counterpart (no `<role>_f` set).
 const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluagh', 'somhairlin']);
-// The road-crew's dig/run animations are stationary set-pieces, not a gait, so
-// they skip the procedural step-bob. Everyone else — Somhairlín included — gets
-// the same step-bob so they all read as walking the same way; her walk frames
-// still cycle on top of it.
-const ANIMATED_WALK_ROLES = new Set(['deaglan_dig', 'finn_run']);
+// Roles with a real multi-frame stride in their art animate their own legs, so
+// they skip the procedural step-bob (which would just lift a bottom-anchored
+// sprite off the ground and read as floating). Everyone else has only a static
+// frame and leans on the bob to read as walking.
+const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run']);
 
 const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },

@@ -608,16 +608,33 @@ export class Game {
   // only where no road connects them.
   _journey(fromB, toB) {
     const fc = this._center(fromB), tc = this._center(toB);
-    const fe = entryRoadTile(this.map, fromB), te = entryRoadTile(this.map, toB);
-    if (fe && te) {
-      const tiles = roadPath(this.map, fe, te);
-      if (tiles) {
-        const wp = [fc];
-        for (const t of tiles) { const w = this.map.tileToWorld(t.x, t.z); wp.push({ x: w.x, z: w.z }); }
-        wp.push(tc); return wp;
-      }
+    const fe = entryRoadTile(this.map, fromB);
+    if (!fe) return [fc, tc]; // her house isn't on a road — walk straight
+    const te = entryRoadTile(this.map, toB);
+    // Ride the roads as far as they go: all the way to the site's own door when
+    // one exists and connects, else to the reachable road tile nearest the site,
+    // then cut straight across the last stretch.
+    const goal = (te && roadPath(this.map, fe, te)) ? te : this._roadTileNearestWorld(fe, tc);
+    const tiles = goal ? roadPath(this.map, fe, goal) : null;
+    if (!tiles) return [fc, tc];
+    const wp = [fc];
+    for (const t of tiles) { const w = this.map.tileToWorld(t.x, t.z); wp.push({ x: w.x, z: w.z }); }
+    wp.push(tc);
+    return wp;
+  }
+  // BFS the road net from `start`; return the reachable road tile whose world
+  // position is nearest `world`, so a traveller rides the roads as close to the
+  // destination as they reach before stepping off.
+  _roadTileNearestWorld(start, world) {
+    const seen = new Set([start.x + ',' + start.z]), q = [start];
+    let best = start, bd = Infinity;
+    while (q.length) {
+      const c = q.shift();
+      const w = this.map.tileToWorld(c.x, c.z), d = (w.x - world.x) ** 2 + (w.z - world.z) ** 2;
+      if (d < bd) { bd = d; best = c; }
+      for (const n of roadNeighbors(this.map, c.x, c.z)) { const k = n.x + ',' + n.z; if (!seen.has(k)) { seen.add(k); q.push(n); } }
     }
-    return [fc, tc];
+    return best;
   }
   _deliver(fromB, toB, carrying, onArrive) {
     const person = { name: randomName(false), female: false, carrying, ...personFor('grain_carrier') };

@@ -44,32 +44,36 @@ def put(src_file, dst):
     shutil.copy(src_file, dst)
     declutter(dst)
 
-# A pack's idle rotations and its animation frames can sit on different-sized
-# canvases (hers: 64² idle vs 88² walk), which makes the figure jump size when
-# she starts moving (the engine scales the whole canvas to one world height).
-# Re-pad each stand frame onto the walk canvas, feet on the walk baseline.
-def match_stand_to_walk(role):
+# A pack's frames can sit on an oversized canvas with the figure loosely placed
+# and its feet at a different height each frame. Because the engine bottom-anchors
+# the sprite and scales the whole canvas to one world height, that makes the
+# figure jump size and float as it animates. Re-pack every frame of the role onto
+# one tight uniform canvas, horizontally centred with the feet planted ~2px from
+# the bottom — exactly how the regular walker sprites are cut — so it renders at a
+# steady size with planted feet and clean leg motion.
+def normalize_walker(role, kinds):
     try:
         from PIL import Image
     except Exception:
-        print('  ! Pillow missing — cannot normalise stand sizes'); return
+        print('  ! Pillow missing — cannot normalise frames'); return
     out = os.path.join(ROOT, role)
-    for short in DIRMAP.values():
-        sp, wp = os.path.join(out, f'{short}_stand.png'), os.path.join(out, f'{short}_walk0.png')
-        if not (os.path.exists(sp) and os.path.exists(wp)):
-            continue
-        st, wk = Image.open(sp).convert('RGBA'), Image.open(wp).convert('RGBA')
-        if st.size == wk.size:
-            continue
-        bs, bw = st.getbbox(), wk.getbbox()
-        if not (bs and bw):
-            continue
-        fig = st.crop(bs); fw, fh = fig.size
-        canvas = Image.new('RGBA', wk.size, (0, 0, 0, 0))
-        left = round((bw[0] + bw[2]) / 2 - fw / 2)
-        canvas.alpha_composite(fig, (max(0, left), max(0, bw[3] - fh)))
-        canvas.save(sp)
-    print(f'  normalised {role} stand frames to the walk canvas')
+    files = [os.path.join(out, f'{short}_{k}.png') for short in DIRMAP.values() for k in kinds]
+    files = [f for f in files if os.path.exists(f)]
+    mw = mh = 0
+    for f in files:
+        b = Image.open(f).convert('RGBA').getbbox()
+        if b: mw = max(mw, b[2] - b[0]); mh = max(mh, b[3] - b[1])
+    if not mw:
+        return
+    cw, ch = mw + 6, mh + 5
+    for f in files:
+        im = Image.open(f).convert('RGBA'); b = im.getbbox()
+        if not b: continue
+        fig = im.crop(b); fw, fh = fig.size
+        canvas = Image.new('RGBA', (cw, ch), (0, 0, 0, 0))
+        canvas.alpha_composite(fig, (max(0, (cw - fw) // 2), max(0, ch - 2 - fh)))
+        canvas.save(f)
+    print(f'  normalised {role}: {len(files)} frames onto a {cw}x{ch} canvas, feet planted')
 
 def convert(src, role):
     sd = os.path.join(SRC_ROOT, src, 'Idle')
@@ -117,4 +121,4 @@ if __name__ == '__main__':
     # build swing under Hammering — import both into the walker layout.
     convert_anim('13_somhairlin_builder', 'somhairlin', 'Carefree_walk', 'walk', WALK_FRAMES)
     convert_anim('13_somhairlin_builder', 'somhairlin', 'Hammering', 'hammer', 7)
-    match_stand_to_walk('somhairlin')  # her 64² idle → the 88² walk canvas, so she holds one size
+    normalize_walker('somhairlin', ['stand'] + [f'walk{i}' for i in range(WALK_FRAMES)] + [f'hammer{i}' for i in range(7)])
