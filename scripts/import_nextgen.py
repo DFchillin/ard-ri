@@ -86,5 +86,7 @@ if __name__ == '__main__':
     ]
     for src, role in jobs:
         convert(src, role)
-    # Somhairlín's 8-facing hammer swing (7 frames) — her build animation.
+    # Somhairlín's pack stores her gait under Carefree_walk (not walk) and her
+    # build swing under Hammering — import both into the walker layout.
+    convert_anim('13_somhairlin_builder', 'somhairlin', 'Carefree_walk', 'walk', WALK_FRAMES)
     convert_anim('13_somhairlin_builder', 'somhairlin', 'Hammering', 'hammer', 7)
