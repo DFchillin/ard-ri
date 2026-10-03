@@ -930,7 +930,7 @@ export class Game {
     const dx = t.x - b.chip.position.x, dz = t.z - b.chip.position.z, dist = Math.hypot(dx, dz);
     if (b.chip.faceWorld) b.chip.faceWorld(dx, dz);
     if (b.chip.animate) b.chip.animate(dt, true);
-    b.walkT = (b.walkT || 0) + dt; b.chip.position.y = WALK_BASE_Y + gaitBob(b.walkT); // step-bob along the road
+    b.walkT = (b.walkT || 0) + dt; b.chip.position.y = WALK_BASE_Y + (b.chip.hasWalkCycle ? 0 : gaitBob(b.walkT)); // her art strides; others get a step-bob
     if (dist < 0.18) { b.pi += 1; return b.pi >= wp.length; }
     const s = Math.min(dist, speed * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s;
     return false;
@@ -960,7 +960,7 @@ export class Game {
       const dx = b.to.x - b.chip.position.x, dz = b.to.z - b.chip.position.z, dist = Math.hypot(dx, dz);
       if (b.chip.faceWorld) b.chip.faceWorld(dx, dz);
       if (b.chip.animate) b.chip.animate(dt, true);
-      b.walkT += dt; b.chip.position.y = WALK_BASE_Y + gaitBob(b.walkT); // step-bob between corners
+      b.walkT += dt; b.chip.position.y = WALK_BASE_Y + (b.chip.hasWalkCycle ? 0 : gaitBob(b.walkT)); // her art strides; others get a step-bob
       if (dist < 0.18) { b.chip.position.y = b.baseY; b.state = 'hammer'; b.timer = b.cornerDur; b.hammerT = 0; } // reached a corner — plant and hammer
       else { const s = Math.min(dist, BSPEED * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s; }
     } else if (b.state === 'hammer') {

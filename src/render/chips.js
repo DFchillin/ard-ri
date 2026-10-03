@@ -31,10 +31,11 @@ const WALK_FILE = {
 
 // Roles drawn as a single figure with no female counterpart (no `<role>_f` set).
 const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluagh', 'somhairlin']);
-// Roles whose "walk" frames are really an idle sway, not a stride: while moving
-// they hold their stand frame and let the procedural step-bob carry the motion,
-// so they stride instead of pulsing. (The dig/run roles DO cycle — not listed.)
-const GAIT_ONLY_ROLES = new Set(['somhairlin']);
+// Roles that carry a genuine walk/dig/run cycle in their art: they animate their
+// own frames while moving and so skip the procedural step-bob (their legs already
+// carry the stride). Every other role has only a static frame and leans on the
+// bob to read as walking.
+const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run']);
 
 const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },
@@ -169,6 +170,7 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
   });
   // animation state on dedicated props — walkers overwrite userData for inspect
   s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._lunge = 0; s._lunging = false;
+  s.hasWalkCycle = ANIMATED_WALK_ROLES.has(role); // has real stride art → no procedural bob
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
   s.strike = () => { if (s._lunge <= 0) s._lunge = LUNGE_DUR; }; // no attack frame — jab instead
   let hammerFrames = null; // set below for roles that carry a hammer swing
@@ -197,7 +199,7 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
       return;
     }
     const fr = T[screenDir(s._dx, s._dz)] || T.s;
-    if (moving && !GAIT_ONLY_ROLES.has(role)) {
+    if (moving) {
       s._t += dt;
       if (s._t >= WALK_FPS) { s._t -= WALK_FPS; s._phase = (s._phase + 1) % fr.walk.length; }
       s.material.map = fr.walk[s._phase] || fr.stand;

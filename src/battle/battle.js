@@ -383,7 +383,7 @@ export class Battle {
       spr.animate(dt, !!u._moving);
       // procedural step-bob so marching figures stride instead of gliding; the
       // lunge owns the sprite's position while it runs, so leave it be then
-      if (!spr._lunging) { u._gait = (u._gait || 0) + dt; spr.position.y = u._moving ? gaitBob(u._gait) : 0; }
+      if (!spr._lunging) { u._gait = (u._gait || 0) + dt; spr.position.y = (u._moving && !spr.hasWalkCycle) ? gaitBob(u._gait) : 0; }
     }
     for (let i = this._dying.length - 1; i >= 0; i--) {
       const c = this._dying[i]; const spr = c.spr;

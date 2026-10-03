@@ -38,7 +38,7 @@ export class Walker {
   _moveSpriteTo(a, b, k) {
     const wa = this.map.tileToWorld(a.x, a.z);
     const wb = this.map.tileToWorld(b.x, b.z);
-    this.sprite.position.set(wa.x + (wb.x - wa.x) * k + this.off.x, WALK_BASE_Y + gaitBob(this.age), wa.z + (wb.z - wa.z) * k + this.off.z);
+    this.sprite.position.set(wa.x + (wb.x - wa.x) * k + this.off.x, WALK_BASE_Y + (this.sprite.hasWalkCycle ? 0 : gaitBob(this.age)), wa.z + (wb.z - wa.z) * k + this.off.z);
   }
 
   _pickNext(prev) {
@@ -112,7 +112,7 @@ export class Traveler {
     const k = Math.min(this.t, 1);
     this.sprite.position.set(
       this.a.x + (this.b.x - this.a.x) * k + this.off.x,
-      WALK_BASE_Y + gaitBob(this.age),
+      WALK_BASE_Y + (this.sprite.hasWalkCycle ? 0 : gaitBob(this.age)),
       this.a.z + (this.b.z - this.a.z) * k + this.off.z
     );
     if (this.sprite.animate) this.sprite.animate(dt, true);
@@ -150,7 +150,7 @@ export class PathWalker {
     this.t += (dt * this.speed * MOVE_SCALE) / dist;
     if (this.sprite.faceWorld) this.sprite.faceWorld(b.x - a.x, b.z - a.z);
     const k = Math.min(this.t, 1);
-    this.sprite.position.set(a.x + (b.x - a.x) * k + this.off.x, WALK_BASE_Y + gaitBob(this.age), a.z + (b.z - a.z) * k + this.off.z);
+    this.sprite.position.set(a.x + (b.x - a.x) * k + this.off.x, WALK_BASE_Y + (this.sprite.hasWalkCycle ? 0 : gaitBob(this.age)), a.z + (b.z - a.z) * k + this.off.z);
     if (this.sprite.animate) this.sprite.animate(dt, true);
     if (this.t >= 1) { this.t = 0; this.i += 1; if (this.i >= this.wp.length - 1) { this.done = true; if (this.onArrive) this.onArrive(); } }
   }
