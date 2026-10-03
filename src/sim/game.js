@@ -5,7 +5,7 @@ import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
 
 const FX_TOP = { dwelling: 1.15, farm: 0.7, market: 1.15, homestead: 1.6 }; // where hearth-smoke leaves the roof — tuned to the ~1.25-tile-tall building art
-import { Walker, Traveler } from './walkers.js?v=CBUST';
+import { Walker, Traveler, PathWalker } from './walkers.js?v=CBUST';
 
 // A soft round pip that floats up from a building when a walker delivers to it,
 // so the invisible food/water/culture transfer can be seen. Colour = what arrived.
@@ -35,7 +35,7 @@ const PIP_TEX_DIAMOND = (() => {
   x.strokeStyle = 'rgba(35,22,12,0.6)'; x.lineWidth = 3; x.strokeRect(-15, -15, 30, 30);
   const t = new THREE.CanvasTexture(c); return t;
 })();
-import { entryRoadTile, adjacentBuildings, roadConnected, roadNeighbors } from './roads.js?v=CBUST';
+import { entryRoadTile, adjacentBuildings, roadConnected, roadNeighbors, roadPath } from './roads.js?v=CBUST';
 import { randomName } from '../data/names.js?v=CBUST';
 import { personFor } from '../data/phrases.js?v=CBUST';
 
@@ -500,7 +500,7 @@ export class Game {
         // crop and waits, rather than sending a carrier that spills the harvest
         // into a full store — so a good year is never silently lost.
         if (b.connected && this.folk >= FARM_MIN_FOLK && this._labour > 0 && this._storeHasRoom() &&
-            this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 2) {
+            this._walkersFrom(b) === 0 && ++b.timer >= 3) {
           b.timer = 0; this._labour--; this._sendGrain(b);
           if (--b.harvestsLeft <= 0) { b.ripe = false; b.grown = 0; } // back to growing
         }
@@ -595,32 +595,48 @@ export class Game {
     this.walkerGroup.add(tr.sprite);
   }
 
-  // --- Directed deliveries: a goods carrier walks straight from source to target
-  // (field → store → market), carrying the goods, so it never wanders or flickers.
+  // --- Directed deliveries: a goods carrier follows the roads from source to
+  // target (field → store → market), carrying the goods — honouring the path.
   _tileOf(b) { return { x: b.x + (b.w >> 1), z: b.z + (b.h >> 1) }; }
   _nearestTo(from, list) {
     const fc = this._center(from); let best = null, bd = Infinity;
     for (const b of list) { const c = this._center(b), d = (c.x - fc.x) ** 2 + (c.z - fc.z) ** 2; if (d < bd) { bd = d; best = b; } }
     return best;
   }
-  _deliver(fromB, toB, type, carrying, onArrive) {
-    const person = { name: randomName(false), female: false, carrying, ...personFor(type) };
-    const tr = new Traveler(this.map, this._tileOf(fromB), this._tileOf(toB), { type, speed: 2.3, person, onArrive });
-    tr.source = fromB; // so _walkersFrom() still caps how many a building has on the roads
-    this.walkers.push(tr); this.walkerGroup.add(tr.sprite);
-    return tr;
+  // World waypoints from one building to another, following the road network as
+  // far as it reaches (centre → door → road path → door → centre); a direct line
+  // only where no road connects them.
+  _journey(fromB, toB) {
+    const fc = this._center(fromB), tc = this._center(toB);
+    const fe = entryRoadTile(this.map, fromB), te = entryRoadTile(this.map, toB);
+    if (fe && te) {
+      const tiles = roadPath(this.map, fe, te);
+      if (tiles) {
+        const wp = [fc];
+        for (const t of tiles) { const w = this.map.tileToWorld(t.x, t.z); wp.push({ x: w.x, z: w.z }); }
+        wp.push(tc); return wp;
+      }
+    }
+    return [fc, tc];
+  }
+  _deliver(fromB, toB, carrying, onArrive) {
+    const person = { name: randomName(false), female: false, carrying, ...personFor('grain_carrier') };
+    const w = new PathWalker(this.map, this._journey(fromB, toB), { type: 'grain_carrier', speed: 2.6, person, onArrive });
+    w.source = fromB; // so _walkersFrom() still caps how many a building has out
+    this.walkers.push(w); this.walkerGroup.add(w.sprite);
+    return w;
   }
 
-  // Farm → nearest grain store: the carrier walks straight there and drops its load.
+  // Farm → nearest grain store: one carrier hauls a batch (up to 4) along the road.
   _sendGrain(farm) {
-    let load = Math.round(farm.def.load * this._farmBoost());
+    let load = Math.min(4, Math.round(farm.def.load * this._farmBoost()));
     if (load <= 0) return;
     const stores = this.buildings.filter((b) => b.def.role === 'granary' && !b.building && b.stock < GRANARY_CAP);
     if (!stores.length) return; // nowhere to store — the field holds its ripe grain
     const store = this._nearestTo(farm, stores);
     const add = Math.min(load, GRANARY_CAP - store.stock);
     this._storeFx(farm, null); // grain taken up off the field
-    this._deliver(farm, store, 'grain_carrier', '🌾 grain', () => { store.stock = Math.min(GRANARY_CAP, store.stock + add); this._storeFx(store, null); });
+    this._deliver(farm, store, `🌾 grain ×${add}`, () => { store.stock = Math.min(GRANARY_CAP, store.stock + add); this._storeFx(store, null); });
   }
 
   // Well → water_carrier wanders roads, refilling the dwellings it passes.
@@ -902,7 +918,21 @@ export class Game {
     const m = site.sprite && site.sprite.userData && site.sprite.userData.spr && site.sprite.userData.spr.material;
     if (m) { m.opacity = 1; m.transparent = true; }
     if (this.onBuilt) this.onBuilt(site);
-    b.state = 'toHouse'; b.to = b.home; // head home, then free for the next
+    b.chip.position.y = b.baseY; // out of the hammer bob
+    b.state = 'toHouse'; b.path = this._journey(site, b.houseB); b.pi = 0; // follow the road home, then free for the next
+  }
+  // Step a builder along her stored road path; returns true once the last
+  // waypoint is reached. Animates her walk cycle and faces her down the road.
+  _followPath(b, dt, speed) {
+    const wp = b.path || [];
+    if (b.pi >= wp.length) return true;
+    const t = wp[b.pi];
+    const dx = t.x - b.chip.position.x, dz = t.z - b.chip.position.z, dist = Math.hypot(dx, dz);
+    if (b.chip.faceWorld) b.chip.faceWorld(dx, dz);
+    if (b.chip.animate) b.chip.animate(dt, true);
+    if (dist < 0.18) { b.pi += 1; return b.pi >= wp.length; }
+    const s = Math.min(dist, speed * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s;
+    return false;
   }
   _updateBuilders(dt) {
     const house = this._builderHouse();
@@ -915,24 +945,38 @@ export class Game {
       site._claimed = true;
       const c = this._center(site), ix = (site.w * this.map.tile) / 2 - 0.5, iz = (site.h * this.map.tile) / 2 - 0.5;
       const corners = [{ x: c.x - ix, z: c.z - iz }, { x: c.x + ix, z: c.z - iz }, { x: c.x + ix, z: c.z + iz }, { x: c.x - ix, z: c.z + iz }];
-      this.builder = { chip, state: 'toCorner', home: hc, site, corners, ci: 0, to: corners[0], cornerDur: this._buildTime(site) / 4, timer: 0, spark: 0 };
+      this.builder = { chip, state: 'toSite', houseB: house, home: hc, site, corners, ci: 0, to: corners[0],
+        cornerDur: this._buildTime(site) / 4, timer: 0, spark: 0, baseY: chip.position.y, hammerT: 0,
+        path: this._journey(house, site), pi: 0 }; // walk the roads out to the site, as far as they reach
     }
     const b = this.builder, BSPEED = 2.2;
-    if (b.state === 'toCorner' || b.state === 'toHouse') {
+    if (b.state === 'toSite' || b.state === 'toHouse') {
+      if (this._followPath(b, dt, BSPEED)) {
+        if (b.state === 'toHouse') { this._removeBuilder(); return; }
+        b.state = 'toCorner'; b.to = b.corners[b.ci]; // off the road, now hop the site corners
+      }
+    } else if (b.state === 'toCorner') {
       const dx = b.to.x - b.chip.position.x, dz = b.to.z - b.chip.position.z, dist = Math.hypot(dx, dz);
       if (b.chip.faceWorld) b.chip.faceWorld(dx, dz);
       if (b.chip.animate) b.chip.animate(dt, true);
-      if (dist < 0.18) {
-        if (b.state === 'toHouse') { this._removeBuilder(); return; }
-        b.state = 'hammer'; b.timer = b.cornerDur; // reached a corner — hammer it
-      } else { const s = Math.min(dist, BSPEED * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s; }
+      if (dist < 0.18) { b.state = 'hammer'; b.timer = b.cornerDur; b.hammerT = 0; } // reached a corner — hammer it
+      else { const s = Math.min(dist, BSPEED * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s; }
     } else if (b.state === 'hammer') {
-      if (b.chip.animate) b.chip.animate(dt, false);
+      // No hammer frame exists in her pack, so she works with a rhythmic strike:
+      // her walk cycle keeps her limbs moving while a vertical bob drops the
+      // hammer, a spark flying off the work on each downbeat.
+      const c = this._center(b.site);
+      if (b.chip.faceWorld) b.chip.faceWorld(c.x - b.chip.position.x, c.z - b.chip.position.z);
+      if (b.chip.animate) b.chip.animate(dt, true);
+      b.hammerT += dt;
+      const PERIOD = 0.5, p = (b.hammerT % PERIOD) / PERIOD;
+      b.chip.position.y = b.baseY + Math.sin(p * Math.PI) * 0.18; // wind up, then strike down
       b.timer -= dt; b.spark -= dt;
-      if (b.spark <= 0) { b.spark = 0.28; this._floatie(b.chip.position.x + (Math.random() - 0.5) * 0.4, 1.1, b.chip.position.z, 'food', { sz: 0.1, vy: 0.7, life: 0.45, over: true }); }
+      if (b.spark <= 0) { b.spark = PERIOD; this._floatie(b.chip.position.x + (Math.random() - 0.5) * 0.4, 1.1, b.chip.position.z, 'food', { sz: 0.1, vy: 0.7, life: 0.45, over: true }); }
       const m = b.site.sprite && b.site.sprite.userData && b.site.sprite.userData.spr && b.site.sprite.userData.spr.material;
       if (m) m.opacity = 0.4 + Math.min(1, (b.ci + (1 - Math.max(0, b.timer) / b.cornerDur)) / 4) * 0.6; // firms up corner by corner
       if (b.timer <= 0) {
+        b.chip.position.y = b.baseY; // settle before moving on
         b.ci += 1;
         if (b.ci >= 4) this._finishSite(b); // all four corners hammered — raised
         else { b.state = 'toCorner'; b.to = b.corners[b.ci]; }
@@ -964,7 +1008,7 @@ export class Game {
     const store = this._nearestTo(market, stores);
     const take = Math.min(store.stock, MARKET_CAP - market.stock);
     store.stock -= take; market._restocking = true; // reserved and in transit
-    this._deliver(store, market, 'grain_carrier', '🌾 grain', () => { market.stock = Math.min(MARKET_CAP, market.stock + take); market._restocking = false; this._storeFx(market, null); });
+    this._deliver(store, market, `🌾 grain ×${take}`, () => { market.stock = Math.min(MARKET_CAP, market.stock + take); market._restocking = false; this._storeFx(market, null); });
   }
 
   // Market → market_trader wanders roads, feeding dwellings it passes.

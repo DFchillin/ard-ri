@@ -55,3 +55,26 @@ export function roadConnected(map, a, b) {
   }
   return false;
 }
+
+// The shortest road-only path from tile a to tile b, as a list of tiles
+// [a, …, b], or null if they aren't road-connected. (BFS with parent tracking.)
+export function roadPath(map, a, b) {
+  if (a.x === b.x && a.z === b.z) return [a];
+  const prev = new Map([[a.x + ',' + a.z, null]]);
+  const q = [a];
+  while (q.length) {
+    const c = q.shift();
+    for (const n of roadNeighbors(map, c.x, c.z)) {
+      const k = n.x + ',' + n.z;
+      if (prev.has(k)) continue;
+      prev.set(k, c);
+      if (n.x === b.x && n.z === b.z) {
+        const path = [n]; let p = c;
+        while (p) { path.push(p); p = prev.get(p.x + ',' + p.z); }
+        return path.reverse();
+      }
+      q.push(n);
+    }
+  }
+  return null;
+}

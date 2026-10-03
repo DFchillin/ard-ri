@@ -114,3 +114,39 @@ export class Traveler {
 
   dispose() { disposeSprite(this.sprite); }
 }
+
+// Follows a fixed list of world waypoints in order (e.g. a road path), animating
+// its walk cycle, then fires onArrive. Used for directed deliveries that honour
+// the roads instead of wandering or cutting straight across.
+export class PathWalker {
+  constructor(map, waypoints, { type = 'villager', speed = 2.4, onArrive, person } = {}) {
+    this.map = map;
+    this.speed = speed;
+    this.onArrive = onArrive;
+    this.person = person || null;
+    this.done = false;
+    this.i = 0; this.t = 0; this.age = 0;
+    this.wp = waypoints || [];
+    this.off = { x: (Math.random() - 0.5) * 0.3, z: (Math.random() - 0.5) * 0.3 };
+    this.sprite = makeWalkerChip(type, this.person ? this.person.female : undefined);
+    this.sprite.userData = { kind: 'walker', person: this.person, type };
+    const a = this.wp[0] || { x: 0, z: 0 };
+    this.sprite.position.set(a.x + this.off.x, 0.05, a.z + this.off.z);
+  }
+
+  update(dt) {
+    if (this.done) return;
+    this.age += dt;
+    const a = this.wp[this.i], b = this.wp[this.i + 1];
+    if (!a || !b) { this.done = true; if (this.onArrive) this.onArrive(); return; }
+    const dist = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+    this.t += (dt * this.speed * MOVE_SCALE) / dist;
+    if (this.sprite.faceWorld) this.sprite.faceWorld(b.x - a.x, b.z - a.z);
+    const k = Math.min(this.t, 1);
+    this.sprite.position.set(a.x + (b.x - a.x) * k + this.off.x, 0.05, a.z + (b.z - a.z) * k + this.off.z);
+    if (this.sprite.animate) this.sprite.animate(dt, true);
+    if (this.t >= 1) { this.t = 0; this.i += 1; if (this.i >= this.wp.length - 1) { this.done = true; if (this.onArrive) this.onArrive(); } }
+  }
+
+  dispose() { disposeSprite(this.sprite); }
+}
