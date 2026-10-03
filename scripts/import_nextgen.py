@@ -44,6 +44,33 @@ def put(src_file, dst):
     shutil.copy(src_file, dst)
     declutter(dst)
 
+# A pack's idle rotations and its animation frames can sit on different-sized
+# canvases (hers: 64² idle vs 88² walk), which makes the figure jump size when
+# she starts moving (the engine scales the whole canvas to one world height).
+# Re-pad each stand frame onto the walk canvas, feet on the walk baseline.
+def match_stand_to_walk(role):
+    try:
+        from PIL import Image
+    except Exception:
+        print('  ! Pillow missing — cannot normalise stand sizes'); return
+    out = os.path.join(ROOT, role)
+    for short in DIRMAP.values():
+        sp, wp = os.path.join(out, f'{short}_stand.png'), os.path.join(out, f'{short}_walk0.png')
+        if not (os.path.exists(sp) and os.path.exists(wp)):
+            continue
+        st, wk = Image.open(sp).convert('RGBA'), Image.open(wp).convert('RGBA')
+        if st.size == wk.size:
+            continue
+        bs, bw = st.getbbox(), wk.getbbox()
+        if not (bs and bw):
+            continue
+        fig = st.crop(bs); fw, fh = fig.size
+        canvas = Image.new('RGBA', wk.size, (0, 0, 0, 0))
+        left = round((bw[0] + bw[2]) / 2 - fw / 2)
+        canvas.alpha_composite(fig, (max(0, left), max(0, bw[3] - fh)))
+        canvas.save(sp)
+    print(f'  normalised {role} stand frames to the walk canvas')
+
 def convert(src, role):
     sd = os.path.join(SRC_ROOT, src, 'Idle')
     out = os.path.join(ROOT, role)
@@ -90,3 +117,4 @@ if __name__ == '__main__':
     # build swing under Hammering — import both into the walker layout.
     convert_anim('13_somhairlin_builder', 'somhairlin', 'Carefree_walk', 'walk', WALK_FRAMES)
     convert_anim('13_somhairlin_builder', 'somhairlin', 'Hammering', 'hammer', 7)
+    match_stand_to_walk('somhairlin')  # her 64² idle → the 88² walk canvas, so she holds one size
