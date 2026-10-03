@@ -3,6 +3,7 @@ import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIs
 import { Tilemap, T } from '../sim/tilemap.js?v=CBUST';
 import { WorldView } from '../render/world_view.js?v=CBUST';
 import { makeBuildingChip, makeWalkerChip, makeWarriorChip } from '../render/chips.js?v=CBUST';
+import { gaitBob } from '../sim/walkers.js?v=CBUST';
 import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNickname, UPSKILL, EMPLOYEES } from './units.js?v=CBUST';
 
 const MAP = 20;
@@ -377,7 +378,13 @@ export class Battle {
     dt = Math.min(dt, 0.05);
     for (const c of this.companies) if (c.cryT > 0) c.cryT -= dt;
     for (const u of this.units) if (!u.dead) this._move(u, dt);
-    for (const u of this.units) { const spr = u.mesh.userData.spr; if (spr && spr.animate && !u.dead) spr.animate(dt, !!u._moving); }
+    for (const u of this.units) {
+      const spr = u.mesh.userData.spr; if (!spr || !spr.animate || u.dead) continue;
+      spr.animate(dt, !!u._moving);
+      // procedural step-bob so marching figures stride instead of gliding; the
+      // lunge owns the sprite's position while it runs, so leave it be then
+      if (!spr._lunging) { u._gait = (u._gait || 0) + dt; spr.position.y = u._moving ? gaitBob(u._gait) : 0; }
+    }
     for (let i = this._dying.length - 1; i >= 0; i--) {
       const c = this._dying[i]; const spr = c.spr;
       c.ttl -= dt;

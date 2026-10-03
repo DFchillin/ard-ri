@@ -39,7 +39,7 @@ export const UNIT_TYPES = {
 
 // Promotion path: a regular who survives a won battle may grow into a warrior,
 // a warrior into a seasoned óglach — about three wins to climb a tier.
-export const UPSKILL = { villager: 'warrior', water: 'warrior', grain: 'warrior', deaglan: 'warrior', druid: 'warrior', fennid: 'seasoned', warrior: 'seasoned' };
+export const UPSKILL = { villager: 'warrior', water: 'warrior', grain: 'warrior', druid: 'warrior', fennid: 'seasoned', warrior: 'seasoned' }; // deaglán/somhairlín are signature craftsfolk — they do not promote
 // City-paid folk: if they fall they take two seasons to replace.
 export const EMPLOYEES = ['water', 'grain', 'druid'];
 

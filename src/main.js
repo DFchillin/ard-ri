@@ -175,7 +175,7 @@ const battle = new Battle({
   onExit: () => { ui.showTitle(); refreshCampaignButton(); },
   onResolve: ({ won, roster, fallen, ransack }) => {
     campaign.ghosts = roster.ghost || 0;
-    const r = { ...roster }; delete r.ghost; delete r.somhairlin; campaign.roster = r; // Somhairlín is drawn from her House each muster, never banked or lost for good
+    const r = { ...roster }; delete r.ghost; delete r.somhairlin; delete r.deaglan; campaign.roster = r; // the craftsfolk are signature folk, granted fresh each muster — never banked or lost for good
     for (const f of fallen) campaign.fallen.push({ type: f.type, name: DEAD_NAMES[(Math.random() * DEAD_NAMES.length) | 0], season: curSeason });
     if (won && battle.scenario === 'attack') {
       campaign.raidsWon = (campaign.raidsWon || 0) + 1; // a won foray abroad advances the map-era chapters
@@ -284,7 +284,7 @@ function collectColonyTribute() {
 
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
 const CAMPAIGN_KEY = 'ardri_campaign';
-const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1 }; // heroes/gods are not owned — they are hosted and summoned
+const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, druid: 2, warrior: 3, seasoned: 2, curadh: 1 }; // deaglan/somhairlín are signature folk granted at muster, not banked; heroes/gods are hosted and summoned
 let campaign = Object.assign({ leader: null, home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 0, mapSeed: _mapSeed, settlement: null, level: 1, doneObjectives: [] }, _savedCampaign);
 if (!campaign.roster) campaign.roster = { ...DEFAULT_ROSTER };
 if (!campaign.fallen) campaign.fallen = [];
@@ -309,7 +309,13 @@ const hurling = new Hurling({
   },
   onClose: () => { resumeGame(); },
 });
-function openHurling() { pauseGame(); ui.hideInspect(); hurling.open(campaign.roster, campaign.hosted); }
+function openHurling() {
+  pauseGame(); ui.hideInspect();
+  const roster = { ...campaign.roster };
+  roster.deaglan = Math.max(1, roster.deaglan || 0);                 // the path-maker always fields a hurley
+  if (game.countBuilt('builder_house') > 0) roster.somhairlin = Math.max(1, roster.somhairlin || 0); // Somhairlín plays while her House stands
+  hurling.open(roster, campaign.hosted);
+}
 const HURL_CHANCE = 1 / 3; // one in three each season a band comes calling (this runs on the season turn)
 function maybeHurlChallenge() {
   if (campaign.hurlChallenge || !game.hurlingField()) return;
@@ -460,6 +466,7 @@ function enterBattle(scenario) {
     if (heldBack) flashNotice(`⛩️ ${heldBack} will not take the field — no flourishing Hall of the Gods seats the god.`);
   }
   const roster = { ...campaign.roster };
+  roster.deaglan = 1;                                              // the path-maker always answers the muster
   if (game.countBuilt('builder_house') > 0) roster.somhairlin = 1; // Somhairlín marches only while her House stands
   battle.loadWarband({ roster, ghosts: campaign.ghosts, hosted, favour: musterFavour() });
   battle.enter(scenario);

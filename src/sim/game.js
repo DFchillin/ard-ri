@@ -5,7 +5,7 @@ import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
 
 const FX_TOP = { dwelling: 1.15, farm: 0.7, market: 1.15, homestead: 1.6 }; // where hearth-smoke leaves the roof — tuned to the ~1.25-tile-tall building art
-import { Walker, Traveler, PathWalker } from './walkers.js?v=CBUST';
+import { Walker, Traveler, PathWalker, gaitBob, WALK_BASE_Y } from './walkers.js?v=CBUST';
 
 // A soft round pip that floats up from a building when a walker delivers to it,
 // so the invisible food/water/culture transfer can be seen. Colour = what arrived.
@@ -930,6 +930,7 @@ export class Game {
     const dx = t.x - b.chip.position.x, dz = t.z - b.chip.position.z, dist = Math.hypot(dx, dz);
     if (b.chip.faceWorld) b.chip.faceWorld(dx, dz);
     if (b.chip.animate) b.chip.animate(dt, true);
+    b.walkT = (b.walkT || 0) + dt; b.chip.position.y = WALK_BASE_Y + gaitBob(b.walkT); // step-bob along the road
     if (dist < 0.18) { b.pi += 1; return b.pi >= wp.length; }
     const s = Math.min(dist, speed * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s;
     return false;
@@ -946,7 +947,7 @@ export class Game {
       const c = this._center(site), ix = (site.w * this.map.tile) / 2 - 0.5, iz = (site.h * this.map.tile) / 2 - 0.5;
       const corners = [{ x: c.x - ix, z: c.z - iz }, { x: c.x + ix, z: c.z - iz }, { x: c.x + ix, z: c.z + iz }, { x: c.x - ix, z: c.z + iz }];
       this.builder = { chip, state: 'toSite', houseB: house, home: hc, site, corners, ci: 0, to: corners[0],
-        cornerDur: this._buildTime(site) / 4, timer: 0, spark: 0, baseY: chip.position.y, hammerT: 0,
+        cornerDur: this._buildTime(site) / 4, timer: 0, spark: 0, baseY: WALK_BASE_Y, hammerT: 0, walkT: 0,
         path: this._journey(house, site), pi: 0 }; // walk the roads out to the site, as far as they reach
     }
     const b = this.builder, BSPEED = 2.2;
@@ -959,7 +960,8 @@ export class Game {
       const dx = b.to.x - b.chip.position.x, dz = b.to.z - b.chip.position.z, dist = Math.hypot(dx, dz);
       if (b.chip.faceWorld) b.chip.faceWorld(dx, dz);
       if (b.chip.animate) b.chip.animate(dt, true);
-      if (dist < 0.18) { b.state = 'hammer'; b.timer = b.cornerDur; b.hammerT = 0; } // reached a corner — hammer it
+      b.walkT += dt; b.chip.position.y = WALK_BASE_Y + gaitBob(b.walkT); // step-bob between corners
+      if (dist < 0.18) { b.chip.position.y = b.baseY; b.state = 'hammer'; b.timer = b.cornerDur; b.hammerT = 0; } // reached a corner — plant and hammer
       else { const s = Math.min(dist, BSPEED * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s; }
     } else if (b.state === 'hammer') {
       // She faces her work and swings her hammer. With the real swing art loaded
@@ -969,7 +971,7 @@ export class Game {
       if (b.chip.faceWorld) b.chip.faceWorld(c.x - b.chip.position.x, c.z - b.chip.position.z);
       let struck = false;
       if (b.chip.hasHammer && b.chip.animateHammer) {
-        struck = b.chip.animateHammer(dt);
+        struck = b.chip.animateHammer(dt); b.chip.position.y = b.baseY; // planted; the swing art carries the motion
       } else {
         if (b.chip.animate) b.chip.animate(dt, true);
         b.hammerT += dt;

@@ -31,6 +31,10 @@ const WALK_FILE = {
 
 // Roles drawn as a single figure with no female counterpart (no `<role>_f` set).
 const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluagh', 'somhairlin']);
+// Roles whose "walk" frames are really an idle sway, not a stride: while moving
+// they hold their stand frame and let the procedural step-bob carry the motion,
+// so they stride instead of pulsing. (The dig/run roles DO cycle — not listed.)
+const GAIT_ONLY_ROLES = new Set(['somhairlin']);
 
 const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },
@@ -167,6 +171,7 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
   s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._lunge = 0; s._lunging = false;
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
   s.strike = () => { if (s._lunge <= 0) s._lunge = LUNGE_DUR; }; // no attack frame — jab instead
+  let hammerFrames = null; // set below for roles that carry a hammer swing
   s.animate = (dt, moving) => {
     // The lunge is a position hop toward the foe (a small rise too). Only the
     // battle uses it, where this chip is a child of a group at local (0,0,0); a
@@ -183,8 +188,16 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
       s.position.set(0, 0, 0);
     }
     if (s._failed) return; // fallback colour figure — nothing to swap
+    // A hammer-bearer swings her hammer instead of jabbing: play the swing art
+    // across the lunge so the blow in battle reads as her hammer falling.
+    if (s._lunge > 0 && hammerFrames) {
+      const fr = hammerFrames[screenDir(s._dx, s._dz)] || hammerFrames.s;
+      const k = 1 - Math.max(0, s._lunge) / LUNGE_DUR;
+      s.material.map = fr[Math.min(HAMMER_FRAMES - 1, Math.floor(k * HAMMER_FRAMES))] || fr[0];
+      return;
+    }
     const fr = T[screenDir(s._dx, s._dz)] || T.s;
-    if (moving) {
+    if (moving && !GAIT_ONLY_ROLES.has(role)) {
       s._t += dt;
       if (s._t >= WALK_FPS) { s._t -= WALK_FPS; s._phase = (s._phase + 1) % fr.walk.length; }
       s.material.map = fr.walk[s._phase] || fr.stand;
@@ -196,15 +209,15 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
   // the walk phase), facing the work. Returns true on the frame the hammer
   // falls, so the caller can throw a spark in time with the blow.
   if (HAMMER_FILE[type]) {
-    const H = {};
-    for (const d of DIRS) H[d] = Array.from({ length: HAMMER_FRAMES }, (_, i) => tex(`assets/walkers/${base}/${d}_hammer${i}.png`));
+    hammerFrames = {};
+    for (const d of DIRS) hammerFrames[d] = Array.from({ length: HAMMER_FRAMES }, (_, i) => tex(`assets/walkers/${base}/${d}_hammer${i}.png`));
     s.hasHammer = true; s._hphase = 0; s._ht = 0;
     s.animateHammer = (dt) => {
       if (s._failed) return false;
       let struck = false;
       s._ht += dt;
       if (s._ht >= HAMMER_FPS) { s._ht -= HAMMER_FPS; const nx = (s._hphase + 1) % HAMMER_FRAMES; struck = nx === HAMMER_STRIKE; s._hphase = nx; }
-      const fr = H[screenDir(s._dx, s._dz)] || H.s;
+      const fr = hammerFrames[screenDir(s._dx, s._dz)] || hammerFrames.s;
       const m = fr[s._hphase]; if (m) s.material.map = m;
       return struck;
     };
