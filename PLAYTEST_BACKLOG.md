@@ -101,10 +101,15 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
   time (a further road is laid but Deaglán doesn't come out again until the first is
   done); and when Somhairlín's House stands he and Finn emerge from it and walk out to
   the head of the new road before digging. No house → they appear at the road as before.
-- [ ] **Walkthrough / street-view mode** [feat] — a "little man" button above the
-  compass (Google-Maps style): drop onto a path and stroll your city, buildings
-  billboarding to face you, click folk as they pass. A screensaver-ish victory lap
-  once a city is built.
+- [x] **Walkthrough / street-view mode (Siúlóid)** [feat] — DONE (`<this batch>`): a
+  🚶 pegman above the compass (shown once you're in a settlement with roads) drops you
+  into a first-person stroll. A `PerspectiveCamera` auto-wanders the road network at
+  eye level (0.85), easing its turn at junctions and preferring not to double back;
+  billboard buildings and folk turn to face you, and a tap inspects whoever you pass
+  (the raycast picks from the eye-level camera). The clock and economy freeze while you
+  stroll — a non-destructive living screensaver — though walkers and ambient fx keep
+  moving. "✕ Leave the stroll" returns you to the iso view. DECISIONS: 1st-person
+  camera; auto-wander + tap-to-inspect.
 
 ## Art integration (ongoing / external)
 

@@ -7,6 +7,7 @@ import { Game } from './sim/game.js?v=CBUST';
 import { UI } from './ui.js?v=CBUST';
 import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=CBUST';
 import { setCamera } from './render/assets.js?v=CBUST';
+import { roadNeighbors } from './sim/roads.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
 import { Hurling } from './hurling.js?v=CBUST';
 import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById, OVERSEAS, overseasById } from './data/kingdoms.js?v=CBUST';
@@ -31,6 +32,58 @@ scene.fog = new THREE.Fog(0x0b1418, 70, 175);
 let aspect = window.innerWidth / window.innerHeight;
 const camera = createIsoCamera(15, aspect);
 setCamera(camera); // walkers face by screen direction
+
+// --- Siúlóid: a first-person stroll through the ráth (a living screensaver) ---
+// A perspective camera wanders the road network at eye level; buildings and folk
+// (billboard sprites) turn to face it as you pass. Tap folk to inspect them.
+const walkCam = new THREE.PerspectiveCamera(74, aspect, 0.05, 1000);
+const walk = {
+  active: false, cur: null, next: null, prev: null, t: 0, speed: 1.6, eye: 0.85,
+  look: new THREE.Vector3(), _look: new THREE.Vector3(),
+  _roadTiles() { const out = []; const m = game.map; for (let z = 0; z < m.size; z++) for (let x = 0; x < m.size; x++) { const t = m.get(x, z); if (t && t.road) out.push({ x, z }); } return out; },
+  _pickNext() {
+    const opts = roadNeighbors(game.map, this.cur.x, this.cur.z);
+    const fwd = this.prev ? opts.filter((n) => !(n.x === this.prev.x && n.z === this.prev.z)) : opts;
+    const pool = fwd.length ? fwd : opts;
+    this.next = pool.length ? pool[(Math.random() * pool.length) | 0] : this.cur;
+  },
+  enter() {
+    const roads = this._roadTiles(); if (!roads.length) { flashNotice('🚶 Lay a road first — there is nowhere to stroll yet.'); return; }
+    const c = { x: (game.map.size / 2) | 0, z: (game.map.size / 2) | 0 };
+    roads.sort((a, b) => ((a.x - c.x) ** 2 + (a.z - c.z) ** 2) - ((b.x - c.x) ** 2 + (b.z - c.z) ** 2));
+    this.cur = roads[0]; this.prev = null; this.t = 0; this._pickNext();
+    const w = game.map.tileToWorld(this.cur.x, this.cur.z); this._look.set(w.x, this.eye, w.z);
+    this.active = true;
+    document.getElementById('ui-overlay').classList.add('in-walk');
+    ui.hideInspect();
+  },
+  exit() {
+    this.active = false;
+    document.getElementById('ui-overlay').classList.remove('in-walk');
+  },
+  update(dt) {
+    this.t += dt * this.speed;
+    while (this.t >= 1) { this.t -= 1; this.prev = this.cur; this.cur = this.next; this._pickNext(); }
+    const a = game.map.tileToWorld(this.cur.x, this.cur.z), b = game.map.tileToWorld(this.next.x, this.next.z);
+    const px = a.x + (b.x - a.x) * this.t, pz = a.z + (b.z - a.z) * this.t;
+    walkCam.position.set(px, this.eye, pz);
+    // look a little ahead along the path, easing the turn at junctions
+    this.look.set(b.x, this.eye, b.z);
+    this._look.lerp(this.look, Math.min(1, dt * 3));
+    walkCam.lookAt(this._look);
+  },
+};
+// Show the pegman only when a settlement with roads is on screen; the exit button
+// only while strolling.
+function updateWalkBtn() {
+  const peg = document.getElementById('walk-btn'), ex = document.getElementById('walk-exit');
+  const inSettlement = titleScreenEl.classList.contains('hidden') && !battle.active && !hurling.active;
+  const hasRoads = !!(game.map && game.map.tiles && game.map.tiles.some((t) => t && t.road));
+  if (peg) peg.classList.toggle('hidden', !(inSettlement && !walk.active && hasRoads));
+  if (ex) ex.classList.toggle('hidden', !walk.active);
+}
+document.getElementById('walk-btn')?.addEventListener('click', () => walk.enter());
+document.getElementById('walk-exit')?.addEventListener('click', () => walk.exit());
 
 const hemi = new THREE.HemisphereLight(0xd6f0cf, 0x40602f, 1.6);
 scene.add(hemi);
@@ -1171,7 +1224,7 @@ const ndc = new THREE.Vector2();
 function setNdc(e) {
   ndc.x = (e.clientX / window.innerWidth) * 2 - 1;
   ndc.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(ndc, camera);
+  raycaster.setFromCamera(ndc, walk.active ? walkCam : camera); // on a stroll, pick from the eye-level camera
 }
 function tileUnderPointer(e) {
   setNdc(e);
@@ -1615,6 +1668,7 @@ canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture?.(e.pointerId);
   if (hurling.active) { hurling.pointerDown(e); return; }
   if (battle.active) { battle.pointerDown(e); return; }
+  if (walk.active) { inspectAt(e); return; } // on a stroll, a tap just looks at who/what you pass
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2) { panLast = null; painting = false; demolishing = false; pinchDist = pointerDist(); return; }
   if (e.button !== 2) {
@@ -1745,11 +1799,12 @@ window.addEventListener('resize', () => {
   aspect = window.innerWidth / window.innerHeight;
   renderer.setSize(window.innerWidth, window.innerHeight);
   resizeIsoCamera(camera, aspect);
+  walkCam.aspect = aspect; walkCam.updateProjectionMatrix();
   battle.resize(aspect);
   hurling.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera, battle, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
+window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
   _dbg: { foundColony, collectColonyTribute, replenishWarband, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
     layRow: (key, sx, sz, ex, ez) => { const before = game.buildings.length; tool = key; showBuildRow({ x: sx, z: sz }, { x: ex, z: ez }); const shown = pendingBuildRow ? pendingBuildRow.length : 0; confirmBuild(); return { shown, placed: game.buildings.length - before }; } },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
@@ -1767,9 +1822,18 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.1);
   if (battle.active) { setCamera(battle.camera); battle.update(dt); battle.render(renderer); return; }
   if (hurling.active) { setCamera(hurling.renderCam()); hurling.update(dt); hurling.render(renderer); return; }
-  setCamera(camera);
-  // The world-clock runs whenever the settlement is the scene you're looking at
-  // (title hidden, not in battle). Festivals/menus still pause via sim.speed.
+  const cam = walk.active ? walkCam : camera;
+  setCamera(cam);
+  updateWalkBtn();
+  // On a stroll the town keeps moving but the clock and economy are frozen — a
+  // non-destructive living screensaver. Otherwise the world-clock runs whenever
+  // the settlement is the scene you're looking at (title hidden, not in battle).
+  if (walk.active) {
+    game.update(dt); game.updateFx(dt);
+    walk.update(dt);
+    renderer.render(scene, walkCam);
+    return;
+  }
   const live = titleScreenEl.classList.contains('hidden');
   if (live) started = true; // play has begun — day-saves and onboarding may run
   const scaled = live ? dt * sim.speed : 0;
