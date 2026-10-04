@@ -8,18 +8,22 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
 
 ## Phase 1 — Quick bugs & copy (day of small wins)
 
-- [ ] **Warriors not replaced after battle** [bug] — once the first crop of warriors
-  dies you're left with only gods/demigods/Deaglán/Somhairlín/ghosts, yet the
-  ledger shows plenty of fighting folk. Muster pool isn't drawing the replacements
-  the roster says you have. *Highest-impact bug — investigate roster→pool flow.*
-- [ ] **Delivery-man flickering** [bug] — carriers still flicker; we just want "the
-  man with the bag." Likely a frame/gender-variant swap per spawn. (`grain_carrier`.)
-- [ ] **Gods' walk is wonky** [bug] — when gods visit, their walk animation is off;
-  confirm they have walk frames and use them (same class of issue as the walkers).
-- [ ] **Hurling monument spam** [tweak] — can keep building victory monuments without
-  new wins; gate each monument on a fresh win.
-- [ ] **Morrigan spelling** [bug] — currently "An Mhórríon"; verify against correct
-  Irish and fix everywhere (`units.js`, `trade.js`, codex).
+- [x] **Warriors not replaced after battle** [bug] — ROOT CAUSE: no replenishment;
+  the war-band only shrank. The ledger's "folk" is settlement population, which the
+  player read as fighting folk. FIXED (`1ba443f`): `replenishWarband()` each season
+  raises levy toward a pop-scaled 6–16 cap and retrains paid hands; veterans still
+  come only from wins.
+- [ ] **Delivery-man flickering** [bug] — intermittent ("sometimes"); carrier is
+  already always male, `grain_carrier` walk frames are static, so the cause isn't
+  gender or frame-cycling. NEEDS A VISUAL DIAGNOSIS (render deliveries and watch) —
+  deferred, not guess-fixed.
+- [ ] **Gods' walk is wonky** [bug] — gods DO have step1/step2 walk frames, well-
+  packed (feet planted), and the bless-walk calls `animate(dt,true)`. So it's not the
+  Somhairlín-class packaging bug. NEEDS A VISUAL DIAGNOSIS — deferred.
+- [x] **Hurling monument spam** [tweak] — FIXED (`dbc2e5e`): the win flag is consumed
+  when a monument is raised; win again to raise another.
+- [x] **Morrigan spelling** [bug] — FIXED (`dbc2e5e`): unit label corrected to
+  "An Mhórrígan" to match the codex/god-data/summon banner.
 - [ ] **"Across the sea" for Irish colonies** [bug] — Ireland is one island; a colony
   within Ériu should say *land*, not "across the water." (Ties to overseas, Phase 3.)
 - [ ] **Orchards only yield wheat** [tweak] — orchards are defined to produce apples
