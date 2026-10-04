@@ -123,15 +123,22 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
 
 ## Phase 6 — Big new system
 
-- [ ] **Sparring stadium** [feat][?] — repurpose the wrestling stadium into a
-  sparring arena with staged championship fights. A roaming champion shows up; you
-  pick a townsperson (drawn with **warrior sprites** for the attack animations). Turn-
-  based over 3 rounds, you as the **corner-person**:
-  - Round: choose primary attack + primary defence (e.g. lance forward / cautious
-    attack; head-guard defence).
-  - Corner advice: *be ruthless / cautious / balanced / technical*.
-  - Score the round boxing-style (10–9, 10–8 knockdown, 10–7 dominance), dramatic
-    Rocky-style flavour. Win the bout → another monument.
+- [x] **Sparring stadium (Babhta Sparála)** [feat] — DONE (`<this batch>`): the
+  wrestling green now draws a roaming champion (one-in-three each season, like the
+  hurling band). Tap the green to answer: you name a fighter from your roster — any
+  soul, for in the ring they all take the warrior's stance and strike frames (gods
+  and heroes use their own battle art) — and corner them over 3 rounds. Each round you
+  call **attack** (Sá dhíreach thrust / Trombhuille heavy / Buille cuirp body),
+  **guard** (Garda ard high / Garda íseal low / Cor coise footwork-evade) and a word of
+  **corner advice** (Ruthless / Cautious / Balanced / Technical — damage/defence/accuracy
+  swings). The two fighters trade blows on an isometric sand ring (crowd, posts, camera
+  shake + recoil on a clean blow) and the round is scored boxing-style: 10–9 edge, 10–8
+  knockdown, 10–7 mauling, with Rocky-style flavour. A knockout ends it there. Win the
+  bout → raise a monument (shares the hurling monument prize). Difficulty scales with
+  raids won (`grit`). Balance (neutral corner, probed headlessly): early champions —
+  villager ~22% → warrior ~27% → seasoned ~48% → curadh ~53% → hero ~68% → god ~80%;
+  late (Ard-Rí-era) champions shift that down so you must field your best. Files:
+  `src/sparring.js`, `#sparring-screen` overlay, `game.wrestlingGreen()`/`setSparChallenge()`.
 
 ---
 

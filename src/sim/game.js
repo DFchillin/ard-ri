@@ -742,6 +742,21 @@ export class Game {
     }
   }
 
+  wrestlingGreen() { return this.buildings.find((b) => b.key === 'wrestling_ring') || null; }
+  setSparChallenge(on) {
+    if (this._sparChip && this._sparChip.parent) this._sparChip.parent.remove(this._sparChip);
+    this._sparChip = null;
+    const green = on ? this.wrestlingGreen() : null;
+    if (!green || !green.sprite) return;
+    const TS = this.map.tile;
+    const chip = makeWarriorChip('curadh', 1.5); // the roaming champion waits in the ring
+    chip.position.set(0, 0.05, -TS * 0.3);
+    if (chip.faceWorld) chip.faceWorld(0, 1);
+    if (chip.material) chip.material.color.setHex(0xe07a5a);
+    green.sprite.add(chip);
+    this._sparChip = chip;
+  }
+
   // A patron god, prayed to at a gallán, manifests at the stones and walks the
   // town's own roads — slowly, at a god's stately pace — blessing the homes it
   // passes: it stops before a house, faces it and streams coloured light at it,

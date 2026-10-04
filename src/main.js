@@ -10,6 +10,7 @@ import { setCamera } from './render/assets.js?v=CBUST';
 import { roadNeighbors } from './sim/roads.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
 import { Hurling } from './hurling.js?v=CBUST';
+import { Sparring } from './sparring.js?v=CBUST';
 import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById, OVERSEAS, overseasById } from './data/kingdoms.js?v=CBUST';
 import { CODEX } from './data/codex.js?v=CBUST';
 import { UNIT_TYPES } from './battle/units.js?v=CBUST';
@@ -77,7 +78,7 @@ const walk = {
 // only while strolling.
 function updateWalkBtn() {
   const peg = document.getElementById('walk-btn'), ex = document.getElementById('walk-exit');
-  const inSettlement = titleScreenEl.classList.contains('hidden') && !battle.active && !hurling.active;
+  const inSettlement = titleScreenEl.classList.contains('hidden') && !battle.active && !hurling.active && !sparring.active;
   const hasRoads = !!(game.map && game.map.tiles && game.map.tiles.some((t) => t && t.road));
   if (peg) peg.classList.toggle('hidden', !(inSettlement && !walk.active && hasRoads));
   if (ex) ex.classList.toggle('hidden', !walk.active);
@@ -137,8 +138,8 @@ let missionDone = false;
 const ui = new UI({
   onTool: (kind) => { cancelPending(); tool = kind; if (!(tool === 'road' || BUILDINGS[tool])) preview.visible = false; game.showInspectDots(kind === 'inspect'); },
   onSpeed: (s) => { sim.speed = s; savedSpeed = null; },
-  onRotate: (d) => { if (hurling.active) { rotateIsoCamera(hurling.camera, d); return; } if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
-  onZoom: (f) => { if (hurling.active) { hurling.zoom(f); return; } if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
+  onRotate: (d) => { if (sparring.active) return; if (hurling.active) { rotateIsoCamera(hurling.camera, d); return; } if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
+  onZoom: (f) => { if (sparring.active) return; if (hurling.active) { hurling.zoom(f); return; } if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
   onInspectClose: () => { _inspectDwelling = null; resumeGame(); },
   onFestivalContinue: () => { if (battleWon) { battleWon = false; battle.exit(); } else resumeGame(); },
   onStartMission: (n) => startMission(n),
@@ -309,7 +310,7 @@ function startCampaign() {
   enterSettlement(); // raiders you provoked now give you warning — see the countdown banner; the defence fires when it runs out
 }
 // Drop into the standing ráth — the clock starts because the title is hidden.
-function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); game.setHurlChallenge(campaign.hurlChallenge); game.deadWalk = (cal.month === 10); }
+function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); game.setHurlChallenge(campaign.hurlChallenge); game.setSparChallenge(campaign.sparChallenge); game.deadWalk = (cal.month === 10); }
 
 // --- Raiders give warning now: a provoked war-band marches on your ráth after a
 // short countdown, so you can muster and ready your defences before they arrive.
@@ -422,6 +423,7 @@ if (!campaign.active) campaign.active = 'home'; // which settlement is loaded: '
 if (campaign.yearsElapsed == null) campaign.yearsElapsed = 0; // festivals are announced only for the first three years
 if (campaign.raidIn == null) campaign.raidIn = 0; // days until a provoked war-band arrives (0 = none pending)
 if (campaign.hurlChallenge == null) campaign.hurlChallenge = false; // a wandering band waits at the hurling field
+if (campaign.sparChallenge == null) campaign.sparChallenge = false; // a roaming champion waits at the wrestling green
 if (campaign.monumentWon == null) campaign.monumentWon = false; // won the hurling challenge → may raise a monument
 if (campaign.menaceHp == null) campaign.menaceHp = UNIT_TYPES.fomor.hp; // the Ollphéist's remaining HP, carried between menace battles until he is slain
 const ARDRI_RAIDS = 4; // four won raids make you Ard Rí
@@ -452,6 +454,31 @@ function maybeHurlChallenge() {
   if (Math.random() < HURL_CHANCE) {
     campaign.hurlChallenge = true; game.setHurlChallenge(true); saveCampaign();
     flashNotice('🏑 A wandering band of hurlers waits at your field, spoiling for a challenge. Tap the hurling field to meet them.');
+  }
+}
+
+// --- The sparring bout: a roaming champion, three corner-called rounds, a monument ---
+const sparring = new Sparring({
+  onResolve: (won) => {
+    campaign.sparChallenge = false; game.setSparChallenge(false);
+    if (won) { campaign.monumentWon = true; ui.hurlWon = true; ui.refreshBuildMenu(); flashNotice('🏆 The bout is yours! Raise a Monument from the Culture menu — while it stands the harvest is a fifth more plentiful.'); }
+    saveCampaign();
+  },
+  onClose: () => { resumeGame(); },
+});
+function openSparring() {
+  pauseGame(); ui.hideInspect();
+  const roster = { ...campaign.roster };
+  roster.deaglan = Math.max(1, roster.deaglan || 0);
+  if (game.countBuilt('builder_house') > 0) roster.somhairlin = Math.max(1, roster.somhairlin || 0);
+  sparring.open(roster, campaign.hosted, { grit: campaign.raidsWon || 0 });
+}
+const SPAR_CHANCE = 1 / 3; // one in three each season a champion comes calling
+function maybeSparChallenge() {
+  if (campaign.sparChallenge || !game.wrestlingGreen()) return;
+  if (Math.random() < SPAR_CHANCE) {
+    campaign.sparChallenge = true; game.setSparChallenge(true); saveCampaign();
+    flashNotice('🤼 A roaming champion waits at your wrestling green, calling out the túath. Tap the green to corner a fighter.');
   }
 }
 if (campaign.nextIsDefend) { campaign.raidIn = campaign.raidIn || 12; campaign.nextIsDefend = false; } // migrate old instant-defend saves to the countdown
@@ -938,6 +965,7 @@ function advanceDay() {
       curSeason = s; applySeason(s); collectColonyTribute(); // colonies render tribute each turn of the year
       replenishWarband(); // the settlement raises fresh levy to replace the fallen
       maybeHurlChallenge(); // a wandering band of hurlers may come calling
+      maybeSparChallenge(); // a roaming champion may come calling at the green
       if (campaign.home && (campaign.raidIn || 0) === 0 && Math.random() < 0.5) { // no war pending — a rival stirs in the provinces
         const r = riseRival();
         if (r) flashNotice(`⚔ ${r.name} is rising in ${r.region} — his host grows, and his eye turns toward your ráth.`);
@@ -1531,6 +1559,11 @@ function inspectAt(e) {
     const b = document.getElementById('hurl-go'); if (b) b.addEventListener('click', openHurling);
     return;
   }
+  if (inst.key === 'wrestling_ring' && campaign.sparChallenge) {
+    ui.showInspect(`<h3>Wrestling Green</h3><div class="role">A champion waits</div><p>A roaming curadh has come to the green and calls out your túath. Name a fighter to stand for you and corner them through three rounds — win the bout and raise a monument to the day.</p><button id="spar-go" class="continue-btn">🤼 Answer the challenge</button>`, false);
+    const b = document.getElementById('spar-go'); if (b) b.addEventListener('click', openSparring);
+    return;
+  }
   ui.showInspect(buildingHtml(inst), false);
   if (inst.def.role === 'dwelling') _inspectDwelling = inst; // keep its meters live
   if (inst.def.role === 'altar') wireAltar();
@@ -1666,6 +1699,7 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture?.(e.pointerId);
+  if (sparring.active) return;
   if (hurling.active) { hurling.pointerDown(e); return; }
   if (battle.active) { battle.pointerDown(e); return; }
   if (walk.active) { inspectAt(e); return; } // on a stroll, a tap just looks at who/what you pass
@@ -1693,6 +1727,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  if (sparring.active) return;
   if (hurling.active) { hurling.pointerMove(e); return; }
   if (battle.active) { battle.pointerMove(e); return; }
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1721,6 +1756,7 @@ canvas.addEventListener('pointermove', (e) => {
 
 function endPointer(e) {
   canvas.releasePointerCapture?.(e.pointerId);
+  if (sparring.active) return;
   if (hurling.active) { hurling.pointerUp(e); return; }
   if (battle.active) { battle.pointerUp(e); return; }
   pointers.delete(e.pointerId);
@@ -1746,6 +1782,7 @@ canvas.addEventListener('pointerleave', () => { if (!pendingBuild) preview.visib
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  if (sparring.active) return;
   if (hurling.active) { hurling.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   if (battle.active) { battle.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   zoomIsoCamera(camera, e.deltaY > 0 ? 1.1 : 0.9, aspect);
@@ -1802,9 +1839,10 @@ window.addEventListener('resize', () => {
   walkCam.aspect = aspect; walkCam.updateProjectionMatrix();
   battle.resize(aspect);
   hurling.resize(aspect);
+  sparring.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
+window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, hurling, sparring, openSparring, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
   _dbg: { foundColony, collectColonyTribute, replenishWarband, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
     layRow: (key, sx, sz, ex, ez) => { const before = game.buildings.length; tool = key; showBuildRow({ x: sx, z: sz }, { x: ex, z: ez }); const shown = pendingBuildRow ? pendingBuildRow.length : 0; confirmBuild(); return { shown, placed: game.buildings.length - before }; } },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
@@ -1822,6 +1860,7 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.1);
   if (battle.active) { setCamera(battle.camera); battle.update(dt); battle.render(renderer); return; }
   if (hurling.active) { setCamera(hurling.renderCam()); hurling.update(dt); hurling.render(renderer); return; }
+  if (sparring.active) { setCamera(sparring.renderCam()); sparring.update(dt); sparring.render(renderer); return; }
   const cam = walk.active ? walkCam : camera;
   setCamera(cam);
   updateWalkBtn();
