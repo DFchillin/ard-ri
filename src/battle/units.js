@@ -29,7 +29,7 @@ export const UNIT_TYPES = {
   brigid:       { label: 'Brigid',          ga: 'the bright goddess',   cat: 'hero', rank: 5, atk: 3.6, hp: 20, build: 1.4, speed: 3.2, morale: 100, aura: 26, battle: { art: 'brigid', h: 2.9, tiles: 1 }, piece: { color: 0xe8a848, tall: 1.35 } },
   // --- summoned gods of the Túatha Dé: giants that stand across four squares ---
   dagda:        { label: 'An Dagda',       ga: 'the Good God',      cat: 'god', rank: 6, atk: 9.0, hp: 40, build: 3.4, speed: 2.8, morale: 100, aura: 24, battle: { art: 'dagda', h: 3.8, tiles: 2 }, piece: { color: 0xf2ead6, tall: 1.7 } },
-  morrigan:     { label: 'An Mhórríon',    ga: 'phantom queen of war', cat: 'god', rank: 6, atk: 8.0, hp: 32, build: 2.4, speed: 3.4, morale: 100, aura: 24, battle: { art: 'morrigan', h: 3.5, tiles: 2 }, piece: { color: 0xc86a8a, tall: 1.6 } },
+  morrigan:     { label: 'An Mhórrígan',   ga: 'phantom queen of war', cat: 'god', rank: 6, atk: 8.0, hp: 32, build: 2.4, speed: 3.4, morale: 100, aura: 24, battle: { art: 'morrigan', h: 3.5, tiles: 2 }, piece: { color: 0xc86a8a, tall: 1.6 } },
   // --- the returned dead: prayed back at an altar, they know no fear ---
   ghost:        { label: 'Ghost Warrior',  ga: 'laoch taibhse',     cat: 'warrior', rank: 2, atk: 2.4, hp: 5, build: 0.4, speed: 3.5, morale: 100, aura: 0, spectral: true, battle: { art: 'ghost', h: 1.55 }, piece: { color: 0x9fc8ff, tall: 0.9 } },
   // --- the menace: the Ollphéist, a great serpent, and its lesser brood (foes only) ---

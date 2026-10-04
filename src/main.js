@@ -56,7 +56,11 @@ const map = new Tilemap(32, 1, _mapSeed);
 const view = new WorldView(scene, map);
 const game = new Game(map, scene);
 // Somhairlín has raised a great work — announce it and refresh the stats/menu.
-game.onBuilt = (inst) => { flashNotice(`🔨 Somhairlín has raised your ${inst.def.label}.`); pushStats(); saveSettlement(); if (inst.def.unique) ui.refreshBuildMenu(); };
+game.onBuilt = (inst) => {
+  flashNotice(`🔨 Somhairlín has raised your ${inst.def.label}.`); pushStats(); saveSettlement();
+  if (inst.def.needsWin) { campaign.monumentWon = false; ui.hurlWon = false; saveCampaign(); } // one monument per hurling win — win again to raise another
+  if (inst.def.unique || inst.def.needsWin) ui.refreshBuildMenu();
+};
 
 const sim = { speed: 1 };
 const cal = { day: 5, month: 0 }; // open in the last days of winter, a breath before Imbolc
