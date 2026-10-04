@@ -35,7 +35,7 @@ const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluag
 // they skip the procedural step-bob (which would just lift a bottom-anchored
 // sprite off the ground and read as floating). Everyone else has only a static
 // frame and leans on the bob to read as walking.
-const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run']);
+const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run', 'deaglan', 'finn', 'vigil']);
 
 const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },

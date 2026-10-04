@@ -144,13 +144,12 @@ export class Hurling {
     // looking from +x +z), folk on the near sidelines show their backs (n family) —
     // so the crowd at the bottom of the screen looks in at the field, not out at you.
     const camTo = new THREE.Vector3(1, 0, 1).normalize();
+    // Always show a watching face turned toward the pitch (a front 3/4), never a
+    // flat back — the whole túath is craning in at the match.
     const dirFrame = (x, z) => {
       const len = Math.hypot(x, z) || 1, nx = -x / len, nz = -z / len; // toward pitch centre
-      const front = nx * camTo.x + nz * camTo.z;         // + toward camera, - away
-      const side = nx * -camTo.z + nz * camTo.x;         // camera-right component
-      if (front > 0.4) return side > 0.4 ? 'se' : side < -0.4 ? 'sw' : 's';
-      if (front < -0.4) return side > 0.4 ? 'ne' : side < -0.4 ? 'nw' : 'n';
-      return side > 0 ? 'e' : 'w';
+      const side = nx * -camTo.z + nz * camTo.x;         // + = the pitch sits to camera-right
+      return side > 0.33 ? 'se' : side < -0.33 ? 'sw' : 's';
     };
     const place = (x, z) => {
       const base = bases[(Math.random() * bases.length) | 0];

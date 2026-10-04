@@ -45,6 +45,14 @@ const walk = {
   _pickNext() {
     const opts = roadNeighbors(game.map, this.cur.x, this.cur.z);
     const fwd = this.prev ? opts.filter((n) => !(n.x === this.prev.x && n.z === this.prev.z)) : opts;
+    // Keep walking straight ahead whenever the road allows (old-screensaver feel):
+    // only turn at a junction where straight is blocked, and only double back at a
+    // true dead end.
+    if (this.prev) {
+      const hx = this.cur.x - this.prev.x, hz = this.cur.z - this.prev.z;
+      const straight = fwd.find((n) => n.x - this.cur.x === hx && n.z - this.cur.z === hz);
+      if (straight) { this.next = straight; return; }
+    }
     const pool = fwd.length ? fwd : opts;
     this.next = pool.length ? pool[(Math.random() * pool.length) | 0] : this.cur;
   },
@@ -55,11 +63,38 @@ const walk = {
     this.cur = roads[0]; this.prev = null; this.t = 0; this._pickNext();
     const w = game.map.tileToWorld(this.cur.x, this.cur.z); this._look.set(w.x, this.eye, w.z);
     this.active = true;
+    this._setSky(true);
     document.getElementById('ui-overlay').classList.add('in-walk');
     ui.hideInspect();
   },
+  // Swap the flat settlement sky for a clearing: blue overhead fading down to a
+  // green haze of distant trees, with fog that closes the ground into that haze —
+  // so at eye level the ráth reads as a clearing ringed by forest, not grey void.
+  _skyTex: null,
+  _setSky(on) {
+    if (on) {
+      if (!this._skyTex) {
+        const cv = document.createElement('canvas'); cv.width = 8; cv.height = 256;
+        const x = cv.getContext('2d');
+        const g = x.createLinearGradient(0, 0, 0, 256);
+        g.addColorStop(0.0, '#9fcdee'); g.addColorStop(0.42, '#cbe6f1');
+        g.addColorStop(0.56, '#b7cf93'); g.addColorStop(0.68, '#86a65c');
+        g.addColorStop(1.0, '#5c7d40');
+        x.fillStyle = g; x.fillRect(0, 0, 8, 256);
+        this._skyTex = new THREE.CanvasTexture(cv); this._skyTex.colorSpace = THREE.SRGBColorSpace;
+      }
+      this._savedBg = scene.background; this._savedFog = { color: scene.fog.color.getHex(), near: scene.fog.near, far: scene.fog.far };
+      scene.background = this._skyTex;
+      scene.fog.color.setHex(0x95ab6b); scene.fog.near = 6; scene.fog.far = 46;
+    } else if (this._savedFog) {
+      scene.background = this._savedBg;
+      scene.fog.color.setHex(this._savedFog.color); scene.fog.near = this._savedFog.near; scene.fog.far = this._savedFog.far;
+      this._savedFog = null;
+    }
+  },
   exit() {
     this.active = false;
+    this._setSky(false);
     document.getElementById('ui-overlay').classList.remove('in-walk');
   },
   update(dt) {

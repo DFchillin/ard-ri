@@ -122,12 +122,12 @@ export class Sparring {
       if (!m) { m = new THREE.SpriteMaterial({ map: tex(`assets/walkers/${base}/${dir}_stand.png`), transparent: true, alphaTest: 0.12 }); cache.set(k, m); }
       return m;
     };
+    // Always show a watching face turned toward the ring (a front 3/4), never a
+    // flat back — the whole green is craning in at the action.
     const dirFrame = (x, z) => {
-      const len = Math.hypot(x, z) || 1, nx = -x / len, nz = -z / len;
-      const front = nx * camTo.x + nz * camTo.z, side = nx * -camTo.z + nz * camTo.x;
-      if (front > 0.4) return side > 0.4 ? 'se' : side < -0.4 ? 'sw' : 's';
-      if (front < -0.4) return side > 0.4 ? 'ne' : side < -0.4 ? 'nw' : 'n';
-      return side > 0 ? 'e' : 'w';
+      const len = Math.hypot(x, z) || 1, nx = -x / len, nz = -z / len; // toward centre
+      const side = nx * -camTo.z + nz * camTo.x; // + = the ring sits to camera-right of them
+      return side > 0.33 ? 'se' : side < -0.33 ? 'sw' : 's';
     };
     for (let r = 0; r < 3; r++) {
       const rad = RING_R + 1.0 + r * 0.85, step = (0.95 + r * 0.1) / rad;
