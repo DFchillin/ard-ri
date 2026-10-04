@@ -58,6 +58,8 @@ const FARM_GROW = 24;      // econ ticks for a field to ripen
 const FARM_HARVESTS = 2;   // grain-carriers a ripe field sends before regrowing
 const FARM_MIN_FOLK = 4;   // hands the settlement needs to bring a harvest in
 const MAX_PER_BLD = 2;     // most walkers any one building keeps on the roads (2 druids per shrine)
+const DELIVER_COST = 1;    // silver a carrier is paid for a delivery along a paved line
+const UNPAVED_COST = 5;    // silver when the run has to cross unpaved ground — build proper roads
 const HERD_GROW = 5;       // econ ticks between calvings at the homestead
 const HERD_RADIUS = 3;     // tiles of open pasture around the homestead that count as grazing
 const COW_PER_TOKEN = 5;   // cattle each grazing cow-token on the map stands for (max 10 shown)
@@ -638,7 +640,16 @@ export class Game {
     }
     return best;
   }
+  // Is the whole run on your own roads? (Both ends have a road door and the net
+  // connects them.) An unpaved run has to cut across open ground.
+  _deliveryPaved(fromB, toB) {
+    const fe = entryRoadTile(this.map, fromB), te = entryRoadTile(this.map, toB);
+    return !!(fe && te && roadPath(this.map, fe, te));
+  }
   _deliver(fromB, toB, carrying, onArrive) {
+    const paved = this._deliveryPaved(fromB, toB);
+    this.silver = Math.max(0, this.silver - (paved ? DELIVER_COST : UNPAVED_COST)); // every delivery is paid for; unpaved runs cost five times as much
+    this._unpavedRun = !paved; // let the UI flag the costly off-road run on its own layer
     const person = { name: randomName(false), female: false, carrying, ...personFor('grain_carrier') };
     const w = new PathWalker(this.map, this._journey(fromB, toB), { type: 'grain_carrier', speed: 2.6, person, onArrive });
     w.source = fromB; // so _walkersFrom() still caps how many a building has out

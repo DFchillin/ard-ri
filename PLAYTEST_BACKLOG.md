@@ -82,11 +82,14 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
 
 ## Phase 4 — Economy (make winning harder)
 
-- [ ] **Pay per delivery** [feat] — 1 silver per delivery; **5 silver** if the route
-  crosses an *unpaved* pass — forcing efficient, paved delivery lines.
-- [ ] **Boat for sea crossings** [feat] — a delivery/building unit crossing ocean gets
-  a little wooden boat drawn under it and costs 5 silver. (Shares plumbing with
-  overseas expansion.)
+- [x] **Pay per delivery** [feat] — DONE (`<this batch>`): every food/restock carrier
+  costs 1 silver from the treasury if the whole run is on your roads, 5 silver if it
+  has to cut across open ground (no road path between the two buildings). A one-time
+  advisor hint fires on the first unpaved run. Pushes you to pave complete lines.
+- [ ] **Boat for sea crossings** [feat] — BLOCKED: settlement maps are landlocked —
+  there is no water/ocean terrain for a delivery/building unit to cross, so there's
+  nothing to draw a boat under yet. Needs coastal/water terrain in settlements first
+  (a bigger map change). Deferred pending that, or a decision to add water tiles.
 
 ## Phase 5 — City life & simulation
 

@@ -1768,6 +1768,7 @@ function frame() {
   if (_inspectDwelling && !_inspectDwelling.dead) refreshDwellMeter(_inspectDwelling); // fill the open panel's meters live
   econAcc += scaled;
   while (econAcc >= ECON_TICK) { econAcc -= ECON_TICK; game.tick(); pushStats(); checkMission(); }
+  if (game._unpavedRun) { game._unpavedRun = false; if (!campaign._unpavedHinted) { campaign._unpavedHinted = true; saveCampaign(); flashNotice('💰 A carrier had to cross open ground — an unpaved run costs 5 silver, not 1. Pave a road all the way to your stores to keep carriage cheap.'); } }
   dayAcc += scaled;
   while (dayAcc >= SECONDS_PER_DAY) { dayAcc -= SECONDS_PER_DAY; advanceDay(); }
   renderer.render(scene, camera);
