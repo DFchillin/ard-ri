@@ -60,6 +60,8 @@ const FARM_MIN_FOLK = 4;   // hands the settlement needs to bring a harvest in
 const MAX_PER_BLD = 2;     // most walkers any one building keeps on the roads (2 druids per shrine)
 const DELIVER_COST = 1;    // silver a carrier is paid for a delivery along a paved line
 const UNPAVED_COST = 5;    // silver when the run has to cross unpaved ground — build proper roads
+const EVICT_SILVER = 10;   // silver a cast-out family takes with them in spite
+const EVICT_COW_CHANCE = 0.4; // chance a departing family also drives off one of your cattle
 const HERD_GROW = 5;       // econ ticks between calvings at the homestead
 const HERD_RADIUS = 3;     // tiles of open pasture around the homestead that count as grazing
 const COW_PER_TOKEN = 5;   // cattle each grazing cow-token on the map stands for (max 10 shown)
@@ -267,7 +269,7 @@ export class Game {
 
       if (b.food <= 0 && b.water <= 0) {
         b.distress = (b.distress || 0) + 1;
-        if (b.distress >= DISTRESS_DAYS && b.pop > 0) { b.distress = 0; this._emigrate(b); }
+        if (b.distress >= DISTRESS_DAYS && b.pop > 0) { b.distress = 0; this._emigrate(b, 'want'); }
       } else b.distress = 0;
     }
     // Prosperity climbs a step whenever a full, fed, watered home turns a month —
@@ -280,6 +282,9 @@ export class Game {
     if ((newMonth || festival) && thriving && b.tier < 3) b.tier += 1;
     else if (newMonth && !festival && neglected && b.tier > 0) b.tier -= 1;
     b.cap = b.tier >= PROSPER_TIER ? PROSPER_CAP : (b.def.folk || 4);
+    // A home whose prosperity slips can no longer hold as many: the folk over its
+    // new capacity are turned out, and they leave in spite (see _emigrate).
+    while (b.pop > b.cap) this._emigrate(b, 'evicted');
   }
 
   _center(f) {
@@ -589,7 +594,7 @@ export class Game {
   }
 
   // A hungry resident gives up and walks back out to the gate.
-  _emigrate(home) {
+  _emigrate(home, reason) {
     home.pop = Math.max(0, home.pop - 1);
     this.folk = Math.max(0, this.folk - 1);
     const female = Math.random() < 0.5;
@@ -597,6 +602,10 @@ export class Game {
     const tr = new Traveler(this.map, { x: home.x, z: home.z }, this._arrivalTile(home), { type: 'villager', speed: 2.4, person });
     this.walkers.push(tr);
     this.walkerGroup.add(tr.sprite);
+    // A cast-out family leaves bitter, taking what they can on the way out.
+    const silver = Math.min(this.silver, EVICT_SILVER); this.silver -= silver;
+    const cow = Math.random() < EVICT_COW_CHANCE;
+    if (this.onEvict) this.onEvict({ name: person.name, reason: reason || 'want', silver, cow });
   }
 
   // --- Directed deliveries: a goods carrier follows the roads from source to

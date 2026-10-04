@@ -61,6 +61,16 @@ game.onBuilt = (inst) => {
   if (inst.def.needsWin) { campaign.monumentWon = false; ui.hurlWon = false; saveCampaign(); } // one monument per hurling win — win again to raise another
   if (inst.def.unique || inst.def.needsWin) ui.refreshBuildMenu();
 };
+// A family turned out of a home leaves bitter — and takes value with them. The
+// sim has already docked the silver; here we drive off the cow and announce it.
+game.onEvict = ({ name, reason, silver, cow }) => {
+  const tookCow = cow && campaign.cattle > 0;
+  if (tookCow) setCattle(campaign.cattle - 1);
+  pushStats(); saveSettlement();
+  const took = [silver ? `🪙 ${silver} silver` : null, tookCow ? '🐄 a cow' : null].filter(Boolean).join(' and ');
+  const how = reason === 'evicted' ? 'is turned out of a home that can no longer hold them' : 'abandons your ráth, unfed and unwatered';
+  flashNotice(`😠 The ${name} family ${how}${took ? ` — and takes ${took} in spite` : ''}. Keep your homes fed and prospering, ${leaderName()}.`);
+};
 
 const sim = { speed: 1 };
 const cal = { day: 5, month: 0 }; // open in the last days of winter, a breath before Imbolc
