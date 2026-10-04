@@ -282,6 +282,27 @@ function collectColonyTribute() {
   else if (small) flashNotice('🏴 Your colonies are yet too small to render tribute — build them up past ten souls (open the 🗺 map and enter one).');
 }
 
+// Each turn of the year the ráth raises fresh levy to replace the fallen: the
+// growing settlement feeds the war-band, so losses in battle are made good over
+// a few seasons instead of draining it to nothing. The levy (villagers) regrows
+// toward an establishment scaled to the town's size; the city's own paid hands
+// (water/grain/druid) are retrained toward their keep. Earned veterans
+// (warriors, seasoned, curadh) are NOT free — they come only from won battles.
+function replenishWarband() {
+  if (!campaign.roster || !game.folk) return;
+  const levyCap = Math.max(6, Math.min(16, Math.floor(game.folk / 4))); // about a quarter of the folk stand as levy, 6–16
+  const cur = campaign.roster.villager || 0;
+  let raised = 0;
+  if (cur < levyCap) {
+    raised = Math.min(levyCap - cur, Math.max(1, Math.floor(game.folk / 10))); // recruits trained this season
+    campaign.roster.villager = cur + raised;
+  }
+  const base = { water: 3, grain: 3, druid: 2 }; // the settlement's own paid hands, retrained toward their keep
+  let retrained = 0;
+  for (const k in base) if ((campaign.roster[k] || 0) < base[k]) { campaign.roster[k] = (campaign.roster[k] || 0) + 1; retrained++; }
+  if (raised || retrained) { saveCampaign(); flashNotice(`⚔ The ráth raises ${raised} fresh levy${retrained ? ` and retrains ${retrained} hands` : ''} — your war-band is made good.`); }
+}
+
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
 const CAMPAIGN_KEY = 'ardri_campaign';
 const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, druid: 2, warrior: 3, seasoned: 2, curadh: 1 }; // deaglan/somhairlín are signature folk granted at muster, not banked; heroes/gods are hosted and summoned
@@ -766,6 +787,7 @@ function advanceDay() {
     const s = seasonOfMonth(cal.month);
     if (s !== curSeason) {
       curSeason = s; applySeason(s); collectColonyTribute(); // colonies render tribute each turn of the year
+      replenishWarband(); // the settlement raises fresh levy to replace the fallen
       maybeHurlChallenge(); // a wandering band of hurlers may come calling
       if (campaign.home && (campaign.raidIn || 0) === 0 && Math.random() < 0.5) { // no war pending — a rival stirs in the provinces
         const r = riseRival();
@@ -1632,7 +1654,7 @@ window.addEventListener('resize', () => {
 });
 
 window.ardri = { game, map, view, sim, cal, camera, battle, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
-  _dbg: { foundColony, collectColonyTribute, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
+  _dbg: { foundColony, collectColonyTribute, replenishWarband, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
     layRow: (key, sx, sz, ex, ez) => { const before = game.buildings.length; tool = key; showBuildRow({ x: sx, z: sz }, { x: ex, z: ez }); const shown = pendingBuildRow ? pendingBuildRow.length : 0; confirmBuild(); return { shown, placed: game.buildings.length - before }; } },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
