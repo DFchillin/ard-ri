@@ -36,12 +36,17 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
 
 ## Phase 2 — Battle balance & feel
 
-- [ ] **Builders' company too fragile** [tweak][?] — Lucht Ceirde dies fast. Options:
-  buff the bond's toughness, allow an extra warrior slot, or both. *Decision needed.*
-- [ ] **Ollphéist too hard / escalation** [feat][?] — his damage should *accumulate*;
-  and later in the game other beasts should attack similarly, at random. *Decision:
-  does "accumulate" mean his damage ramps the longer a fight runs, or he grows across
-  attempts? Which beasts, how often?*
+- [x] **Builders' company too fragile** [tweak] — DECISION: add a warrior slot.
+  DONE (`<this batch>`): Lucht Ceirde now marches with a free forge-guard (a
+  warrior, who leads the company). The guard is signature — never drawn from or
+  returned to the war-band roster.
+- [x] **Ollphéist persists his wounds** [feat] — DECISION: you wound him, withdraw,
+  and finish him later. DONE (`<this batch>`): the Ollphéist's HP carries between
+  menace battles (campaign.menaceHp), so he enters already hurt and you wear him
+  down; slaying him resets it. His bar still scales to full so the damage shows.
+  *(Still open: other beasts raiding at random late-game — separate item below.)*
+- [ ] **Random late-game beast raids** [feat] — other beasts should attack at random
+  later in the game, like the menace. (Split from the Ollphéist item.)
 - [ ] **God/demigod spacing** [tweak] — big sprites bunch up so you can't see what
   they're doing; add visual separation (wider slots for large units).
 

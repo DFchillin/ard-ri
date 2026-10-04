@@ -172,6 +172,7 @@ const battle = new Battle({
     ui.showFestival({ name: 'Defeat', emoji: '💀', sub: `${sub} The day is lost, ${leaderName()} — but a ráth can be raised again.`, onDone: () => { battle.exit(); } });
   },
   onTruce: (cattle) => {
+    if (battle.scenario === 'menace') { const rem = battle.menaceRemainingHp(); if (rem != null) { campaign.menaceHp = rem > 0 ? rem : UNIT_TYPES.fomor.hp; saveCampaign(); } } // his wounds persist even if you withdraw
     battle.exit();
     if (cattle) setCattle(campaign.cattle - cattle);
     ui.showFestival({ name: 'A Truce', emoji: '🕊️', sub: `You paid a bóruma of ${cattle} cattle and withdrew. No blood was shed this day — though the foe remembers your silver.` });
@@ -188,6 +189,11 @@ const battle = new Battle({
       if (campaign._raidFar && campaign.target && !isColony(campaign.target)) { const k = foundColony(campaign.target); if (k) { campaign._newColony = k.en; campaign._colonyWin = true; } }
     }
     if (won && battle.scenario === 'menace') { campaign._menaceRepelled = true; game.clearMenace(); saveSettlement(); } // the menace is thrown back, the blight lifts
+    if (battle.scenario === 'menace') { // carry the Ollphéist's wounds to the next fight; reset to full once he is slain
+      const rem = battle.menaceRemainingHp();
+      if (rem != null) { campaign.menaceHp = rem > 0 ? rem : UNIT_TYPES.fomor.hp; saveCampaign();
+        if (rem > 0 && !won) flashNotice(`☠️ You could not finish him — but the Ollphéist bleeds. ${Math.round(rem)}/${UNIT_TYPES.fomor.hp} of his strength remains. Muster again and end him.`); }
+    }
     if (ransack) {
       const lost = Math.floor(campaign.cattle / 2) + 6; setCattle(campaign.cattle - lost); campaign._ransacked = lost;
       if (campaign.colonies.length && Math.random() < 0.5) { const gone = campaign.colonies.splice((Math.random() * campaign.colonies.length) | 0, 1)[0]; campaign._ransacked = lost; flashNotice(`🏴 While you fought at home, ${gone.name} threw off your yoke.`); }
@@ -324,6 +330,7 @@ if (campaign.yearsElapsed == null) campaign.yearsElapsed = 0; // festivals are a
 if (campaign.raidIn == null) campaign.raidIn = 0; // days until a provoked war-band arrives (0 = none pending)
 if (campaign.hurlChallenge == null) campaign.hurlChallenge = false; // a wandering band waits at the hurling field
 if (campaign.monumentWon == null) campaign.monumentWon = false; // won the hurling challenge → may raise a monument
+if (campaign.menaceHp == null) campaign.menaceHp = UNIT_TYPES.fomor.hp; // the Ollphéist's remaining HP, carried between menace battles until he is slain
 ui.hurlWon = campaign.monumentWon; // the monument is a build-menu prize
 // --- The hurling challenge: a wandering band, a shootout of points, a monument ---
 const hurling = new Hurling({
@@ -494,6 +501,7 @@ function enterBattle(scenario) {
   roster.deaglan = 1;                                              // the path-maker always answers the muster
   if (game.countBuilt('builder_house') > 0) roster.somhairlin = 1; // Somhairlín marches only while her House stands
   battle.loadWarband({ roster, ghosts: campaign.ghosts, hosted, favour: musterFavour() });
+  battle.menaceHp = scenario === 'menace' ? campaign.menaceHp : null; // the Ollphéist enters carrying his old wounds
   battle.enter(scenario);
   announceSummons(battle.summoned || []); // heroes/gods that answered this muster
 }

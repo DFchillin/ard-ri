@@ -173,7 +173,13 @@ export class Battle {
     this._randomTerrain((Math.random() * 0x7fffffff) | 0); // a different field every fight
     for (const d of this.cfg.buildings || []) this._spawnBuilding(d);
     for (const c of this.cfg.enemyCompanies || []) this._placeCompany('enemy', c.name, c.formation, c.types, this._worldOf(c.x, c.z));
-    for (const [t, x, z] of this.cfg.enemyLone || []) this._placeCompany('enemy', null, 'line', [t], this._worldOf(x, z));
+    this._menaceUnit = null;
+    for (const [t, x, z] of this.cfg.enemyLone || []) {
+      const co = this._placeCompany('enemy', null, 'line', [t], this._worldOf(x, z));
+      // The Ollphéist carries his wounds between battles: he enters already hurt
+      // by how much you bled him last time, so you wear him down and finish later.
+      if (t === 'fomor' && this.menaceHp != null) { const u = co.units[0]; u.hp = Math.max(1, Math.min(u.hp0, this.menaceHp)); this._menaceUnit = u; drawBar(u.bar, u.hp / u.hp0, u.hp / u.hp0 > 0.5 ? 0x6cc551 : u.hp / u.hp0 > 0.25 ? 0xe0b83a : 0xe0563a); }
+    }
     this.forming = { types: [], name: nextNickname(), formation: 'line' };
     this.pool = Object.assign({}, this.roster); // muster draws from your war-band
     document.getElementById('battle-ui').classList.remove('hidden');
@@ -203,7 +209,7 @@ export class Battle {
   _commence() {
     document.getElementById('parley-overlay').classList.add('hidden');
     // the mustered folk march out of the war-band; survivors return after the battle
-    for (const u of this.units) if (u.team === 'player') this.roster[u.type] = Math.max(0, (this.roster[u.type] || 0) - 1);
+    for (const u of this.units) if (u.team === 'player' && !u.bondGuard) this.roster[u.type] = Math.max(0, (this.roster[u.type] || 0) - 1); // the bond's free guard isn't drawn from the war-band
     this.phase = 'battle'; this.started = true;
     for (const c of this.companies) {
       if (c.team === 'enemy' && this.cfg.defend) { const b = pick(c, this.buildings.filter((x) => !x.dead)); if (b) c.target = { foe: b }; }
@@ -279,13 +285,15 @@ export class Battle {
   // ---------- companies & units ----------
   _placeCompany(team, name, formation, types, at) {
     const bondPair = BOND_TYPES.every((t) => types.includes(t)); // both craftsfolk mustered together
-    if (bondPair) name = BOND_PAIR;                              // they always fly as Lucht Ceirde
+    if (bondPair) { name = BOND_PAIR; types = [...types, 'warrior']; } // Lucht Ceirde march with a free forge-guard so the craftsfolk aren't alone
     const co = { id: ++_uid, team, name: name || null, formation, units: [], leader: null, morale: 0, target: null, routing: false, lone: types.length === 1, bondPair };
     const slots = formationSlots(types.length, formation);
     types.forEach((type, i) => {
       const s = slots[i];
       const u = this._makeUnit(team, type, at.x + s.dx, at.z + s.dz, co);
-      u.slot = s; co.units.push(u);
+      u.slot = s;
+      if (bondPair && i === types.length - 1) u.bondGuard = true; // the appended warrior is a free signature guard — never drawn from or returned to the roster
+      co.units.push(u);
     });
     co.leader = co.units.reduce((a, b) => (UNIT_TYPES[b.type].rank >= UNIT_TYPES[a.type].rank ? b : a), co.units[0]);
     const avg = co.units.reduce((n, u) => n + UNIT_TYPES[u.type].morale, 0) / co.units.length;
@@ -534,7 +542,7 @@ export class Battle {
   _resolveRoster(won) {
     const grew = {}; let fell = 0, empLost = 0;
     for (const u of this.units) {
-      if (u.team !== 'player') continue;
+      if (u.team !== 'player' || u.bondGuard) continue; // the bond's free guard is signature — never banked, counted among the dead, or returned
       const spectral = UNIT_TYPES[u.type].spectral;
       if (u.killed) { if (spectral) continue; fell++; this.fallen.push({ type: u.type }); if (EMPLOYEES.includes(u.type)) empLost++; continue; } // ghosts banished, not buried
       let t = u.type; // survivors (alive or fled home) return
@@ -650,6 +658,9 @@ export class Battle {
       if (hosted && hosted[h] && Math.random() < chance) { this.roster[h] = 1; this.summoned.push(h); }
     }
   }
+  // The Ollphéist's remaining HP after a menace battle, to carry to the next one
+  // (0 once he is slain). null when there was no menace unit this fight.
+  menaceRemainingHp() { if (!this._menaceUnit) return null; return this._menaceUnit.dead ? 0 : Math.max(0, this._menaceUnit.hp); }
   rotate(d) { rotateIsoCamera(this.camera, d); }
   zoom(f) { zoomIsoCamera(this.camera, f, this.aspect); }
   resize(aspect) { this.aspect = aspect; resizeIsoCamera(this.camera, aspect); }
