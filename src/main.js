@@ -187,6 +187,19 @@ const battle = new Battle({
       setCattle(campaign.cattle + 8 + ((Math.random() * 8) | 0)); // plunder driven home from a won raid
       if (Math.random() < 0.5) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; campaign._looted = gk; } // and sometimes foreign spoils
       if (campaign._raidFar && campaign.target && !isColony(campaign.target)) { const k = foundColony(campaign.target); if (k) { campaign._newColony = k.en; campaign._colonyWin = true; } }
+      // Four won raids make you Ard Rí. The grand proclamation is the level-7
+      // narrative; here we hold the crown as a real, loseable state — and a raid
+      // won while the crown is contested wins it straight back.
+      if (campaign.raidsWon >= ARDRI_RAIDS && !campaign.ardRi) {
+        campaign.ardRi = true;
+        if (campaign.crownContested) { campaign.crownContested = false; flashNotice('👑 The crown is yours once more — Ériu names you Ard Rí again.'); }
+      }
+    }
+    // A defeat while you wear the crown reopens the contest: the sub-kings stir,
+    // and you are High King no longer until you prove your strength with a raid.
+    if (!won && campaign.ardRi && (battle.scenario === 'attack' || battle.scenario === 'defend')) {
+      campaign.ardRi = false; campaign.crownContested = true;
+      flashNotice('⚔ A defeat, and the sub-kings rise — the battle for the crown is back. Win a raid abroad to reclaim your High Kingship.');
     }
     if (won && battle.scenario === 'menace') { campaign._menaceRepelled = true; game.clearMenace(); saveSettlement(); } // the menace is thrown back, the blight lifts
     if (battle.scenario === 'menace') { // carry the Ollphéist's wounds to the next fight; reset to full once he is slain
@@ -331,6 +344,9 @@ if (campaign.raidIn == null) campaign.raidIn = 0; // days until a provoked war-b
 if (campaign.hurlChallenge == null) campaign.hurlChallenge = false; // a wandering band waits at the hurling field
 if (campaign.monumentWon == null) campaign.monumentWon = false; // won the hurling challenge → may raise a monument
 if (campaign.menaceHp == null) campaign.menaceHp = UNIT_TYPES.fomor.hp; // the Ollphéist's remaining HP, carried between menace battles until he is slain
+const ARDRI_RAIDS = 4; // four won raids make you Ard Rí
+if (campaign.ardRi == null) campaign.ardRi = (campaign.raidsWon || 0) >= ARDRI_RAIDS; // do we currently wear the High Kingship
+if (campaign.crownContested == null) campaign.crownContested = false; // lost the crown in battle — win a raid to reclaim
 ui.hurlWon = campaign.monumentWon; // the monument is a build-menu prize
 // --- The hurling challenge: a wandering band, a shootout of points, a monument ---
 const hurling = new Hurling({
@@ -659,7 +675,11 @@ function leaderName() { return campaign.leader || 'a Rí'; }
 function refreshCampaignButton() {
   const btn = document.querySelector('.mission-btn[data-mission="1"]');
   if (!btn) return;
-  btn.textContent = (campaign.leader && campaign.home) ? `⚔ Continue as ${campaign.leader}` : '⚔ Play the Campaign';
+  if (!(campaign.leader && campaign.home)) { btn.textContent = '⚔ Play the Campaign'; return; }
+  const style = campaign.ardRi ? `👑 Continue as ${campaign.leader}, Ard Rí`
+    : campaign.crownContested ? `⚔ Continue as ${campaign.leader} — the crown contested`
+    : `⚔ Continue as ${campaign.leader}`;
+  btn.textContent = style;
 }
 
 // --- Manage Campaign: rename, export/import a JSON save, restart ---

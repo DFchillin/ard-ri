@@ -55,9 +55,11 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
 
 ## Phase 3 — Progression, map & conquest
 
-- [ ] **Ard Rí comes too early** [tweak][?] — proclaimed after ~2 raids; should require
-  holding ~half the country. *Decision: how is "half" measured (N of M Irish kingdoms/
-  regions held), and what's the target?* (Lives in `data/levels.js`.)
+- [x] **Ard Rí is now a loseable crown** [feat] — DECISION: 4 won raids = Ard Rí, but
+  a defeat reopens the contest. DONE (`<this batch>`): `campaign.ardRi` holds the crown
+  at 4 raids; a loss in a raid or home defence sets `crownContested` and flashes "the
+  battle for the crown is back"; winning a raid while contested reclaims it. The title-
+  screen Continue button shows the status (👑 Ard Rí / crown contested).
 - [ ] **Colonies lost on their own** [feat] — beyond ransack-loss, colonies should
   sometimes revolt/throw off rule spontaneously over time.
 - [ ] **Colonies need 4× culture** [tweak] — a colony dwelling should need 4× the
