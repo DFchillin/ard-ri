@@ -66,8 +66,11 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
 - [x] **Colonies lost on their own** [feat] — DONE (`<this batch>`): each turn of the
   year a distant Dál may throw off your rule on its own (12% thinly-held, 5% if it's
   a thriving 10+ folk colony); one you hold in person that season never revolts.
-- [ ] **Colonies need 4× culture** [tweak] — a colony dwelling should need 4× the
-  culture of a native one, pushing you to courts & late-game culture buildings.
+- [x] **Colonies need 4× culture** [tweak] — DONE (`<this batch>`): a colony's dwellings
+  drain culture 4× as fast as native ones (10→2 per day vs 10→8), so you must pour in
+  4× the upkeep — courts, halls and other culture buildings — to win the folk over. The
+  sim learns it's in a colony via `game.isColony` (set on every settlement load); the
+  colony map info spells out the 4× cost.
 - [x] **Overseas raids after Ard Rí (Thar Sáile)** [feat] — DONE (`<this batch>`):
   a "⛵ Thar Sáile — beyond Ériu" button on the war map (shown once you've been Ard
   Rí) opens a sea-choice — North → Lochlann (Norse), East → Saxony, South → Gaul.

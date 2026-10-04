@@ -48,6 +48,7 @@ const RENT_PER_HEAD = 1;   // silver per content head per day
 const FOOD_DECAY = 1;      // per day → a full home is fed ~10 days
 const WATER_DECAY = 1;     // per day → ~10 days
 const CULTURE_DECAY = 2;   // per day → ~5 days
+const COLONY_CULTURE_MULT = 4; // a colony's folk, far from the ráth, need 4× the culture to win over
 const DISTRESS_DAYS = 4;   // days with NO food AND NO water before a family leaves
 const PROSPER_TIER = 2;    // a home at this prosperity tier or above holds more folk
 const PROSPER_CAP = 6;     // the folk a prospering home can hold
@@ -260,7 +261,8 @@ export class Game {
     } else {
       b.food = Math.max(0, b.food - FOOD_DECAY);
       b.water = Math.max(0, b.water - WATER_DECAY);
-      b.culture = Math.max(0, b.culture - CULTURE_DECAY);
+      b.culture = Math.max(0, b.culture - CULTURE_DECAY * (this.isColony ? COLONY_CULTURE_MULT : 1)); // colony folk are far harder to keep cultured
+
       if (b.food <= 0 && b.water <= 0) {
         b.distress = (b.distress || 0) + 1;
         if (b.distress >= DISTRESS_DAYS && b.pop > 0) { b.distress = 0; this._emigrate(b); }

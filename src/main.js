@@ -417,6 +417,7 @@ function switchSettlement(target) {
   campaign.active = target;
   let snap = target === 'home' ? campaign.settlement : (campaign.colonies.find((c) => c.region === target) || {}).settlement;
   game.load(snap || emptySettlement());
+  game.isColony = target !== 'home'; // a colony's folk are harder to win over — culture drains faster there
   game.cattle = campaign.cattle;
   view.rebuildRoads(); view.rebuildCros();
   applyWarTint();
@@ -495,6 +496,7 @@ battle.setLivery(campaign.livery);
     : (campaign.colonies.find((c) => c.region === campaign.active) || {}).settlement;
   if (bootSnap) {
     game.load(bootSnap);
+    game.isColony = campaign.active !== 'home';
     game.cattle = campaign.cattle != null ? campaign.cattle : game.cattle;
     view.rebuildRoads(); view.rebuildCros();
     started = true; // you already have a settlement — the sim runs
@@ -620,7 +622,7 @@ function selectKingdom(id) {
   if (isColony(id)) {
     kg.enter = id;
     const folk = colonyFolk(campaign.colonies.find((c) => c.region === id));
-    document.getElementById('kg-seat').textContent = `Your colony at ${k.seat} — ${folk} folk. Enter to build it up; it renders a cow home for every ten who settle there.`;
+    document.getElementById('kg-seat').textContent = `Your colony at ${k.seat} — ${folk} folk. Enter to build it up; it renders a cow home for every ten who settle there. Its folk, far from the ráth, need four times the culture to win over — raise courts and halls to hold them.`;
     act.textContent = campaign.active === id ? `You are here` : `Build in ${k.en} 🏗`;
     act.disabled = campaign.active === id;
     return;
