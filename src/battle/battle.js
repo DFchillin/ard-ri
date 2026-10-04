@@ -287,7 +287,7 @@ export class Battle {
     const bondPair = BOND_TYPES.every((t) => types.includes(t)); // both craftsfolk mustered together
     if (bondPair) { name = BOND_PAIR; types = [...types, 'warrior']; } // Lucht Ceirde march with a free forge-guard so the craftsfolk aren't alone
     const co = { id: ++_uid, team, name: name || null, formation, units: [], leader: null, morale: 0, target: null, routing: false, lone: types.length === 1, bondPair };
-    const slots = formationSlots(types.length, formation);
+    const slots = formationSlots(types.length, formation, types);
     types.forEach((type, i) => {
       const s = slots[i];
       const u = this._makeUnit(team, type, at.x + s.dx, at.z + s.dz, co);
@@ -845,8 +845,12 @@ function drawBar(sprite, frac, color) { const cv = sprite.userData.cv, x = cv.ge
   x.fillStyle = '#' + color.toString(16).padStart(6, '0'); x.fillRect(1, 1, 62 * Math.max(0, Math.min(1, frac)), 8); sprite.userData.tex.needsUpdate = true; }
 
 // formation slot offsets for n units
-function formationSlots(n, shape) {
-  const sp = 0.95, out = [];
+function formationSlots(n, shape, types) {
+  // Spacing scales with the biggest figure in the company: heroes and gods stand
+  // across one or two tiles, so a mortal's 0.95 gap would stack them on top of one
+  // another. Give the whole formation room equal to the largest unit present.
+  const big = types ? types.reduce((m, t) => { const b = UNIT_TYPES[t] && UNIT_TYPES[t].battle; return Math.max(m, (b && b.tiles) || 0); }, 0) : 0;
+  const sp = 0.95 * (1 + big * 0.9), out = [];
   if (shape === 'column') {
     const cols = Math.min(2, n);
     for (let i = 0; i < n; i++) { const c = i % cols, r = (i / cols) | 0; out.push({ dx: (c - (cols - 1) / 2) * sp, dz: r * sp - (Math.ceil(n / cols) - 1) * sp / 2 }); }

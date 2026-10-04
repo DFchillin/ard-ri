@@ -47,8 +47,11 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
   *(Still open: other beasts raiding at random late-game — separate item below.)*
 - [ ] **Random late-game beast raids** [feat] — other beasts should attack at random
   later in the game, like the menace. (Split from the Ollphéist item.)
-- [ ] **God/demigod spacing** [tweak] — big sprites bunch up so you can't see what
-  they're doing; add visual separation (wider slots for large units).
+- [x] **God/demigod spacing** [tweak] — DONE (`<this batch>`): formation slot spacing
+  now scales with the largest figure in the company, so a company of heroes/gods
+  spreads out (min gap ~0.95 → ~2.66 for a god company) while mortals are unchanged.
+  *(If separate lone-god companies still cluster when converging, a battle-time
+  separation pass is the follow-up.)*
 
 ## Phase 3 — Progression, map & conquest
 
