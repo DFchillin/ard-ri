@@ -13,10 +13,13 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
   player read as fighting folk. FIXED (`1ba443f`): `replenishWarband()` each season
   raises levy toward a pop-scaled 6–16 cap and retrains paid hands; veterans still
   come only from wins.
-- [ ] **Delivery-man flickering** [bug] — intermittent ("sometimes"); carrier is
-  already always male, `grain_carrier` walk frames are static, so the cause isn't
-  gender or frame-cycling. NEEDS A VISUAL DIAGNOSIS (render deliveries and watch) —
-  deferred, not guess-fixed.
+- [x] **Delivery-man flickering** [bug] — ROOT CAUSE found by data-capture: the
+  carrier cycled its 6 walk frames, which for `grain_carrier` are *separate files
+  byte-identical to the idle* — 12 distinct texture objects that look the same and
+  flicker while each async-loads. FIXED (`<this batch>`): only roles with a real
+  stride (`hasWalkCycle`) cycle frames; everyone else holds the stand frame and
+  moves on the step-bob. Carrier now shows one stable "man with the bag" (distinct
+  textures 12 → 2, and those 2 are just facings at a corner).
 - [ ] **Gods' walk is wonky** [bug] — gods DO have step1/step2 walk frames, well-
   packed (feet planted), and the bless-walk calls `animate(dt,true)`. So it's not the
   Somhairlín-class packaging bug. NEEDS A VISUAL DIAGNOSIS — deferred.

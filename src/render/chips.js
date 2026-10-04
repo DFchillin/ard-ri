@@ -199,7 +199,12 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
       return;
     }
     const fr = T[screenDir(s._dx, s._dz)] || T.s;
-    if (moving) {
+    // Only roles with a genuine stride cycle their frames. The rest (villagers,
+    // carriers, …) have walk frames that are just copies of the idle on separate
+    // files — cycling them swaps between distinct textures that look identical and
+    // flickers while they load, for no gain. They hold the stand frame and let the
+    // step-bob carry the motion — just the figure with its load, no flicker.
+    if (moving && s.hasWalkCycle) {
       const fps = s._walkFps || WALK_FPS; // a slower-moving figure can set a slower leg cadence
       s._t += dt;
       if (s._t >= fps) { s._t -= fps; s._phase = (s._phase + 1) % fr.walk.length; }
