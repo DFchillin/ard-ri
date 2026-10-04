@@ -91,7 +91,7 @@ ui.builtCount = (role) => game.count(role);
 // Grain stores hold barley from fields and apples from orchards in one pool — name
 // the goods for what the settlement actually grows, so apples get their due.
 function hasOrchard() { return game.buildings.some((b) => b.def.produce === 'apples'); }
-function storeGoods() { return hasOrchard() ? 'grain &amp; apples' : 'grain'; }
+function storeGoods() { return hasOrchard() ? 'food' : 'grain'; } // once orchards stand, barley and apples pool as one "food"
 function showAdvisors() {
   const B = game.buildings;
   const sum = (role, key) => B.reduce((n, b) => n + (b.def.role === role ? (b[key] || 0) : 0), 0);
@@ -110,7 +110,7 @@ function showAdvisors() {
     `<h3>Trusted Advisors</h3><div class="role">Counsel at your ear</div>` +
     `<div class="advisor"><h4>🌾 An Rechtaire · the Steward</h4><table class="ledger">` +
       row('Fields sown', fields + (ripe ? ` · ${ripe} ripe` : '')) +
-      row(hasOrchard() ? 'Grain &amp; apples' : 'Grain in store', sum('granary', 'stock')) +
+      row(hasOrchard() ? 'Food in store' : 'Grain in store', sum('granary', 'stock')) +
       row('At market', sum('market', 'stock')) +
       row('Wells', game.count('well')) +
     `</table></div>` +

@@ -644,6 +644,10 @@ export class Game {
     return w;
   }
 
+  // Once an orchard stands, barley and apples pool as one "food"; until then it's
+  // plain grain. The carrier's label reflects whichever the ráth is harvesting.
+  _hasOrchard() { return this.buildings.some((b) => b.def.produce === 'apples' && !b.building); }
+  _harvestTag(n) { return this._hasOrchard() ? `🍲 food ×${n}` : `🌾 grain ×${n}`; }
   // Farm → nearest grain store: one carrier hauls a batch (up to 4) along the road.
   _sendGrain(farm) {
     let load = Math.min(4, Math.round(farm.def.load * this._farmBoost()));
@@ -653,7 +657,7 @@ export class Game {
     const store = this._nearestTo(farm, stores);
     const add = Math.min(load, GRANARY_CAP - store.stock);
     this._storeFx(farm, null); // grain taken up off the field
-    this._deliver(farm, store, `🌾 grain ×${add}`, () => { store.stock = Math.min(GRANARY_CAP, store.stock + add); this._storeFx(store, null); });
+    this._deliver(farm, store, this._harvestTag(add), () => { store.stock = Math.min(GRANARY_CAP, store.stock + add); this._storeFx(store, null); });
   }
 
   // Well → water_carrier wanders roads, refilling the dwellings it passes.
@@ -1033,7 +1037,7 @@ export class Game {
     const store = this._nearestTo(market, stores);
     const take = Math.min(store.stock, MARKET_CAP - market.stock);
     store.stock -= take; market._restocking = true; // reserved and in transit
-    this._deliver(store, market, `🌾 grain ×${take}`, () => { market.stock = Math.min(MARKET_CAP, market.stock + take); market._restocking = false; this._storeFx(market, null); });
+    this._deliver(store, market, this._harvestTag(take), () => { market.stock = Math.min(MARKET_CAP, market.stock + take); market._restocking = false; this._storeFx(market, null); });
   }
 
   // Market → market_trader wanders roads, feeding dwellings it passes.

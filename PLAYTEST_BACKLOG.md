@@ -29,9 +29,10 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
   "An Mhórrígan" to match the codex/god-data/summon banner.
 - [ ] **"Across the sea" for Irish colonies** [bug] — Ireland is one island; a colony
   within Ériu should say *land*, not "across the water." (Ties to overseas, Phase 3.)
-- [ ] **Orchards only yield wheat** [tweak] — orchards are defined to produce apples
-  but the economy only trades grain. Track & show apples separately: 🌾 grain and
-  bushels of 🍎 / 🍏.
+- [x] **Orchards only yield wheat** [tweak] — DONE (`<this batch>`): rather than split
+  the goods, once an orchard stands barley+apples pool as one "food" (🍲). Carrier
+  labels, the ledger ("Food in store"), and granary/market inspect all say *food*
+  when `hasOrchard()`, else *grain*. (Per your call to keep it simple.)
 
 ## Phase 2 — Battle balance & feel
 
