@@ -61,35 +61,41 @@ const walk = {
     const c = { x: (game.map.size / 2) | 0, z: (game.map.size / 2) | 0 };
     roads.sort((a, b) => ((a.x - c.x) ** 2 + (a.z - c.z) ** 2) - ((b.x - c.x) ** 2 + (b.z - c.z) ** 2));
     this.cur = roads[0]; this.prev = null; this.t = 0; this._pickNext();
-    const w = game.map.tileToWorld(this.cur.x, this.cur.z); this._look.set(w.x, this.eye, w.z);
+    const a = game.map.tileToWorld(this.cur.x, this.cur.z), b = game.map.tileToWorld(this.next.x, this.next.z);
+    let hx = b.x - a.x, hz = b.z - a.z; const hl = Math.hypot(hx, hz) || 1; this._hx = hx / hl; this._hz = hz / hl;
+    this._look.set(a.x + this._hx * 6, this.eye, a.z + this._hz * 6);
     this.active = true;
     this._setSky(true);
     document.getElementById('ui-overlay').classList.add('in-walk');
     ui.hideInspect();
   },
-  // Swap the flat settlement sky for a clearing: blue overhead fading down to a
-  // green haze of distant trees, with fog that closes the ground into that haze —
-  // so at eye level the ráth reads as a clearing ringed by forest, not grey void.
-  _skyTex: null,
+  // Swap the flat settlement sky for a clearing: a gradient skydome (blue overhead
+  // fading to a green haze of trees at the horizon) plus fog that closes the ground
+  // into that haze — so at eye level the ráth reads as a clearing ringed by forest,
+  // not a grey void. A real dome mesh (not a background texture) renders the same on
+  // every screen shape and device.
+  _skyDome: null,
   _setSky(on) {
     if (on) {
-      if (!this._skyTex) {
-        const cv = document.createElement('canvas'); cv.width = 8; cv.height = 256;
+      if (!this._skyDome) {
+        const cv = document.createElement('canvas'); cv.width = 16; cv.height = 256;
         const x = cv.getContext('2d');
         const g = x.createLinearGradient(0, 0, 0, 256);
-        g.addColorStop(0.0, '#9fcdee'); g.addColorStop(0.42, '#cbe6f1');
-        g.addColorStop(0.56, '#b7cf93'); g.addColorStop(0.68, '#86a65c');
-        g.addColorStop(1.0, '#5c7d40');
-        x.fillStyle = g; x.fillRect(0, 0, 8, 256);
-        this._skyTex = new THREE.CanvasTexture(cv); this._skyTex.colorSpace = THREE.SRGBColorSpace;
+        g.addColorStop(0.0, '#8ec5ea'); g.addColorStop(0.38, '#a9d4ee'); g.addColorStop(0.56, '#cfe6ef');
+        g.addColorStop(0.66, '#aec489'); g.addColorStop(0.76, '#86a65c'); g.addColorStop(1.0, '#5c7d40');
+        x.fillStyle = g; x.fillRect(0, 0, 16, 256);
+        const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
+        const mat = new THREE.MeshBasicMaterial({ map: tx, side: THREE.BackSide, fog: false, depthWrite: false });
+        this._skyDome = new THREE.Mesh(new THREE.SphereGeometry(300, 24, 16), mat);
+        this._skyDome.renderOrder = -10;
+        scene.add(this._skyDome);
       }
-      this._savedBg = scene.background; this._savedFog = { color: scene.fog.color.getHex(), near: scene.fog.near, far: scene.fog.far };
-      scene.background = this._skyTex;
-      scene.fog.color.setHex(0x95ab6b); scene.fog.near = 6; scene.fog.far = 46;
-    } else if (this._savedFog) {
-      scene.background = this._savedBg;
-      scene.fog.color.setHex(this._savedFog.color); scene.fog.near = this._savedFog.near; scene.fog.far = this._savedFog.far;
-      this._savedFog = null;
+      this._skyDome.visible = true;
+      this._savedFog = { color: scene.fog.color.getHex(), near: scene.fog.near, far: scene.fog.far };
+      scene.fog.color.setHex(0x9fb577); scene.fog.near = 7; scene.fog.far = 48;
+    } else {
+      if (this._skyDome) this._skyDome.visible = false;
+      if (this._savedFog) { scene.fog.color.setHex(this._savedFog.color); scene.fog.near = this._savedFog.near; scene.fog.far = this._savedFog.far; this._savedFog = null; }
     }
   },
   exit() {
@@ -103,9 +109,15 @@ const walk = {
     const a = game.map.tileToWorld(this.cur.x, this.cur.z), b = game.map.tileToWorld(this.next.x, this.next.z);
     const px = a.x + (b.x - a.x) * this.t, pz = a.z + (b.z - a.z) * this.t;
     walkCam.position.set(px, this.eye, pz);
-    // look a little ahead along the path, easing the turn at junctions
-    this.look.set(b.x, this.eye, b.z);
-    this._look.lerp(this.look, Math.min(1, dt * 3));
+    if (this._skyDome) this._skyDome.position.set(px, 0, pz); // the sky travels with you
+    // Gaze a fixed distance ahead along the direction of travel — never at our own
+    // feet, never degenerate — and ease the turn so junctions and the rare dead-end
+    // about-face read as a smooth pan, not a snap. Heading persists if a step can't
+    // move (isolated tile), so the camera never spins.
+    let dx = b.x - a.x, dz = b.z - a.z; const l = Math.hypot(dx, dz);
+    if (l > 0.0001) { this._hx = dx / l; this._hz = dz / l; }
+    this.look.set(px + this._hx * 6, this.eye, pz + this._hz * 6);
+    this._look.lerp(this.look, Math.min(1, dt * 2.2));
     walkCam.lookAt(this._look);
   },
 };
