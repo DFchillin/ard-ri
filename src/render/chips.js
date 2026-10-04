@@ -200,8 +200,9 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
     }
     const fr = T[screenDir(s._dx, s._dz)] || T.s;
     if (moving) {
+      const fps = s._walkFps || WALK_FPS; // a slower-moving figure can set a slower leg cadence
       s._t += dt;
-      if (s._t >= WALK_FPS) { s._t -= WALK_FPS; s._phase = (s._phase + 1) % fr.walk.length; }
+      if (s._t >= fps) { s._t -= fps; s._phase = (s._phase + 1) % fr.walk.length; }
       s.material.map = fr.walk[s._phase] || fr.stand;
     } else {
       s.material.map = fr.stand;

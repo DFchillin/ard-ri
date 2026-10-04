@@ -959,6 +959,7 @@ export class Game {
       const hc = this._center(house), site = this._nextSite(hc);
       if (!site) return;
       const chip = makeWalkerChip('somhairlin', false, 1.35); // her own art — not the female fallback (there is no _f set)
+      chip._walkFps = 0.22; // half the usual leg cadence, to match her slower builder's pace
       chip.position.set(hc.x, 0.05, hc.z); chip.renderOrder = 2; this.walkerGroup.add(chip);
       site._claimed = true;
       const c = this._center(site), ix = (site.w * this.map.tile) / 2 - 0.5, iz = (site.h * this.map.tile) / 2 - 0.5;
@@ -967,7 +968,7 @@ export class Game {
         cornerDur: this._buildTime(site) / 4, timer: 0, spark: 0, baseY: WALK_BASE_Y, hammerT: 0, walkT: 0,
         path: this._journey(house, site), pi: 0 }; // walk the roads out to the site, as far as they reach
     }
-    const b = this.builder, BSPEED = 2.2;
+    const b = this.builder, BSPEED = 1.1; // a steady builder's pace — half the old speed
     if (b.state === 'toSite' || b.state === 'toHouse') {
       if (this._followPath(b, dt, BSPEED)) {
         if (b.state === 'toHouse') { this._removeBuilder(); return; }
