@@ -93,11 +93,14 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
 
 ## Phase 5 — City life & simulation
 
-- [ ] **Eviction penalty** [feat][bug] — folk get evicted when capacity rises then
-  falls; they should say so as they leave, and take value with them (some silver,
-  or steal a cow) so you work to avoid it.
-- [ ] **One Deaglán, housed** [tweak] — only one Deaglán at a time; he lives in
-  Somhairlín's house, and he + Finn walk the road out to build.
+- [x] **Eviction penalty** [feat][bug] — DONE (`<this batch>`): a tier drop now actually
+  turns out the folk over the home's new capacity (they used to linger over-cap), and
+  every departing family — evicted or starved out — takes 10 silver and, 40% of the
+  time, drives off a cow, with a named notice. Keeping homes prosperous now pays.
+- [x] **One Deaglán, housed** [tweak] — DONE (`<this batch>`): only one road-crew at a
+  time (a further road is laid but Deaglán doesn't come out again until the first is
+  done); and when Somhairlín's House stands he and Finn emerge from it and walk out to
+  the head of the new road before digging. No house → they appear at the road as before.
 - [ ] **Walkthrough / street-view mode** [feat] — a "little man" button above the
   compass (Google-Maps style): drop onto a path and stroll your city, buildings
   billboarding to face you, click folk as they pass. A screensaver-ish victory lap

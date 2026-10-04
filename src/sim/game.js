@@ -842,6 +842,7 @@ export class Game {
   // Deaglán digs. Then the two slip away.
   roadCrew(path, setHidden) {
     if (!path || path.length < 2) return;
+    if (this.crews.length) return; // only one Deaglán at a time — a further road is laid, but he does not come out again until this one is done
     const tiles = path.map((p) => ({ x: p.x, z: p.z }));
     // Pick the gaps: 2–3 random squares per window of eight (never the start
     // tile). Those are hidden now; the rest of the road stands built.
@@ -853,15 +854,22 @@ export class Game {
       for (let n = 0; n < want && idxs.length; n++) digSet.add(idxs.splice((Math.random() * idxs.length) | 0, 1)[0]);
     }
     if (setHidden) for (const k of digSet) setHidden(tiles[k], true);
-    const w0 = this.map.tileToWorld(tiles[0].x, tiles[0].z);
+    const startTile = this.map.tileToWorld(tiles[0].x, tiles[0].z);
+    // Deaglán lives in Somhairlín's house; he and Finn walk out from there to the
+    // head of the new road before he begins to dig. With no house they appear at
+    // the road itself, as before.
+    const house = this._builderHouse();
+    const home = house ? this._center(house) : null;
+    const spawn = home || startTile;
     // deaglan/finn have no _f set, so force female:false; Finn the dog rides at
     // half a person's height.
     const deagWalk = makeWalkerChip('deaglan', false);
     const deagDig = makeWalkerChip('deaglan_dig', false); deagDig.visible = false;
     const finn = makeWalkerChip('finn_run', false, 0.65);
-    for (const c of [deagWalk, deagDig, finn]) { c.position.set(w0.x, 0.05, w0.z); this.crewGroup.add(c); }
+    for (const c of [deagWalk, deagDig, finn]) { c.position.set(spawn.x, 0.05, spawn.z); this.crewGroup.add(c); }
     this.crews.push({ tiles, digSet, setHidden, deagWalk, deagDig, finn, di: 0, dt: 0,
-      digging: false, digT: 0, fi: 0, fdir: 1, ft: 0, leaving: false, fade: 0 });
+      digging: false, digT: 0, fi: 0, fdir: 1, ft: 0, leaving: false, fade: 0,
+      approach: home ? [{ x: home.x, z: home.z }, { x: startTile.x, z: startTile.z }] : null, ai: 0, at: 0, approaching: !!home });
   }
   _crewMove(chip, a, b, k) {
     const wa = this.map.tileToWorld(a.x, a.z), wb = this.map.tileToWorld(b.x, b.z);
@@ -872,6 +880,20 @@ export class Game {
     const DEAG_SPEED = 1.0, FINN_SPEED = 2.25, DIG_TIME = 2.6; // half the old pace — a calm, watchable build
     for (let i = this.crews.length - 1; i >= 0; i--) {
       const cr = this.crews[i], T = cr.tiles, last = T.length - 1;
+      // Walk out from Somhairlín's house to the head of the road before digging.
+      if (cr.approaching && cr.approach) {
+        const a = cr.approach[cr.ai], b = cr.approach[cr.ai + 1] || a;
+        cr.at += dt * DEAG_SPEED; const k = Math.min(cr.at, 1);
+        cr.deagWalk.visible = true; cr.deagDig.visible = false;
+        if (cr.deagWalk.faceWorld) cr.deagWalk.faceWorld(b.x - a.x, b.z - a.z);
+        cr.deagWalk.position.set(a.x + (b.x - a.x) * k, 0.05, a.z + (b.z - a.z) * k);
+        cr.finn.position.set(a.x + (b.x - a.x) * k - 0.3, 0.05, a.z + (b.z - a.z) * k - 0.3); // the dog trots alongside
+        if (cr.finn.faceWorld) cr.finn.faceWorld(b.x - a.x, b.z - a.z);
+        if (cr.deagWalk.animate) cr.deagWalk.animate(dt, true);
+        if (cr.finn.animate) cr.finn.animate(dt, true);
+        if (cr.at >= 1) { cr.at = 0; cr.ai += 1; if (cr.ai >= cr.approach.length - 1) cr.approaching = false; }
+        continue;
+      }
       // Finn runs the length, but stops to watch whenever Deaglán is digging.
       if (cr.digging && !cr.leaving) {
         const wt = this.map.tileToWorld(T[cr.di].x, T[cr.di].z);
