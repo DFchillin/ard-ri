@@ -69,6 +69,32 @@ const SCENARIOS = {
     ],
     enemyLone: [['fomor', 10, 2]],
   },
+  // Thar Sáile — raids across the sea. Harder hosts than any kingdom of Ériu:
+  // more seasoned ranks and two champions apiece.
+  lochlann: {
+    title: 'Lochlann — the Norse shore', musterMinZ: 6, buildings: [],
+    enemyCompanies: [
+      { name: ['Bjǫrn Járnsíða', 'the sea-wolves'], formation: 'wedge', types: ['seasoned', 'seasoned', 'seasoned', 'seasoned', 'curadh'], x: 7, z: 2 },
+      { name: ['Drengir', 'the shield-wall'], formation: 'line', types: ['seasoned', 'seasoned', 'seasoned', 'seasoned', 'villager', 'villager'], x: 13, z: 2 },
+    ],
+    enemyLone: [['curadh', 10, 1]],
+  },
+  saxony: {
+    title: 'Saxony — the Saxon burhs', musterMinZ: 6, buildings: [],
+    enemyCompanies: [
+      { name: ['Fyrd', 'the levy of the burh'], formation: 'line', types: ['seasoned', 'seasoned', 'seasoned', 'villager', 'villager', 'villager'], x: 6, z: 2 },
+      { name: ['Thegnas', 'the thanes'], formation: 'diamond', types: ['seasoned', 'seasoned', 'seasoned', 'curadh'], x: 13, z: 2 },
+    ],
+    enemyLone: [['curadh', 10, 1]],
+  },
+  gaul: {
+    title: 'Gaul — the Frankish host', musterMinZ: 6, buildings: [],
+    enemyCompanies: [
+      { name: ['Caballarii', 'the Frankish horse'], formation: 'wedge', types: ['seasoned', 'seasoned', 'seasoned', 'seasoned', 'seasoned'], x: 7, z: 2 },
+      { name: ['Leudes', 'the sworn men'], formation: 'line', types: ['seasoned', 'seasoned', 'seasoned', 'villager', 'villager', 'villager'], x: 13, z: 2 },
+    ],
+    enemyLone: [['curadh', 10, 1], ['curadh', 4, 2]],
+  },
 };
 
 // The craftsfolk bond: when Somhairlín and Deaglán — the two who build the

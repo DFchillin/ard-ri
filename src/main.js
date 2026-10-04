@@ -9,7 +9,7 @@ import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?
 import { setCamera } from './render/assets.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
 import { Hurling } from './hurling.js?v=CBUST';
-import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById } from './data/kingdoms.js?v=CBUST';
+import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById, OVERSEAS, overseasById } from './data/kingdoms.js?v=CBUST';
 import { CODEX } from './data/codex.js?v=CBUST';
 import { UNIT_TYPES } from './battle/units.js?v=CBUST';
 import { GOODS, HOSTING, HOST_ORDER, canHost, reqText } from './data/trade.js?v=CBUST';
@@ -182,22 +182,33 @@ const battle = new Battle({
     campaign.ghosts = roster.ghost || 0;
     const r = { ...roster }; delete r.ghost; delete r.somhairlin; delete r.deaglan; campaign.roster = r; // the craftsfolk are signature folk, granted fresh each muster — never banked or lost for good
     for (const f of fallen) campaign.fallen.push({ type: f.type, name: DEAD_NAMES[(Math.random() * DEAD_NAMES.length) | 0], season: curSeason });
-    if (won && battle.scenario === 'attack') {
-      campaign.raidsWon = (campaign.raidsWon || 0) + 1; // a won foray abroad advances the map-era chapters
-      setCattle(campaign.cattle + 8 + ((Math.random() * 8) | 0)); // plunder driven home from a won raid
-      if (Math.random() < 0.5) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; campaign._looted = gk; } // and sometimes foreign spoils
-      if (campaign._raidFar && campaign.target && !isColony(campaign.target)) { const k = foundColony(campaign.target); if (k) { campaign._newColony = k.en; campaign._colonyWin = true; } }
+    const overseas = campaign._overseas ? overseasById(battle.scenario) : null; // a raid across the sea
+    if (won && (battle.scenario === 'attack' || overseas)) {
+      campaign.raidsWon = (campaign.raidsWon || 0) + 1; // a won foray advances the map-era chapters and the crown
+      if (overseas) {
+        setCattle(campaign.cattle + overseas.plunderCattle);
+        if (overseas.plunderSilver) { game.silver += overseas.plunderSilver; pushStats(); saveSettlement(); }
+        for (const gk of overseas.spoils) campaign.goods[gk] = (campaign.goods[gk] || 0) + 1;
+        campaign._looted = overseas.spoils[0];
+        const spoilStr = overseas.spoils.map((g) => `${GOODS[g].icon} ${GOODS[g].label}`).join(', ');
+        flashNotice(`⛵ ${overseas.en} is plundered! Home come 🐄 ${overseas.plunderCattle}${overseas.plunderSilver ? `, 🪙 ${overseas.plunderSilver} silver` : ''} and ${spoilStr}.`);
+      } else {
+        setCattle(campaign.cattle + 8 + ((Math.random() * 8) | 0)); // plunder driven home from a won raid
+        if (Math.random() < 0.5) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; campaign._looted = gk; } // and sometimes foreign spoils
+        if (campaign._raidFar && campaign.target && !isColony(campaign.target)) { const k = foundColony(campaign.target); if (k) { campaign._newColony = k.en; campaign._colonyWin = true; } }
+      }
       // Four won raids make you Ard Rí. The grand proclamation is the level-7
       // narrative; here we hold the crown as a real, loseable state — and a raid
       // won while the crown is contested wins it straight back.
       if (campaign.raidsWon >= ARDRI_RAIDS && !campaign.ardRi) {
-        campaign.ardRi = true;
+        campaign.ardRi = true; campaign.everArdRi = true;
         if (campaign.crownContested) { campaign.crownContested = false; flashNotice('👑 The crown is yours once more — Ériu names you Ard Rí again.'); }
       }
     }
+    if (campaign.ardRi) campaign.everArdRi = true; // once crowned, the longships may always sail
     // A defeat while you wear the crown reopens the contest: the sub-kings stir,
     // and you are High King no longer until you prove your strength with a raid.
-    if (!won && campaign.ardRi && (battle.scenario === 'attack' || battle.scenario === 'defend')) {
+    if (!won && campaign.ardRi && (battle.scenario === 'attack' || battle.scenario === 'defend' || overseas)) {
       campaign.ardRi = false; campaign.crownContested = true;
       flashNotice('⚔ A defeat, and the sub-kings rise — the battle for the crown is back. Win a raid abroad to reclaim your High Kingship.');
     }
@@ -211,7 +222,7 @@ const battle = new Battle({
       const lost = Math.floor(campaign.cattle / 2) + 6; setCattle(campaign.cattle - lost); campaign._ransacked = lost;
       if (campaign.colonies.length && Math.random() < 0.5) { const gone = campaign.colonies.splice((Math.random() * campaign.colonies.length) | 0, 1)[0]; campaign._ransacked = lost; flashNotice(`🏴 While you fought at home, ${gone.name} threw off your yoke.`); }
     }
-    campaign._raidFar = false;
+    campaign._raidFar = false; campaign._overseas = false;
     saveCampaign();
   },
 });
@@ -353,6 +364,8 @@ if (campaign.menaceHp == null) campaign.menaceHp = UNIT_TYPES.fomor.hp; // the O
 const ARDRI_RAIDS = 4; // four won raids make you Ard Rí
 if (campaign.ardRi == null) campaign.ardRi = (campaign.raidsWon || 0) >= ARDRI_RAIDS; // do we currently wear the High Kingship
 if (campaign.crownContested == null) campaign.crownContested = false; // lost the crown in battle — win a raid to reclaim
+if (campaign.everArdRi == null) campaign.everArdRi = campaign.ardRi; // once proclaimed, the longships may sail beyond Ériu even if the crown is later contested
+const FLEET_COST = 8; // cattle to launch a fleet across the sea
 ui.hurlWon = campaign.monumentWon; // the monument is a build-menu prize
 // --- The hurling challenge: a wandering band, a shootout of points, a monument ---
 const hurling = new Hurling({
@@ -564,6 +577,8 @@ function buildKingdomMap() {
   kg.colonyGroup = mk('g', {}); svg.appendChild(kg.colonyGroup);
   document.getElementById('kg-close').addEventListener('click', closeKingdomMap);
   document.getElementById('kg-action').addEventListener('click', kingdomAction);
+  { const sb = document.getElementById('kg-oversea-btn'); if (sb) sb.addEventListener('click', openOverseasChoice); }
+  document.querySelectorAll('#kg-overseas .kg-sea').forEach((b) => b.addEventListener('click', () => selectOverseas(b.dataset.o)));
   const c1 = document.getElementById('kg-c1'), c2 = document.getElementById('kg-c2');
   c1.value = campaign.livery[0]; c2.value = campaign.livery[1];
   const onCol = () => { campaign.livery = [c1.value, c2.value]; battle.setLivery(campaign.livery); applyWarTint(); drawFlagPreview(); };
@@ -583,7 +598,8 @@ function drawFlagPreview() {
   x.strokeStyle = 'rgba(0,0,0,0.45)'; x.strokeRect(X, Y, W, H);
 }
 function selectKingdom(id) {
-  kg.sel = id; kg.enter = null;
+  kg.sel = id; kg.enter = null; kg.overseas = null;
+  { const sp = document.getElementById('kg-overseas'); if (sp) sp.classList.add('hidden'); }
   for (const rid in kg.regions) kg.regions[rid].classList.toggle('sel', rid === id);
   const k = kingdomById(id);
   document.getElementById('kg-none').classList.add('hidden');
@@ -615,9 +631,32 @@ function selectKingdom(id) {
     : `A cattle-raid on ${k.seat}. Drive off their herd.`;
   act.textContent = far ? `March on ${k.en} 🏴` : `Raid ${k.en} ⚔`;
 }
+// Thar Sáile — reveal the three shores beyond Ériu (once you have been Ard Rí).
+function openOverseasChoice() {
+  for (const rid in kg.regions) kg.regions[rid].classList.remove('sel');
+  kg.sel = null; kg.enter = null; kg.overseas = null;
+  document.getElementById('kg-none').classList.add('hidden');
+  document.getElementById('kg-info').classList.add('hidden');
+  const sp = document.getElementById('kg-overseas'); if (sp) sp.classList.remove('hidden');
+  const act = document.getElementById('kg-action'); act.disabled = true; act.textContent = 'Choose a shore ⛵';
+}
+function selectOverseas(id) {
+  const o = overseasById(id); if (!o) return;
+  kg.overseas = id; kg.sel = null; kg.enter = null;
+  for (const rid in kg.regions) kg.regions[rid].classList.remove('sel');
+  document.getElementById('kg-overseas').classList.add('hidden');
+  document.getElementById('kg-none').classList.add('hidden');
+  const info = document.getElementById('kg-info'); info.classList.remove('hidden');
+  document.getElementById('kg-name').textContent = o.en;
+  document.getElementById('kg-ga').textContent = o.ga;
+  document.getElementById('kg-seat').innerHTML = `${o.desc}<br><span class="dim">A harder host than any kingdom of Ériu. ${FLEET_COST} cattle to launch the fleet.</span>`;
+  const act = document.getElementById('kg-action'); act.disabled = false; act.textContent = `${o.arrow} Sail against ${o.en} ⛵`;
+}
 function openKingdomMap(mode, then) {
   buildKingdomMap();
-  kg.mode = mode; kg.sel = null; kg.enter = null; kg.then = then || null;
+  kg.mode = mode; kg.sel = null; kg.enter = null; kg.then = then || null; kg.overseas = null;
+  { const sb = document.getElementById('kg-oversea-btn'); if (sb) sb.classList.toggle('hidden', !(mode === 'war' && campaign.everArdRi)); }
+  { const sp = document.getElementById('kg-overseas'); if (sp) sp.classList.add('hidden'); }
   document.getElementById('kg-title').textContent = mode === 'war' ? 'Raid, or ride home' : 'The Kingdoms of Ériu';
   document.getElementById('kg-hint').textContent = mode === 'war'
     ? 'Fall upon a foreign kingdom — or tap your own home or a colony to enter and build it.'
@@ -777,6 +816,13 @@ function renderTrade() {
   body.appendChild(hostSec);
 }
 function kingdomAction() {
+  if (kg.overseas) { // sail across the sea against a foreign shore
+    const o = overseasById(kg.overseas); if (!o) return;
+    if (campaign.cattle < FLEET_COST) { document.getElementById('kg-seat').textContent = `You need ${FLEET_COST} cattle to launch a fleet — you have ${campaign.cattle}.`; return; }
+    setCattle(campaign.cattle - FLEET_COST);
+    campaign.target = o.id; campaign._overseas = true; campaign._raidFar = false;
+    saveCampaign(); closeKingdomMap(); enterBattle(o.id); return;
+  }
   if (!kg.sel) return;
   if (kg.mode === 'war') {
     if (kg.enter) { const t = kg.enter; closeKingdomMap(); switchSettlement(t); enterSettlement(); return; } // enter home / a colony to build it

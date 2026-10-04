@@ -68,9 +68,14 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
   a thriving 10+ folk colony); one you hold in person that season never revolts.
 - [ ] **Colonies need 4× culture** [tweak] — a colony dwelling should need 4× the
   culture of a native one, pushing you to courts & late-game culture buildings.
-- [ ] **Overseas expansion after Ard Rí** [feat] — once High King, sail for France,
-  England and the Nordic countries (truly "across the sea" targets). Ties to the
-  Irish-vs-overseas wording fix and the boat mechanic.
+- [x] **Overseas raids after Ard Rí (Thar Sáile)** [feat] — DONE (`<this batch>`):
+  a "⛵ Thar Sáile — beyond Ériu" button on the war map (shown once you've been Ard
+  Rí) opens a sea-choice — North → Lochlann (Norse), East → Saxony, South → Gaul.
+  Each is a tougher host than any kingdom of Ériu, costs 8 cattle to launch a fleet,
+  and pays big plunder + themed spoils (Lochlann→iron, Saxony→silver+marble,
+  Gaul→gold+wine). Overseas wins count as raids (crown).
+  *v2 (not yet): planting overseas Dála — needs offshore map/colony support; for now
+  they're plunder raids, not settled colonies. Boat-under-unit art is the Phase-4 item.*
 
 ## Phase 4 — Economy (make winning harder)
 

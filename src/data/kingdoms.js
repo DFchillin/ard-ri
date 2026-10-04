@@ -29,3 +29,20 @@ export const NEIGHBOURS = {
   desmumu: ['tuadmumu', 'laigin'],
 };
 export const kingdomById = (id) => KINGDOMS.find((k) => k.id === id);
+
+// Thar Sáile — beyond Ériu. Once you are Ard Rí the whole island is yours, and
+// the longships turn outward. Three shores across the sea, each a harder host
+// than any kingdom of Ériu, each with its own spoils. (Raided for plunder, not
+// yet settled as Dála.) `spoils` are GOODS keys.
+export const OVERSEAS = [
+  { id: 'lochlann', en: 'Lochlann', ga: 'the Norselands', dir: 'north', arrow: '⬆', seat: 'the fjords of the Norsemen',
+    desc: 'North across the grey sea lie the Lochlannaigh — sea-wolves who raid as hard as they are raided. Break their shield-wall and their smith-work is yours.',
+    spoils: ['iron'], plunderCattle: 14, plunderSilver: 18 },
+  { id: 'saxony', en: 'Saxony', ga: 'the Saxon lands', dir: 'east', arrow: '➡', seat: 'the burhs of the Saxons',
+    desc: 'East over the water stand the burhs of the Saxons, fat with silver and fine stone. A hard shore, but a rich one.',
+    spoils: ['marble'], plunderCattle: 10, plunderSilver: 30 },
+  { id: 'gaul', en: 'Gaul', ga: 'Francia', dir: 'south', arrow: '⬇', seat: 'the vineyards of the Franks',
+    desc: 'South lie the vineyards and gold of the Franks. Their horsemen are fearsome, but the plunder of Francia is the richest of all.',
+    spoils: ['gold', 'wine'], plunderCattle: 12, plunderSilver: 24 },
+];
+export const overseasById = (id) => OVERSEAS.find((o) => o.id === id);

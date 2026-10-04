@@ -711,3 +711,7 @@ body.in-hurling #brightness-btn, body.in-hurling #advisors-fab, body.in-hurling 
 #parley-actions .parley-yes { border-color: #6cc551; color: #9ce08a; }
 #parley-actions .parley-pay { border-color: #b98cff; color: #cdb0ff; }
 #parley-actions .parley-back { background: transparent; border: none; color: var(--ink); opacity: 0.55; font-size: 12px; padding: 4px; }
+
+/* Thar Sáile — the sea-raid choice on the kingdom map */
+.kg-sea-h { font-size: 0.85em; opacity: 0.82; margin: 8px 0 4px; }
+#kg-overseas .kg-sea { display: block; width: 100%; margin: 5px 0; text-align: left; }
