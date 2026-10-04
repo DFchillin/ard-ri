@@ -290,6 +290,12 @@ function foundColony(region) {
 function colonyFolk(c) { return campaign.active === c.region ? game.folk : (c.folk || 0); }
 function collectColonyTribute() {
   if (!campaign.colonies.length) return;
+  // A distant Dál may throw off your rule on its own over the turn of the year —
+  // a thriving, well-settled colony is harder to lose than a thinly-held one, and
+  // one you hold in person (you are there this season) never revolts.
+  const revolted = campaign.colonies.filter((c) => campaign.active !== c.region && Math.random() < (colonyFolk(c) >= 10 ? 0.05 : 0.12));
+  for (const c of revolted) { const i = campaign.colonies.indexOf(c); if (i >= 0) campaign.colonies.splice(i, 1); flashNotice(`🏴 ${c.name} has thrown off your yoke and returned to its own kings — a Dál lost.`); }
+  if (!campaign.colonies.length) { saveCampaign(); return; }
   let cattle = 0; const goods = []; let small = 0;
   for (const c of campaign.colonies) {
     c.seasons = (c.seasons || 0) + 1;

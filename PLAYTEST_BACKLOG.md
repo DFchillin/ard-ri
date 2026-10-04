@@ -60,8 +60,9 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
   at 4 raids; a loss in a raid or home defence sets `crownContested` and flashes "the
   battle for the crown is back"; winning a raid while contested reclaims it. The title-
   screen Continue button shows the status (👑 Ard Rí / crown contested).
-- [ ] **Colonies lost on their own** [feat] — beyond ransack-loss, colonies should
-  sometimes revolt/throw off rule spontaneously over time.
+- [x] **Colonies lost on their own** [feat] — DONE (`<this batch>`): each turn of the
+  year a distant Dál may throw off your rule on its own (12% thinly-held, 5% if it's
+  a thriving 10+ folk colony); one you hold in person that season never revolts.
 - [ ] **Colonies need 4× culture** [tweak] — a colony dwelling should need 4× the
   culture of a native one, pushing you to courts & late-game culture buildings.
 - [ ] **Overseas expansion after Ard Rí** [feat] — once High King, sail for France,
