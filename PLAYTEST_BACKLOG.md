@@ -27,8 +27,11 @@ From a full play-through. Grouped into phases, smallest/most-broken first. Tags:
   when a monument is raised; win again to raise another.
 - [x] **Morrigan spelling** [bug] — FIXED (`dbc2e5e`): unit label corrected to
   "An Mhórrígan" to match the codex/god-data/summon banner.
-- [ ] **"Across the sea" for Irish colonies** [bug] — Ireland is one island; a colony
-  within Ériu should say *land*, not "across the water." (Ties to overseas, Phase 3.)
+- [x] **"Across the sea" for Irish colonies** [bug] — DONE (`<Phase 3>`): all 9 map
+  regions are within Ireland, so colonies now read as distant provinces/kingdoms of
+  Ériu held "across the island", not "across the water"/Alba (codex, both level
+  narratives, and the new-colony banner reworded). True sea wording is reserved for
+  the future overseas content.
 - [x] **Orchards only yield wheat** [tweak] — DONE (`<this batch>`): rather than split
   the goods, once an orchard stands barley+apples pool as one "food" (🍲). Carrier
   labels, the ledger ("Food in store"), and granary/market inspect all say *food*

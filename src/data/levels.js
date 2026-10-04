@@ -52,7 +52,7 @@ export const LEVELS = [
       title: 'Toward the High Kingship', ga: 'I dTreo na hArd-Ríochta',
       body: [
         'The menace is broken, and your name is spoken with awe from Ailech to the far south.',
-        'Now the whole island lies before you — kingdoms to raid, colonies to plant across the water, heroes to host and gods to summon. Rise from this lone ráth to High King of Ériu.',
+        'Now the whole island lies before you — kingdoms to raid, Dála to plant in distant provinces, heroes to host and gods to summon. Rise from this lone ráth to High King of Ériu.',
         'Each war you win abroad teaches your túath a new craft to raise at home. Ride out from the 🗺 map, and grow.',
       ],
     },
@@ -114,7 +114,7 @@ export const LEVELS = [
       emoji: '👑', motif: 'linear-gradient(160deg,#3a2f10,#8a6a1e)',
       title: 'High King of Ériu', ga: 'Ard-Rí na hÉireann',
       body: [
-        'From a lone ráth you have risen: orchards and stone stores, a war-host of the Fian, colonies across the water, and heroes of the old tales at your muster.',
+        'From a lone ráth you have risen: orchards and stone stores, a war-host of the Fian, Dála in far-flung kingdoms, and heroes of the old tales at your muster.',
         'The kingdoms bow, and the poets name you what you have become — Ard Rí, High King of all Ériu.',
         'The island is yours. Long may you hold it.',
       ],

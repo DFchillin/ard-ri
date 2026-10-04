@@ -162,7 +162,7 @@ const battle = new Battle({
     battleWon = true;
     if (info && info.cattle) setCattle(campaign.cattle + info.cattle);
     let sub = (info && info.sub) || `The enemy slua is broken and flees the field. Ériu will remember this cath, ${leaderName()}.`;
-    if (campaign._newColony) { sub += ` And a new Dál is planted in ${campaign._newColony} — your rule now reaches across the water.`; campaign._newColony = null; }
+    if (campaign._newColony) { sub += ` And a new Dál is planted in ${campaign._newColony} — your rule now reaches to the far side of the island.`; campaign._newColony = null; }
     ui.showFestival({ name: campaign._colonyWin ? 'A New Dál' : 'Victory!', emoji: campaign._colonyWin ? '🏴' : '🏆', sub });
     campaign._colonyWin = false;
   },
