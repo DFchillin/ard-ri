@@ -1038,7 +1038,8 @@ export class Game {
     }
     const b = this.builder, BSPEED = 1.1; // a steady builder's pace — half the old speed
     if (b.state === 'toSite' || b.state === 'toHouse') {
-      if (this._followPath(b, dt, BSPEED)) {
+      const legSpeed = b.state === 'toSite' ? BSPEED * 1.33 : BSPEED; // eager on the way out to a job; steady home
+      if (this._followPath(b, dt, legSpeed)) {
         if (b.state === 'toHouse') { this._removeBuilder(); return; }
         b.state = 'toCorner'; b.to = b.corners[b.ci]; // off the road, now hop the site corners
       }
