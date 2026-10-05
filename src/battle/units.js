@@ -12,6 +12,7 @@ export const UNIT_TYPES = {
   grain:        { label: 'Grain-carrier',  ga: 'iompróir arbhair',  cat: 'regular', rank: 1, atk: 1.2, hp: 3, build: 0.3, speed: 3.5, morale: 50, aura: 0, sprite: 'grain_carrier' },
   deaglan:      { label: 'Deaglán',        ga: 'the path-maker',    cat: 'regular', rank: 1, atk: 1.5, hp: 4, build: 0.4, speed: 4.4, morale: 62, aura: 0, sprite: 'market_trader', battle: { art: 'deaglan', h: 1.55 } },
   druid:        { label: 'Druid',          ga: 'draoi',             cat: 'regular', rank: 1, atk: 1.8, hp: 4, build: 0.3, speed: 3.2, morale: 72, aura: 8, sprite: 'druid' },
+  somhairlin:   { label: 'Somhairlín',     ga: 'the master-builder', cat: 'regular', rank: 1, atk: 1.1, hp: 6, build: 1.4, speed: 3.0, morale: 64, aura: 0, sprite: 'somhairlin' },
   // --- trained tiers: folk grow into these by surviving won battles ---
   warrior:      { label: 'Warrior',        ga: 'laoch',             cat: 'warrior', rank: 2, atk: 2.0, hp: 5, build: 0.6, speed: 3.2, morale: 66, aura: 0, battle: { art: 'warrior', h: 1.5 }, piece: { color: 0xb0763a, tall: 0.9 } },
   seasoned:     { label: 'Seasoned Warrior', ga: 'óglach',          cat: 'seasoned', rank: 3, atk: 2.7, hp: 8, build: 0.9, speed: 2.8, morale: 80, aura: 0, battle: { art: 'curadh', h: 1.6 }, piece: { color: 0x4a6fae, tall: 1.05 } },
@@ -28,17 +29,17 @@ export const UNIT_TYPES = {
   brigid:       { label: 'Brigid',          ga: 'the bright goddess',   cat: 'hero', rank: 5, atk: 3.6, hp: 20, build: 1.4, speed: 3.2, morale: 100, aura: 26, battle: { art: 'brigid', h: 2.9, tiles: 1 }, piece: { color: 0xe8a848, tall: 1.35 } },
   // --- summoned gods of the Túatha Dé: giants that stand across four squares ---
   dagda:        { label: 'An Dagda',       ga: 'the Good God',      cat: 'god', rank: 6, atk: 9.0, hp: 40, build: 3.4, speed: 2.8, morale: 100, aura: 24, battle: { art: 'dagda', h: 3.8, tiles: 2 }, piece: { color: 0xf2ead6, tall: 1.7 } },
-  morrigan:     { label: 'An Mhórríon',    ga: 'phantom queen of war', cat: 'god', rank: 6, atk: 8.0, hp: 32, build: 2.4, speed: 3.4, morale: 100, aura: 24, battle: { art: 'morrigan', h: 3.5, tiles: 2 }, piece: { color: 0xc86a8a, tall: 1.6 } },
+  morrigan:     { label: 'An Mhórrígan',   ga: 'phantom queen of war', cat: 'god', rank: 6, atk: 8.0, hp: 32, build: 2.4, speed: 3.4, morale: 100, aura: 24, battle: { art: 'morrigan', h: 3.5, tiles: 2 }, piece: { color: 0xc86a8a, tall: 1.6 } },
   // --- the returned dead: prayed back at an altar, they know no fear ---
   ghost:        { label: 'Ghost Warrior',  ga: 'laoch taibhse',     cat: 'warrior', rank: 2, atk: 2.4, hp: 5, build: 0.4, speed: 3.5, morale: 100, aura: 0, spectral: true, battle: { art: 'ghost', h: 1.55 }, piece: { color: 0x9fc8ff, tall: 0.9 } },
   // --- the menace: the Ollphéist, a great serpent, and its lesser brood (foes only) ---
   fomor:        { label: 'The Ollphéist',  ga: 'an Ollphéist',      cat: 'god', rank: 7, atk: 11.0, hp: 70, build: 4.0, speed: 2.2, morale: 100, aura: 0, menace: true, battle: { art: 'olipheist', h: 3.8, tiles: 3 }, piece: { color: 0x2b4a36, tall: 2.4 }, tiles: 3 },
-  fuath:        { label: 'Fuath',          ga: 'a water-fiend',     cat: 'special', rank: 4, atk: 4.0, hp: 14, build: 1.2, speed: 3.0, morale: 100, aura: 0, menace: true, piece: { color: 0x3a5a52, tall: 1.2 } },
+  fuath:        { label: 'Fomórach',       ga: 'a Fomorian of the brood', cat: 'special', rank: 4, atk: 4.0, hp: 14, build: 1.2, speed: 3.0, morale: 100, aura: 0, menace: true, sprite: 'fomorian', piece: { color: 0x3a5a52, tall: 1.2 } },
 };
 
 // Promotion path: a regular who survives a won battle may grow into a warrior,
 // a warrior into a seasoned óglach — about three wins to climb a tier.
-export const UPSKILL = { villager: 'warrior', water: 'warrior', grain: 'warrior', deaglan: 'warrior', druid: 'warrior', fennid: 'seasoned', warrior: 'seasoned' };
+export const UPSKILL = { villager: 'warrior', water: 'warrior', grain: 'warrior', druid: 'warrior', fennid: 'seasoned', warrior: 'seasoned' }; // deaglán/somhairlín are signature craftsfolk — they do not promote
 // City-paid folk: if they fall they take two seasons to replace.
 export const EMPLOYEES = ['water', 'grain', 'druid'];
 

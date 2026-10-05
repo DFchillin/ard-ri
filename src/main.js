@@ -9,7 +9,8 @@ import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?
 import { setCamera } from './render/assets.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
 import { Hurling } from './hurling.js?v=CBUST';
-import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById } from './data/kingdoms.js?v=CBUST';
+import { Sparring } from './sparring.js?v=CBUST';
+import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById, OVERSEAS, overseasById } from './data/kingdoms.js?v=CBUST';
 import { CODEX } from './data/codex.js?v=CBUST';
 import { UNIT_TYPES } from './battle/units.js?v=CBUST';
 import { GOODS, HOSTING, HOST_ORDER, canHost, reqText } from './data/trade.js?v=CBUST';
@@ -32,6 +33,173 @@ let aspect = window.innerWidth / window.innerHeight;
 const camera = createIsoCamera(15, aspect);
 setCamera(camera); // walkers face by screen direction
 
+// --- Siúlóid: a first-person stroll through the ráth (a living screensaver) ---
+// A perspective camera wanders the road network at eye level; buildings and folk
+// (billboard sprites) turn to face it as you pass. Tap folk to inspect them.
+const walkCam = new THREE.PerspectiveCamera(74, aspect, 0.05, 1000);
+const _tmpV = new THREE.Vector3();
+const walk = {
+  active: false, follow: null, _hx: 0, _hz: 1, _first: false,
+  _cp: new THREE.Vector3(), _cl: new THREE.Vector3(),
+  // Townsfolk worth following: anyone abroad with a name (never the risen dead).
+  _followable() { return game.walkers.filter((w) => w && !w.done && w.sprite && w.person && w.tag !== 'risen'); },
+  _pickFollow(after) {
+    const list = this._followable(); if (!list.length) return null;
+    if (after) { const i = list.indexOf(after); if (i >= 0) return list[(i + 1) % list.length]; }
+    const c = game.map.tileToWorld((game.map.size / 2) | 0, (game.map.size / 2) | 0);
+    list.sort((a, b) => a.sprite.position.distanceToSquared(c) - b.sprite.position.distanceToSquared(c));
+    return list[0];
+  },
+  cycle() { const n = this._pickFollow(this.follow); if (n) { this.follow = n; this._first = true; this._updateName(); } },
+  _updateName() {
+    const el = document.getElementById('walk-name'); if (!el) return;
+    const p = this.follow && this.follow.person;
+    el.innerHTML = p
+      ? `<b>${p.nick ? `${p.name} ‘${p.nick}’` : p.name}</b><span>${p.roleEn} · tap to follow another</span>`
+      : `<b>Nobody abroad</b><span>waiting for folk…</span>`;
+  },
+  enter() {
+    const w = this._pickFollow(null);
+    if (!w) { flashNotice('🚶 No folk are abroad just now — let the ráth bustle a while, then stroll.'); return; }
+    this.follow = w; this._first = true;
+    this.active = true;
+    this._setSky(true);
+    // Tuck away the build-mode markers (road-alert "!" and inspect dots) — they
+    // billboard and would float in the sky over a scenic stroll.
+    for (const b of game.buildings) {
+      if (b.alert) { b._alertWas = b.alert.visible; b.alert.visible = false; }
+      if (b.dot) { b._dotWas = b.dot.visible; b.dot.visible = false; }
+    }
+    document.getElementById('ui-overlay').classList.add('in-walk');
+    this._updateName();
+    ui.hideInspect();
+  },
+  // Swap the flat settlement sky for a clearing: a gradient skydome (blue overhead
+  // fading to a green haze of trees at the horizon) plus fog that closes the ground
+  // into that haze — so at eye level the ráth reads as a clearing ringed by forest,
+  // not a grey void. A real dome mesh (not a background texture) renders the same on
+  // every screen shape and device.
+  _skyDome: null,
+  _setSky(on) {
+    if (on) {
+      if (!this._skyDome) {
+        const cv = document.createElement('canvas'); cv.width = 16; cv.height = 256;
+        const x = cv.getContext('2d');
+        const g = x.createLinearGradient(0, 0, 0, 256);
+        g.addColorStop(0.0, '#8ec5ea'); g.addColorStop(0.38, '#a9d4ee'); g.addColorStop(0.56, '#cfe6ef');
+        g.addColorStop(0.66, '#aec489'); g.addColorStop(0.76, '#86a65c'); g.addColorStop(1.0, '#5c7d40');
+        x.fillStyle = g; x.fillRect(0, 0, 16, 256);
+        const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
+        const mat = new THREE.MeshBasicMaterial({ map: tx, side: THREE.BackSide, fog: false, depthWrite: false });
+        this._skyDome = new THREE.Mesh(new THREE.SphereGeometry(300, 24, 16), mat);
+        this._skyDome.renderOrder = -10;
+        scene.add(this._skyDome);
+      }
+      this._skyDome.visible = true;
+      this._buildScenery(); this._scenery.visible = true;
+      const sk = SEASON_SKY[curSeason] || SEASON_SKY.earrach;
+      this._skyDome.material.color.setHex(sk.tint); // tint the dome to the season's mood
+      this._savedFog = { color: scene.fog.color.getHex(), near: scene.fog.near, far: scene.fog.far };
+      scene.fog.color.setHex(sk.fog); scene.fog.near = 7; scene.fog.far = 58;
+    } else {
+      if (this._skyDome) this._skyDome.visible = false;
+      if (this._scenery) this._scenery.visible = false;
+      if (this._savedFog) { scene.fog.color.setHex(this._savedFog.color); scene.fog.near = this._savedFog.near; scene.fog.far = this._savedFog.far; this._savedFog = null; }
+    }
+  },
+  // Low-poly hills and cone-trees ringing the ráth, drawn once in Three.js geometry.
+  // They sit out past the settlement and are fog-affected, so they read as hazy green
+  // forest and rolling hills beyond the clearing — real depth under the skydome.
+  _scenery: null,
+  _buildScenery() {
+    if (this._scenery) return;
+    const g = new THREE.Group();
+    let seed = 1337; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a4028 });
+    const leafMats = [0x3f6b32, 0x4c7a38, 0x37602c, 0x567f3f].map((c) => new THREE.MeshLambertMaterial({ color: c }));
+    const hillMats = [0x4a6b3a, 0x3e5c32, 0x56763f].map((c) => new THREE.MeshLambertMaterial({ color: c }));
+    const trunkGeo = new THREE.CylinderGeometry(0.3, 0.42, 2.0, 5);
+    const coneGeo = new THREE.ConeGeometry(2.0, 4.2, 7);
+    // Trees sit out past the ráth's ground plane, so sink them below the horizon:
+    // the trunks drop out of sight and only the canopies crown the treeline.
+    const TREE_SINK = -3.4;
+    const tree = (x, z, s) => {
+      const t = new THREE.Group();
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.position.y = 1.0 * s; trunk.scale.setScalar(s);
+      const leaf = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf.position.y = (2.0 + 1.4) * s; leaf.scale.setScalar(s);
+      const leaf2 = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf2.position.y = (2.0 + 2.6) * s; leaf2.scale.setScalar(s * 0.72);
+      t.add(trunk, leaf, leaf2); t.position.set(x, TREE_SINK, z); g.add(t);
+    };
+    // trees ring the clearing in copses — smaller trees, bunched into stands with
+    // gaps between, rather than an even picket line.
+    for (let c = 0; c < 26; c++) {
+      const a = rnd() * Math.PI * 2, r = 30 + rnd() * 26; // copse centre, radius 30–56
+      const cx = Math.cos(a) * r, cz = Math.sin(a) * r;
+      const n = 5 + ((rnd() * 7) | 0);
+      for (let i = 0; i < n; i++) {
+        const x = cx + (rnd() - 0.5) * 7, z = cz + (rnd() - 0.5) * 7, s = 0.45 + rnd() * 0.5;
+        tree(x, z, s);
+      }
+    }
+    // rolling hills further out, bigger now, rising well above the tree-line
+    for (let i = 0; i < 24; i++) {
+      const a = rnd() * Math.PI * 2, r = 54 + rnd() * 34; // radius 54–88
+      const w = 18 + rnd() * 26, h = 12 + rnd() * 18;
+      const hill = new THREE.Mesh(new THREE.ConeGeometry(w, h, 8), hillMats[(rnd() * hillMats.length) | 0]);
+      hill.position.set(Math.cos(a) * r, -2, Math.sin(a) * r); g.add(hill);
+    }
+    g.visible = false; this._scenery = g; scene.add(g);
+  },
+  exit() {
+    this.active = false;
+    this._setSky(false);
+    for (const b of game.buildings) {
+      if (b.alert && b._alertWas !== undefined) { b.alert.visible = b._alertWas; b._alertWas = undefined; }
+      if (b.dot && b._dotWas !== undefined) { b.dot.visible = b._dotWas; b._dotWas = undefined; }
+    }
+    document.getElementById('ui-overlay').classList.remove('in-walk');
+  },
+  update(dt) {
+    // Keep a living subject: if the one we follow finished their errand (or was
+    // removed), pick up whoever else is abroad; if nobody is, hold the camera.
+    if (!this.follow || this.follow.done || !game.walkers.includes(this.follow)) {
+      this.follow = this._pickFollow(null); this._first = true; this._updateName();
+      if (!this.follow) return;
+    }
+    const p = this.follow.sprite.position;
+    // Heading from the walker's own facing (world); hold the last one while they stand.
+    const s = this.follow.sprite, hl = Math.hypot(s._dx || 0, s._dz || 0);
+    if (hl > 0.0001) { this._hx = s._dx / hl; this._hz = s._dz / hl; }
+    // Chase pose: behind and a little to one side, so the walker reads as a 3/4 back
+    // view (the diagonal facings that carry real stride art) rather than a flat spine.
+    const rx = -this._hz, rz = this._hx; // heading turned 90° → camera-side offset
+    const DIST = 2.7, SIDE = 1.15, HEIGHT = 1.55, HEAD = 0.78, AHEAD = 1.3;
+    const cx = p.x - this._hx * DIST + rx * SIDE, cz = p.z - this._hz * DIST + rz * SIDE;
+    const tx = p.x + this._hx * AHEAD, tz = p.z + this._hz * AHEAD;
+    if (this._first) { this._cp.set(cx, HEIGHT, cz); this._cl.set(tx, HEAD, tz); this._first = false; }
+    else {
+      const k = Math.min(1, dt * 3.2);
+      this._cp.lerp(_tmpV.set(cx, HEIGHT, cz), k);
+      this._cl.lerp(_tmpV.set(tx, HEAD, tz), k);
+    }
+    walkCam.position.copy(this._cp);
+    walkCam.lookAt(this._cl);
+    if (this._skyDome) this._skyDome.position.set(this._cp.x, 0, this._cp.z); // sky travels with you
+  },
+};
+// Show the pegman only when a settlement with roads is on screen; the exit button
+// only while strolling.
+function updateWalkBtn() {
+  const peg = document.getElementById('walk-btn'), ex = document.getElementById('walk-exit');
+  const inSettlement = titleScreenEl.classList.contains('hidden') && !battle.active && !hurling.active && !sparring.active;
+  const hasRoads = !!(game.map && game.map.tiles && game.map.tiles.some((t) => t && t.road));
+  if (peg) peg.classList.toggle('hidden', !(inSettlement && !walk.active && hasRoads));
+  if (ex) ex.classList.toggle('hidden', !walk.active);
+}
+document.getElementById('walk-btn')?.addEventListener('click', () => walk.enter());
+document.getElementById('walk-exit')?.addEventListener('click', () => walk.exit());
+document.getElementById('walk-name')?.addEventListener('click', () => walk.cycle());
+
 const hemi = new THREE.HemisphereLight(0xd6f0cf, 0x40602f, 1.6);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xdfffcf, 1.8);
@@ -47,6 +215,14 @@ const SEASON_ACCENT = {
   fomhar:     { color: 0xff8a4a, pos: [45, 42, 45] },
   geimhreadh: { color: 0x8fbfff, pos: [-45, 42, 45] },
 };
+// The stroll's sky takes the mood of the season: a tint multiplied over the blue→
+// green skydome, and a matching haze for the fog where ground meets the treeline.
+const SEASON_SKY = {
+  earrach:    { tint: 0xeafff0, fog: 0x9fbf72 }, // spring — fresh green
+  samhradh:   { tint: 0xfff3d6, fog: 0xbcc877 }, // summer — warm gold
+  fomhar:     { tint: 0xffe1ba, fog: 0xc2a46a }, // autumn — amber
+  geimhreadh: { tint: 0xd6e4f2, fog: 0xbcc8c4 }, // winter — cold and pale
+};
 
 // The ráth-land is randomised once, then it is your homeland — the same seed
 // (and the buildings on it) return every session. Read the seed before the map.
@@ -56,7 +232,21 @@ const map = new Tilemap(32, 1, _mapSeed);
 const view = new WorldView(scene, map);
 const game = new Game(map, scene);
 // Somhairlín has raised a great work — announce it and refresh the stats/menu.
-game.onBuilt = (inst) => { flashNotice(`🔨 Somhairlín has raised your ${inst.def.label}.`); pushStats(); saveSettlement(); if (inst.def.unique) ui.refreshBuildMenu(); };
+game.onBuilt = (inst) => {
+  flashNotice(`🔨 Somhairlín has raised your ${inst.def.label}.`); pushStats(); saveSettlement();
+  if (inst.def.needsWin) { campaign.monumentWon = false; ui.hurlWon = false; saveCampaign(); } // one monument per hurling win — win again to raise another
+  if (inst.def.unique || inst.def.needsWin) ui.refreshBuildMenu();
+};
+// A family turned out of a home leaves bitter — and takes value with them. The
+// sim has already docked the silver; here we drive off the cow and announce it.
+game.onEvict = ({ name, reason, silver, cow }) => {
+  const tookCow = cow && campaign.cattle > 0;
+  if (tookCow) setCattle(campaign.cattle - 1);
+  pushStats(); saveSettlement();
+  const took = [silver ? `🪙 ${silver} silver` : null, tookCow ? '🐄 a cow' : null].filter(Boolean).join(' and ');
+  const how = reason === 'evicted' ? 'is turned out of a home that can no longer hold them' : 'abandons your ráth, unfed and unwatered';
+  flashNotice(`😠 The ${name} family ${how}${took ? ` — and takes ${took} in spite` : ''}. Keep your homes fed and prospering, ${leaderName()}.`);
+};
 
 const sim = { speed: 1 };
 const cal = { day: 5, month: 0 }; // open in the last days of winter, a breath before Imbolc
@@ -70,8 +260,8 @@ let missionDone = false;
 const ui = new UI({
   onTool: (kind) => { cancelPending(); tool = kind; if (!(tool === 'road' || BUILDINGS[tool])) preview.visible = false; game.showInspectDots(kind === 'inspect'); },
   onSpeed: (s) => { sim.speed = s; savedSpeed = null; },
-  onRotate: (d) => { if (hurling.active) { rotateIsoCamera(hurling.camera, d); return; } if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
-  onZoom: (f) => { if (hurling.active) { hurling.zoom(f); return; } if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
+  onRotate: (d) => { if (sparring.active) return; if (hurling.active) { rotateIsoCamera(hurling.camera, d); return; } if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
+  onZoom: (f) => { if (sparring.active) return; if (hurling.active) { hurling.zoom(f); return; } if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
   onInspectClose: () => { _inspectDwelling = null; resumeGame(); },
   onFestivalContinue: () => { if (battleWon) { battleWon = false; battle.exit(); } else resumeGame(); },
   onStartMission: (n) => startMission(n),
@@ -87,7 +277,7 @@ ui.builtCount = (role) => game.count(role);
 // Grain stores hold barley from fields and apples from orchards in one pool — name
 // the goods for what the settlement actually grows, so apples get their due.
 function hasOrchard() { return game.buildings.some((b) => b.def.produce === 'apples'); }
-function storeGoods() { return hasOrchard() ? 'grain &amp; apples' : 'grain'; }
+function storeGoods() { return hasOrchard() ? 'food' : 'grain'; } // once orchards stand, barley and apples pool as one "food"
 function showAdvisors() {
   const B = game.buildings;
   const sum = (role, key) => B.reduce((n, b) => n + (b.def.role === role ? (b[key] || 0) : 0), 0);
@@ -106,7 +296,7 @@ function showAdvisors() {
     `<h3>Trusted Advisors</h3><div class="role">Counsel at your ear</div>` +
     `<div class="advisor"><h4>🌾 An Rechtaire · the Steward</h4><table class="ledger">` +
       row('Fields sown', fields + (ripe ? ` · ${ripe} ripe` : '')) +
-      row(hasOrchard() ? 'Grain &amp; apples' : 'Grain in store', sum('granary', 'stock')) +
+      row(hasOrchard() ? 'Food in store' : 'Grain in store', sum('granary', 'stock')) +
       row('At market', sum('market', 'stock')) +
       row('Wells', game.count('well')) +
     `</table></div>` +
@@ -158,7 +348,7 @@ const battle = new Battle({
     battleWon = true;
     if (info && info.cattle) setCattle(campaign.cattle + info.cattle);
     let sub = (info && info.sub) || `The enemy slua is broken and flees the field. Ériu will remember this cath, ${leaderName()}.`;
-    if (campaign._newColony) { sub += ` And a new Dál is planted in ${campaign._newColony} — your rule now reaches across the water.`; campaign._newColony = null; }
+    if (campaign._newColony) { sub += ` And a new Dál is planted in ${campaign._newColony} — your rule now reaches to the far side of the island.`; campaign._newColony = null; }
     ui.showFestival({ name: campaign._colonyWin ? 'A New Dál' : 'Victory!', emoji: campaign._colonyWin ? '🏴' : '🏆', sub });
     campaign._colonyWin = false;
   },
@@ -168,6 +358,7 @@ const battle = new Battle({
     ui.showFestival({ name: 'Defeat', emoji: '💀', sub: `${sub} The day is lost, ${leaderName()} — but a ráth can be raised again.`, onDone: () => { battle.exit(); } });
   },
   onTruce: (cattle) => {
+    if (battle.scenario === 'menace') { const rem = battle.menaceRemainingHp(); if (rem != null) { campaign.menaceHp = rem > 0 ? rem : UNIT_TYPES.fomor.hp; saveCampaign(); } } // his wounds persist even if you withdraw
     battle.exit();
     if (cattle) setCattle(campaign.cattle - cattle);
     ui.showFestival({ name: 'A Truce', emoji: '🕊️', sub: `You paid a bóruma of ${cattle} cattle and withdrew. No blood was shed this day — though the foe remembers your silver.` });
@@ -175,20 +366,49 @@ const battle = new Battle({
   onExit: () => { ui.showTitle(); refreshCampaignButton(); },
   onResolve: ({ won, roster, fallen, ransack }) => {
     campaign.ghosts = roster.ghost || 0;
-    const r = { ...roster }; delete r.ghost; campaign.roster = r;
+    const r = { ...roster }; delete r.ghost; delete r.somhairlin; delete r.deaglan; campaign.roster = r; // the craftsfolk are signature folk, granted fresh each muster — never banked or lost for good
     for (const f of fallen) campaign.fallen.push({ type: f.type, name: DEAD_NAMES[(Math.random() * DEAD_NAMES.length) | 0], season: curSeason });
-    if (won && battle.scenario === 'attack') {
-      campaign.raidsWon = (campaign.raidsWon || 0) + 1; // a won foray abroad advances the map-era chapters
-      setCattle(campaign.cattle + 8 + ((Math.random() * 8) | 0)); // plunder driven home from a won raid
-      if (Math.random() < 0.5) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; campaign._looted = gk; } // and sometimes foreign spoils
-      if (campaign._raidFar && campaign.target && !isColony(campaign.target)) { const k = foundColony(campaign.target); if (k) { campaign._newColony = k.en; campaign._colonyWin = true; } }
+    const overseas = campaign._overseas ? overseasById(battle.scenario) : null; // a raid across the sea
+    if (won && (battle.scenario === 'attack' || overseas)) {
+      campaign.raidsWon = (campaign.raidsWon || 0) + 1; // a won foray advances the map-era chapters and the crown
+      if (overseas) {
+        setCattle(campaign.cattle + overseas.plunderCattle);
+        if (overseas.plunderSilver) { game.silver += overseas.plunderSilver; pushStats(); saveSettlement(); }
+        for (const gk of overseas.spoils) campaign.goods[gk] = (campaign.goods[gk] || 0) + 1;
+        campaign._looted = overseas.spoils[0];
+        const spoilStr = overseas.spoils.map((g) => `${GOODS[g].icon} ${GOODS[g].label}`).join(', ');
+        flashNotice(`⛵ ${overseas.en} is plundered! Home come 🐄 ${overseas.plunderCattle}${overseas.plunderSilver ? `, 🪙 ${overseas.plunderSilver} silver` : ''} and ${spoilStr}.`);
+      } else {
+        setCattle(campaign.cattle + 8 + ((Math.random() * 8) | 0)); // plunder driven home from a won raid
+        if (Math.random() < 0.5) { const gk = Object.keys(GOODS)[(Math.random() * Object.keys(GOODS).length) | 0]; campaign.goods[gk] = (campaign.goods[gk] || 0) + 1; campaign._looted = gk; } // and sometimes foreign spoils
+        if (campaign._raidFar && campaign.target && !isColony(campaign.target)) { const k = foundColony(campaign.target); if (k) { campaign._newColony = k.en; campaign._colonyWin = true; } }
+      }
+      // Four won raids make you Ard Rí. The grand proclamation is the level-7
+      // narrative; here we hold the crown as a real, loseable state — and a raid
+      // won while the crown is contested wins it straight back.
+      if (campaign.raidsWon >= ARDRI_RAIDS && !campaign.ardRi) {
+        campaign.ardRi = true; campaign.everArdRi = true;
+        if (campaign.crownContested) { campaign.crownContested = false; flashNotice('👑 The crown is yours once more — Ériu names you Ard Rí again.'); }
+      }
+    }
+    if (campaign.ardRi) campaign.everArdRi = true; // once crowned, the longships may always sail
+    // A defeat while you wear the crown reopens the contest: the sub-kings stir,
+    // and you are High King no longer until you prove your strength with a raid.
+    if (!won && campaign.ardRi && (battle.scenario === 'attack' || battle.scenario === 'defend' || overseas)) {
+      campaign.ardRi = false; campaign.crownContested = true;
+      flashNotice('⚔ A defeat, and the sub-kings rise — the battle for the crown is back. Win a raid abroad to reclaim your High Kingship.');
     }
     if (won && battle.scenario === 'menace') { campaign._menaceRepelled = true; game.clearMenace(); saveSettlement(); } // the menace is thrown back, the blight lifts
+    if (battle.scenario === 'menace') { // carry the Ollphéist's wounds to the next fight; reset to full once he is slain
+      const rem = battle.menaceRemainingHp();
+      if (rem != null) { campaign.menaceHp = rem > 0 ? rem : UNIT_TYPES.fomor.hp; saveCampaign();
+        if (rem > 0 && !won) flashNotice(`☠️ You could not finish him — but the Ollphéist bleeds. ${Math.round(rem)}/${UNIT_TYPES.fomor.hp} of his strength remains. Muster again and end him.`); }
+    }
     if (ransack) {
       const lost = Math.floor(campaign.cattle / 2) + 6; setCattle(campaign.cattle - lost); campaign._ransacked = lost;
       if (campaign.colonies.length && Math.random() < 0.5) { const gone = campaign.colonies.splice((Math.random() * campaign.colonies.length) | 0, 1)[0]; campaign._ransacked = lost; flashNotice(`🏴 While you fought at home, ${gone.name} threw off your yoke.`); }
     }
-    campaign._raidFar = false;
+    campaign._raidFar = false; campaign._overseas = false;
     saveCampaign();
   },
 });
@@ -212,7 +432,7 @@ function startCampaign() {
   enterSettlement(); // raiders you provoked now give you warning — see the countdown banner; the defence fires when it runs out
 }
 // Drop into the standing ráth — the clock starts because the title is hidden.
-function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); game.setHurlChallenge(campaign.hurlChallenge); game.deadWalk = (cal.month === 10); }
+function enterSettlement() { closeKingdomMap(); if (titleScreenEl) titleScreenEl.classList.add('hidden'); updateMenaceButton(); updateRaidBanner(); game.setHurlChallenge(campaign.hurlChallenge); game.setSparChallenge(campaign.sparChallenge); game.deadWalk = (cal.month === 10); }
 
 // --- Raiders give warning now: a provoked war-band marches on your ráth after a
 // short countdown, so you can muster and ready your defences before they arrive.
@@ -267,6 +487,12 @@ function foundColony(region) {
 function colonyFolk(c) { return campaign.active === c.region ? game.folk : (c.folk || 0); }
 function collectColonyTribute() {
   if (!campaign.colonies.length) return;
+  // A distant Dál may throw off your rule on its own over the turn of the year —
+  // a thriving, well-settled colony is harder to lose than a thinly-held one, and
+  // one you hold in person (you are there this season) never revolts.
+  const revolted = campaign.colonies.filter((c) => campaign.active !== c.region && Math.random() < (colonyFolk(c) >= 10 ? 0.05 : 0.12));
+  for (const c of revolted) { const i = campaign.colonies.indexOf(c); if (i >= 0) campaign.colonies.splice(i, 1); flashNotice(`🏴 ${c.name} has thrown off your yoke and returned to its own kings — a Dál lost.`); }
+  if (!campaign.colonies.length) { saveCampaign(); return; }
   let cattle = 0; const goods = []; let small = 0;
   for (const c of campaign.colonies) {
     c.seasons = (c.seasons || 0) + 1;
@@ -282,9 +508,30 @@ function collectColonyTribute() {
   else if (small) flashNotice('🏴 Your colonies are yet too small to render tribute — build them up past ten souls (open the 🗺 map and enter one).');
 }
 
+// Each turn of the year the ráth raises fresh levy to replace the fallen: the
+// growing settlement feeds the war-band, so losses in battle are made good over
+// a few seasons instead of draining it to nothing. The levy (villagers) regrows
+// toward an establishment scaled to the town's size; the city's own paid hands
+// (water/grain/druid) are retrained toward their keep. Earned veterans
+// (warriors, seasoned, curadh) are NOT free — they come only from won battles.
+function replenishWarband() {
+  if (!campaign.roster || !game.folk) return;
+  const levyCap = Math.max(6, Math.min(16, Math.floor(game.folk / 4))); // about a quarter of the folk stand as levy, 6–16
+  const cur = campaign.roster.villager || 0;
+  let raised = 0;
+  if (cur < levyCap) {
+    raised = Math.min(levyCap - cur, Math.max(1, Math.floor(game.folk / 10))); // recruits trained this season
+    campaign.roster.villager = cur + raised;
+  }
+  const base = { water: 3, grain: 3, druid: 2 }; // the settlement's own paid hands, retrained toward their keep
+  let retrained = 0;
+  for (const k in base) if ((campaign.roster[k] || 0) < base[k]) { campaign.roster[k] = (campaign.roster[k] || 0) + 1; retrained++; }
+  if (raised || retrained) { saveCampaign(); flashNotice(`⚔ The ráth raises ${raised} fresh levy${retrained ? ` and retrains ${retrained} hands` : ''} — your war-band is made good.`); }
+}
+
 // --- Campaign: a home kingdom and your battle livery, kept per device ---
 const CAMPAIGN_KEY = 'ardri_campaign';
-const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, deaglan: 1, druid: 2, warrior: 3, seasoned: 2, curadh: 1 }; // heroes/gods are not owned — they are hosted and summoned
+const DEFAULT_ROSTER = { villager: 6, water: 3, grain: 3, druid: 2, warrior: 3, seasoned: 2, curadh: 1 }; // deaglan/somhairlín are signature folk granted at muster, not banked; heroes/gods are hosted and summoned
 let campaign = Object.assign({ leader: null, home: null, livery: ['#2f5fc0', '#eae2c8'], roster: { ...DEFAULT_ROSTER }, ghosts: 0, fallen: [], cattle: 0, mapSeed: _mapSeed, settlement: null, level: 1, doneObjectives: [] }, _savedCampaign);
 if (!campaign.roster) campaign.roster = { ...DEFAULT_ROSTER };
 if (!campaign.fallen) campaign.fallen = [];
@@ -298,7 +545,14 @@ if (!campaign.active) campaign.active = 'home'; // which settlement is loaded: '
 if (campaign.yearsElapsed == null) campaign.yearsElapsed = 0; // festivals are announced only for the first three years
 if (campaign.raidIn == null) campaign.raidIn = 0; // days until a provoked war-band arrives (0 = none pending)
 if (campaign.hurlChallenge == null) campaign.hurlChallenge = false; // a wandering band waits at the hurling field
+if (campaign.sparChallenge == null) campaign.sparChallenge = false; // a roaming champion waits at the wrestling green
 if (campaign.monumentWon == null) campaign.monumentWon = false; // won the hurling challenge → may raise a monument
+if (campaign.menaceHp == null) campaign.menaceHp = UNIT_TYPES.fomor.hp; // the Ollphéist's remaining HP, carried between menace battles until he is slain
+const ARDRI_RAIDS = 4; // four won raids make you Ard Rí
+if (campaign.ardRi == null) campaign.ardRi = (campaign.raidsWon || 0) >= ARDRI_RAIDS; // do we currently wear the High Kingship
+if (campaign.crownContested == null) campaign.crownContested = false; // lost the crown in battle — win a raid to reclaim
+if (campaign.everArdRi == null) campaign.everArdRi = campaign.ardRi; // once proclaimed, the longships may sail beyond Ériu even if the crown is later contested
+const FLEET_COST = 8; // cattle to launch a fleet across the sea
 ui.hurlWon = campaign.monumentWon; // the monument is a build-menu prize
 // --- The hurling challenge: a wandering band, a shootout of points, a monument ---
 const hurling = new Hurling({
@@ -309,13 +563,44 @@ const hurling = new Hurling({
   },
   onClose: () => { resumeGame(); },
 });
-function openHurling() { pauseGame(); ui.hideInspect(); hurling.open(campaign.roster, campaign.hosted); }
+function openHurling() {
+  pauseGame(); ui.hideInspect();
+  const roster = { ...campaign.roster };
+  roster.deaglan = Math.max(1, roster.deaglan || 0);                 // the path-maker always fields a hurley
+  if (game.countBuilt('builder_house') > 0) roster.somhairlin = Math.max(1, roster.somhairlin || 0); // Somhairlín plays while her House stands
+  hurling.open(roster, campaign.hosted);
+}
 const HURL_CHANCE = 1 / 3; // one in three each season a band comes calling (this runs on the season turn)
 function maybeHurlChallenge() {
   if (campaign.hurlChallenge || !game.hurlingField()) return;
   if (Math.random() < HURL_CHANCE) {
     campaign.hurlChallenge = true; game.setHurlChallenge(true); saveCampaign();
     flashNotice('🏑 A wandering band of hurlers waits at your field, spoiling for a challenge. Tap the hurling field to meet them.');
+  }
+}
+
+// --- The sparring bout: a roaming champion, three corner-called rounds, a monument ---
+const sparring = new Sparring({
+  onResolve: (won) => {
+    campaign.sparChallenge = false; game.setSparChallenge(false);
+    if (won) { campaign.monumentWon = true; ui.hurlWon = true; ui.refreshBuildMenu(); flashNotice('🏆 The bout is yours! Raise a Monument from the Culture menu — while it stands the harvest is a fifth more plentiful.'); }
+    saveCampaign();
+  },
+  onClose: () => { resumeGame(); },
+});
+function openSparring() {
+  pauseGame(); ui.hideInspect();
+  const roster = { ...campaign.roster };
+  roster.deaglan = Math.max(1, roster.deaglan || 0);
+  if (game.countBuilt('builder_house') > 0) roster.somhairlin = Math.max(1, roster.somhairlin || 0);
+  sparring.open(roster, campaign.hosted, { grit: campaign.raidsWon || 0 });
+}
+const SPAR_CHANCE = 1 / 3; // one in three each season a champion comes calling
+function maybeSparChallenge() {
+  if (campaign.sparChallenge || !game.wrestlingGreen()) return;
+  if (Math.random() < SPAR_CHANCE) {
+    campaign.sparChallenge = true; game.setSparChallenge(true); saveCampaign();
+    flashNotice('🤼 A roaming champion waits at your wrestling green, calling out the túath. Tap the green to corner a fighter.');
   }
 }
 if (campaign.nextIsDefend) { campaign.raidIn = campaign.raidIn || 12; campaign.nextIsDefend = false; } // migrate old instant-defend saves to the countdown
@@ -344,6 +629,7 @@ function switchSettlement(target) {
   campaign.active = target;
   let snap = target === 'home' ? campaign.settlement : (campaign.colonies.find((c) => c.region === target) || {}).settlement;
   game.load(snap || emptySettlement());
+  game.isColony = target !== 'home'; // a colony's folk are harder to win over — culture drains faster there
   game.cattle = campaign.cattle;
   view.rebuildRoads(); view.rebuildCros();
   applyWarTint();
@@ -422,6 +708,7 @@ battle.setLivery(campaign.livery);
     : (campaign.colonies.find((c) => c.region === campaign.active) || {}).settlement;
   if (bootSnap) {
     game.load(bootSnap);
+    game.isColony = campaign.active !== 'home';
     game.cattle = campaign.cattle != null ? campaign.cattle : game.cattle;
     view.rebuildRoads(); view.rebuildCros();
     started = true; // you already have a settlement — the sim runs
@@ -459,7 +746,11 @@ function enterBattle(scenario) {
     }
     if (heldBack) flashNotice(`⛩️ ${heldBack} will not take the field — no flourishing Hall of the Gods seats the god.`);
   }
-  battle.loadWarband({ roster: campaign.roster, ghosts: campaign.ghosts, hosted, favour: musterFavour() });
+  const roster = { ...campaign.roster };
+  roster.deaglan = 1;                                              // the path-maker always answers the muster
+  if (game.countBuilt('builder_house') > 0) roster.somhairlin = 1; // Somhairlín marches only while her House stands
+  battle.loadWarband({ roster, ghosts: campaign.ghosts, hosted, favour: musterFavour() });
+  battle.menaceHp = scenario === 'menace' ? campaign.menaceHp : null; // the Ollphéist enters carrying his old wounds
   battle.enter(scenario);
   announceSummons(battle.summoned || []); // heroes/gods that answered this muster
 }
@@ -500,6 +791,8 @@ function buildKingdomMap() {
   kg.colonyGroup = mk('g', {}); svg.appendChild(kg.colonyGroup);
   document.getElementById('kg-close').addEventListener('click', closeKingdomMap);
   document.getElementById('kg-action').addEventListener('click', kingdomAction);
+  { const sb = document.getElementById('kg-oversea-btn'); if (sb) sb.addEventListener('click', openOverseasChoice); }
+  document.querySelectorAll('#kg-overseas .kg-sea').forEach((b) => b.addEventListener('click', () => selectOverseas(b.dataset.o)));
   const c1 = document.getElementById('kg-c1'), c2 = document.getElementById('kg-c2');
   c1.value = campaign.livery[0]; c2.value = campaign.livery[1];
   const onCol = () => { campaign.livery = [c1.value, c2.value]; battle.setLivery(campaign.livery); applyWarTint(); drawFlagPreview(); };
@@ -519,7 +812,8 @@ function drawFlagPreview() {
   x.strokeStyle = 'rgba(0,0,0,0.45)'; x.strokeRect(X, Y, W, H);
 }
 function selectKingdom(id) {
-  kg.sel = id; kg.enter = null;
+  kg.sel = id; kg.enter = null; kg.overseas = null;
+  { const sp = document.getElementById('kg-overseas'); if (sp) sp.classList.add('hidden'); }
   for (const rid in kg.regions) kg.regions[rid].classList.toggle('sel', rid === id);
   const k = kingdomById(id);
   document.getElementById('kg-none').classList.add('hidden');
@@ -540,7 +834,7 @@ function selectKingdom(id) {
   if (isColony(id)) {
     kg.enter = id;
     const folk = colonyFolk(campaign.colonies.find((c) => c.region === id));
-    document.getElementById('kg-seat').textContent = `Your colony at ${k.seat} — ${folk} folk. Enter to build it up; it renders a cow home for every ten who settle there.`;
+    document.getElementById('kg-seat').textContent = `Your colony at ${k.seat} — ${folk} folk. Enter to build it up; it renders a cow home for every ten who settle there. Its folk, far from the ráth, need four times the culture to win over — raise courts and halls to hold them.`;
     act.textContent = campaign.active === id ? `You are here` : `Build in ${k.en} 🏗`;
     act.disabled = campaign.active === id;
     return;
@@ -551,9 +845,32 @@ function selectKingdom(id) {
     : `A cattle-raid on ${k.seat}. Drive off their herd.`;
   act.textContent = far ? `March on ${k.en} 🏴` : `Raid ${k.en} ⚔`;
 }
+// Thar Sáile — reveal the three shores beyond Ériu (once you have been Ard Rí).
+function openOverseasChoice() {
+  for (const rid in kg.regions) kg.regions[rid].classList.remove('sel');
+  kg.sel = null; kg.enter = null; kg.overseas = null;
+  document.getElementById('kg-none').classList.add('hidden');
+  document.getElementById('kg-info').classList.add('hidden');
+  const sp = document.getElementById('kg-overseas'); if (sp) sp.classList.remove('hidden');
+  const act = document.getElementById('kg-action'); act.disabled = true; act.textContent = 'Choose a shore ⛵';
+}
+function selectOverseas(id) {
+  const o = overseasById(id); if (!o) return;
+  kg.overseas = id; kg.sel = null; kg.enter = null;
+  for (const rid in kg.regions) kg.regions[rid].classList.remove('sel');
+  document.getElementById('kg-overseas').classList.add('hidden');
+  document.getElementById('kg-none').classList.add('hidden');
+  const info = document.getElementById('kg-info'); info.classList.remove('hidden');
+  document.getElementById('kg-name').textContent = o.en;
+  document.getElementById('kg-ga').textContent = o.ga;
+  document.getElementById('kg-seat').innerHTML = `${o.desc}<br><span class="dim">A harder host than any kingdom of Ériu. ${FLEET_COST} cattle to launch the fleet.</span>`;
+  const act = document.getElementById('kg-action'); act.disabled = false; act.textContent = `${o.arrow} Sail against ${o.en} ⛵`;
+}
 function openKingdomMap(mode, then) {
   buildKingdomMap();
-  kg.mode = mode; kg.sel = null; kg.enter = null; kg.then = then || null;
+  kg.mode = mode; kg.sel = null; kg.enter = null; kg.then = then || null; kg.overseas = null;
+  { const sb = document.getElementById('kg-oversea-btn'); if (sb) sb.classList.toggle('hidden', !(mode === 'war' && campaign.everArdRi)); }
+  { const sp = document.getElementById('kg-overseas'); if (sp) sp.classList.add('hidden'); }
   document.getElementById('kg-title').textContent = mode === 'war' ? 'Raid, or ride home' : 'The Kingdoms of Ériu';
   document.getElementById('kg-hint').textContent = mode === 'war'
     ? 'Fall upon a foreign kingdom — or tap your own home or a colony to enter and build it.'
@@ -617,7 +934,11 @@ function leaderName() { return campaign.leader || 'a Rí'; }
 function refreshCampaignButton() {
   const btn = document.querySelector('.mission-btn[data-mission="1"]');
   if (!btn) return;
-  btn.textContent = (campaign.leader && campaign.home) ? `⚔ Continue as ${campaign.leader}` : '⚔ Play the Campaign';
+  if (!(campaign.leader && campaign.home)) { btn.textContent = '⚔ Play the Campaign'; return; }
+  const style = campaign.ardRi ? `👑 Continue as ${campaign.leader}, Ard Rí`
+    : campaign.crownContested ? `⚔ Continue as ${campaign.leader} — the crown contested`
+    : `⚔ Continue as ${campaign.leader}`;
+  btn.textContent = style;
 }
 
 // --- Manage Campaign: rename, export/import a JSON save, restart ---
@@ -709,6 +1030,13 @@ function renderTrade() {
   body.appendChild(hostSec);
 }
 function kingdomAction() {
+  if (kg.overseas) { // sail across the sea against a foreign shore
+    const o = overseasById(kg.overseas); if (!o) return;
+    if (campaign.cattle < FLEET_COST) { document.getElementById('kg-seat').textContent = `You need ${FLEET_COST} cattle to launch a fleet — you have ${campaign.cattle}.`; return; }
+    setCattle(campaign.cattle - FLEET_COST);
+    campaign.target = o.id; campaign._overseas = true; campaign._raidFar = false;
+    saveCampaign(); closeKingdomMap(); enterBattle(o.id); return;
+  }
   if (!kg.sel) return;
   if (kg.mode === 'war') {
     if (kg.enter) { const t = kg.enter; closeKingdomMap(); switchSettlement(t); enterSettlement(); return; } // enter home / a colony to build it
@@ -757,7 +1085,9 @@ function advanceDay() {
     const s = seasonOfMonth(cal.month);
     if (s !== curSeason) {
       curSeason = s; applySeason(s); collectColonyTribute(); // colonies render tribute each turn of the year
+      replenishWarband(); // the settlement raises fresh levy to replace the fallen
       maybeHurlChallenge(); // a wandering band of hurlers may come calling
+      maybeSparChallenge(); // a roaming champion may come calling at the green
       if (campaign.home && (campaign.raidIn || 0) === 0 && Math.random() < 0.5) { // no war pending — a rival stirs in the provinces
         const r = riseRival();
         if (r) flashNotice(`⚔ ${r.name} is rising in ${r.region} — his host grows, and his eye turns toward your ráth.`);
@@ -1044,7 +1374,7 @@ const ndc = new THREE.Vector2();
 function setNdc(e) {
   ndc.x = (e.clientX / window.innerWidth) * 2 - 1;
   ndc.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(ndc, camera);
+  raycaster.setFromCamera(ndc, walk.active ? walkCam : camera); // on a stroll, pick from the eye-level camera
 }
 function tileUnderPointer(e) {
   setNdc(e);
@@ -1079,6 +1409,7 @@ function updatePreview(e) {
 function personHtml(p) {
   const name = p.nick ? `${p.name} ‘${p.nick}’` : p.name;
   return `<h3>${name}</h3><div class="role">${p.roleEn} · ${p.roleGa}</div>` +
+    (p.carrying ? `<p class="carrying">Carrying: ${p.carrying}</p>` : '') +
     `<blockquote>“${p.phraseGa}”<br><span class="en">“${p.phraseEn}”</span></blockquote>`;
 }
 function buildingHtml(inst) {
@@ -1350,6 +1681,11 @@ function inspectAt(e) {
     const b = document.getElementById('hurl-go'); if (b) b.addEventListener('click', openHurling);
     return;
   }
+  if (inst.key === 'wrestling_ring' && campaign.sparChallenge) {
+    ui.showInspect(`<h3>Wrestling Green</h3><div class="role">A champion waits</div><p>A roaming curadh has come to the green and calls out your túath. Name a fighter to stand for you and corner them through three rounds — win the bout and raise a monument to the day.</p><button id="spar-go" class="continue-btn">🤼 Answer the challenge</button>`, false);
+    const b = document.getElementById('spar-go'); if (b) b.addEventListener('click', openSparring);
+    return;
+  }
   ui.showInspect(buildingHtml(inst), false);
   if (inst.def.role === 'dwelling') _inspectDwelling = inst; // keep its meters live
   if (inst.def.role === 'altar') wireAltar();
@@ -1485,8 +1821,10 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture?.(e.pointerId);
+  if (sparring.active) return;
   if (hurling.active) { hurling.pointerDown(e); return; }
   if (battle.active) { battle.pointerDown(e); return; }
+  if (walk.active) { inspectAt(e); return; } // on a stroll, a tap just looks at who/what you pass
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2) { panLast = null; painting = false; demolishing = false; pinchDist = pointerDist(); return; }
   if (e.button !== 2) {
@@ -1511,6 +1849,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  if (sparring.active) return;
   if (hurling.active) { hurling.pointerMove(e); return; }
   if (battle.active) { battle.pointerMove(e); return; }
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1539,6 +1878,7 @@ canvas.addEventListener('pointermove', (e) => {
 
 function endPointer(e) {
   canvas.releasePointerCapture?.(e.pointerId);
+  if (sparring.active) return;
   if (hurling.active) { hurling.pointerUp(e); return; }
   if (battle.active) { battle.pointerUp(e); return; }
   pointers.delete(e.pointerId);
@@ -1564,6 +1904,7 @@ canvas.addEventListener('pointerleave', () => { if (!pendingBuild) preview.visib
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  if (sparring.active) return;
   if (hurling.active) { hurling.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   if (battle.active) { battle.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   zoomIsoCamera(camera, e.deltaY > 0 ? 1.1 : 0.9, aspect);
@@ -1617,12 +1958,14 @@ window.addEventListener('resize', () => {
   aspect = window.innerWidth / window.innerHeight;
   renderer.setSize(window.innerWidth, window.innerHeight);
   resizeIsoCamera(camera, aspect);
+  walkCam.aspect = aspect; walkCam.updateProjectionMatrix();
   battle.resize(aspect);
   hurling.resize(aspect);
+  sparring.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera, battle, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
-  _dbg: { foundColony, collectColonyTribute, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
+window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, hurling, sparring, openSparring, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
+  _dbg: { foundColony, collectColonyTribute, replenishWarband, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
     layRow: (key, sx, sz, ex, ez) => { const before = game.buildings.length; tool = key; showBuildRow({ x: sx, z: sz }, { x: ex, z: ez }); const shown = pendingBuildRow ? pendingBuildRow.length : 0; confirmBuild(); return { shown, placed: game.buildings.length - before }; } },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
@@ -1634,14 +1977,39 @@ window.ardri = { game, map, view, sim, cal, camera, battle, ui, openKingdomMap, 
 let econAcc = 0, dayAcc = 0;
 const clock = new THREE.Clock();
 
+// Buildings are quads we orient ourselves each frame. Under the iso camera we match
+// its view plane (identical to the old billboard sprite). In the first-person stroll
+// we only yaw them to face the camera, keeping them vertically upright — so a building
+// stands straight instead of tilting its top toward you and overhanging the tile.
+function billboardBuildings(cam, upright) {
+  const list = game.buildingGroup.children;
+  for (let i = 0; i < list.length; i++) {
+    const g = list[i], spr = g.userData && g.userData.spr;
+    if (!spr || !spr.userData || !spr.userData.billboard) continue;
+    if (upright) spr.rotation.set(0, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
+    else spr.quaternion.copy(cam.quaternion);
+  }
+}
+
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
   if (battle.active) { setCamera(battle.camera); battle.update(dt); battle.render(renderer); return; }
   if (hurling.active) { setCamera(hurling.renderCam()); hurling.update(dt); hurling.render(renderer); return; }
-  setCamera(camera);
-  // The world-clock runs whenever the settlement is the scene you're looking at
-  // (title hidden, not in battle). Festivals/menus still pause via sim.speed.
+  if (sparring.active) { setCamera(sparring.renderCam()); sparring.update(dt); sparring.render(renderer); return; }
+  const cam = walk.active ? walkCam : camera;
+  setCamera(cam);
+  updateWalkBtn();
+  // On a stroll the town keeps moving but the clock and economy are frozen — a
+  // non-destructive living screensaver. Otherwise the world-clock runs whenever
+  // the settlement is the scene you're looking at (title hidden, not in battle).
+  if (walk.active) {
+    game.update(dt); game.updateFx(dt);
+    walk.update(dt);
+    billboardBuildings(walkCam, true);
+    renderer.render(scene, walkCam);
+    return;
+  }
   const live = titleScreenEl.classList.contains('hidden');
   if (live) started = true; // play has begun — day-saves and onboarding may run
   const scaled = live ? dt * sim.speed : 0;
@@ -1650,8 +2018,10 @@ function frame() {
   if (_inspectDwelling && !_inspectDwelling.dead) refreshDwellMeter(_inspectDwelling); // fill the open panel's meters live
   econAcc += scaled;
   while (econAcc >= ECON_TICK) { econAcc -= ECON_TICK; game.tick(); pushStats(); checkMission(); }
+  if (game._unpavedRun) { game._unpavedRun = false; if (!campaign._unpavedHinted) { campaign._unpavedHinted = true; saveCampaign(); flashNotice('💰 A carrier had to cross open ground — an unpaved run costs 5 silver, not 1. Pave a road all the way to your stores to keep carriage cheap.'); } }
   dayAcc += scaled;
   while (dayAcc >= SECONDS_PER_DAY) { dayAcc -= SECONDS_PER_DAY; advanceDay(); }
+  billboardBuildings(camera, false);
   renderer.render(scene, camera);
 }
 frame();

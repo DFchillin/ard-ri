@@ -10,6 +10,7 @@ export const CODEX = [
       { icon: '🌾', name: 'Grain-carrier', ga: 'iompróir arbhair', repr: 'the grain-carrier walker', lore: 'Runs grain from field to granary. Also a paid hand, slow to replace once lost.' },
       { icon: '🛤️', name: 'Deaglán', ga: 'the path-maker', repr: 'the market-trader walker', lore: 'A wandering builder of togher and road. Hardier and quicker than the common folk.' },
       { icon: '🌿', name: 'Druid', ga: 'draoi', repr: 'the druid walker', lore: 'Raised at a shrine. Lifts the culture and heart of those near, and steadies a company’s courage.' },
+      { icon: '🔨', name: 'Somhairlín', ga: 'the master-builder', repr: 'the builder walker', lore: 'The raiser of the great works takes the field only while her House stands. No warrior — but her hammer knows how a wall is made, and so how it is broken. Muster her alongside Deaglán and the two craftsfolk form Lucht Ceirde: the company tears down the enemy’s buildings far faster and holds a steadier line. She never grows into a warrior — she is always the builder.' },
     ],
   },
   {
@@ -78,7 +79,7 @@ export const CODEX = [
     entries: [
       { icon: '🌍', name: 'An Domhan Mór', ga: 'the wider world', repr: 'a trade screen opened from your homestead', lore: 'Send cattle to foreign merchants for wine, iron, salt, gold and marble — things no Gaelic smith or field can make.' },
       { icon: '🏛️', name: 'Hosting a Hero', ga: 'aíocht', repr: 'spend goods for the right to summon a hero/god', lore: 'Gather the right foreign goods and host Cú Chulainn, Fionn, the Dagda or the Mhórrígan. Hosting wins the *right* to summon them — but they answer only about one muster in four, or four in five if a shrine keeps their favour.' },
-      { icon: '🏴', name: 'A Colony', ga: 'coilíneacht', repr: 'a gold-ringed region on the map of Ériu', lore: 'Raid a kingdom far across the water — not a neighbour — and win, and you plant a Dál there, as the Gaels did in Alba. Each turn of the year it renders tribute in cattle and foreign goods; lose a defence at home and a distant colony may throw off your rule.' },
+      { icon: '🏴', name: 'A Colony', ga: 'coilíneacht', repr: 'a gold-ringed region on the map of Ériu', lore: 'Raid a kingdom far across Ériu — not a neighbour you border — and win, and you plant a Dál there, a province held to your name across the island. Each turn of the year it renders tribute in cattle and foreign goods; lose a defence at home, or leave it long unheld, and a distant Dál may throw off your rule.' },
     ],
   },
   {

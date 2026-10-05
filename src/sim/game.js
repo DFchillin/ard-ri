@@ -5,7 +5,7 @@ import { tex, spriteFrom } from '../render/assets.js?v=CBUST';
 import { emitterFor, Emitter } from '../render/effects.js?v=CBUST';
 
 const FX_TOP = { dwelling: 1.15, farm: 0.7, market: 1.15, homestead: 1.6 }; // where hearth-smoke leaves the roof — tuned to the ~1.25-tile-tall building art
-import { Walker, Traveler } from './walkers.js?v=CBUST';
+import { Walker, Traveler, PathWalker, gaitBob, WALK_BASE_Y } from './walkers.js?v=CBUST';
 
 // A soft round pip that floats up from a building when a walker delivers to it,
 // so the invisible food/water/culture transfer can be seen. Colour = what arrived.
@@ -35,7 +35,7 @@ const PIP_TEX_DIAMOND = (() => {
   x.strokeStyle = 'rgba(35,22,12,0.6)'; x.lineWidth = 3; x.strokeRect(-15, -15, 30, 30);
   const t = new THREE.CanvasTexture(c); return t;
 })();
-import { entryRoadTile, adjacentBuildings, roadConnected, roadNeighbors } from './roads.js?v=CBUST';
+import { entryRoadTile, adjacentBuildings, roadConnected, roadNeighbors, roadPath } from './roads.js?v=CBUST';
 import { randomName } from '../data/names.js?v=CBUST';
 import { personFor } from '../data/phrases.js?v=CBUST';
 
@@ -48,6 +48,7 @@ const RENT_PER_HEAD = 1;   // silver per content head per day
 const FOOD_DECAY = 1;      // per day → a full home is fed ~10 days
 const WATER_DECAY = 1;     // per day → ~10 days
 const CULTURE_DECAY = 2;   // per day → ~5 days
+const COLONY_CULTURE_MULT = 4; // a colony's folk, far from the ráth, need 4× the culture to win over
 const DISTRESS_DAYS = 4;   // days with NO food AND NO water before a family leaves
 const PROSPER_TIER = 2;    // a home at this prosperity tier or above holds more folk
 const PROSPER_CAP = 6;     // the folk a prospering home can hold
@@ -57,6 +58,12 @@ const FARM_GROW = 24;      // econ ticks for a field to ripen
 const FARM_HARVESTS = 2;   // grain-carriers a ripe field sends before regrowing
 const FARM_MIN_FOLK = 4;   // hands the settlement needs to bring a harvest in
 const MAX_PER_BLD = 2;     // most walkers any one building keeps on the roads (2 druids per shrine)
+const DELIVER_COST = 1;    // silver a carrier is paid for a delivery along a paved line
+const UNPAVED_COST = 5;    // silver when the run has to cross unpaved ground — build proper roads
+const EVICT_SILVER = 300;    // silver a spiteful family makes off with — rare, but a real blow
+const EVICT_SPITE_CHANCE = 0.05; // only one family in twenty leaves bitter; the rest go quietly.
+// When they do, they take the silver AND drive off a cow — and only then is it announced,
+// so the constant churn of folk coming and going while you improve the ráth isn't punished.
 const HERD_GROW = 5;       // econ ticks between calvings at the homestead
 const HERD_RADIUS = 3;     // tiles of open pasture around the homestead that count as grazing
 const COW_PER_TOKEN = 5;   // cattle each grazing cow-token on the map stands for (max 10 shown)
@@ -260,10 +267,11 @@ export class Game {
     } else {
       b.food = Math.max(0, b.food - FOOD_DECAY);
       b.water = Math.max(0, b.water - WATER_DECAY);
-      b.culture = Math.max(0, b.culture - CULTURE_DECAY);
+      b.culture = Math.max(0, b.culture - CULTURE_DECAY * (this.isColony ? COLONY_CULTURE_MULT : 1)); // colony folk are far harder to keep cultured
+
       if (b.food <= 0 && b.water <= 0) {
         b.distress = (b.distress || 0) + 1;
-        if (b.distress >= DISTRESS_DAYS && b.pop > 0) { b.distress = 0; this._emigrate(b); }
+        if (b.distress >= DISTRESS_DAYS && b.pop > 0) { b.distress = 0; this._emigrate(b, 'want'); }
       } else b.distress = 0;
     }
     // Prosperity climbs a step whenever a full, fed, watered home turns a month —
@@ -276,6 +284,9 @@ export class Game {
     if ((newMonth || festival) && thriving && b.tier < 3) b.tier += 1;
     else if (newMonth && !festival && neglected && b.tier > 0) b.tier -= 1;
     b.cap = b.tier >= PROSPER_TIER ? PROSPER_CAP : (b.def.folk || 4);
+    // A home whose prosperity slips can no longer hold as many: the folk over its
+    // new capacity are turned out, and they leave in spite (see _emigrate).
+    while (b.pop > b.cap) this._emigrate(b, 'evicted');
   }
 
   _center(f) {
@@ -500,7 +511,7 @@ export class Game {
         // crop and waits, rather than sending a carrier that spills the harvest
         // into a full store — so a good year is never silently lost.
         if (b.connected && this.folk >= FARM_MIN_FOLK && this._labour > 0 && this._storeHasRoom() &&
-            this._walkersFrom(b) < MAX_PER_BLD && ++b.timer >= 2) {
+            this._walkersFrom(b) === 0 && ++b.timer >= 3) {
           b.timer = 0; this._labour--; this._sendGrain(b);
           if (--b.harvestsLeft <= 0) { b.ripe = false; b.grown = 0; } // back to growing
         }
@@ -585,7 +596,7 @@ export class Game {
   }
 
   // A hungry resident gives up and walks back out to the gate.
-  _emigrate(home) {
+  _emigrate(home, reason) {
     home.pop = Math.max(0, home.pop - 1);
     this.folk = Math.max(0, this.folk - 1);
     const female = Math.random() < 0.5;
@@ -593,28 +604,87 @@ export class Game {
     const tr = new Traveler(this.map, { x: home.x, z: home.z }, this._arrivalTile(home), { type: 'villager', speed: 2.4, person });
     this.walkers.push(tr);
     this.walkerGroup.add(tr.sprite);
+    // A cast-out family leaves bitter, taking what they can on the way out.
+    // Most families go quietly (no toll, no notice). One in twenty leaves bitter and
+    // takes value — silver and a cow — and only that departure is announced.
+    if (Math.random() < EVICT_SPITE_CHANCE) {
+      const silver = Math.min(this.silver, EVICT_SILVER); this.silver -= silver;
+      if (this.onEvict) this.onEvict({ name: person.name, reason: reason || 'want', silver, cow: true });
+    }
   }
 
-  // Farm → grain_carrier wanders roads, deposits its load in the first granary it passes.
+  // --- Directed deliveries: a goods carrier follows the roads from source to
+  // target (field → store → market), carrying the goods — honouring the path.
+  _tileOf(b) { return { x: b.x + (b.w >> 1), z: b.z + (b.h >> 1) }; }
+  _nearestTo(from, list) {
+    const fc = this._center(from); let best = null, bd = Infinity;
+    for (const b of list) { const c = this._center(b), d = (c.x - fc.x) ** 2 + (c.z - fc.z) ** 2; if (d < bd) { bd = d; best = b; } }
+    return best;
+  }
+  // World waypoints from one building to another, following the road network as
+  // far as it reaches (centre → door → road path → door → centre); a direct line
+  // only where no road connects them.
+  _journey(fromB, toB) {
+    const fc = this._center(fromB), tc = this._center(toB);
+    const fe = entryRoadTile(this.map, fromB);
+    if (!fe) return [fc, tc]; // her house isn't on a road — walk straight
+    const te = entryRoadTile(this.map, toB);
+    // Ride the roads as far as they go: all the way to the site's own door when
+    // one exists and connects, else to the reachable road tile nearest the site,
+    // then cut straight across the last stretch.
+    const goal = (te && roadPath(this.map, fe, te)) ? te : this._roadTileNearestWorld(fe, tc);
+    const tiles = goal ? roadPath(this.map, fe, goal) : null;
+    if (!tiles) return [fc, tc];
+    const wp = [fc];
+    for (const t of tiles) { const w = this.map.tileToWorld(t.x, t.z); wp.push({ x: w.x, z: w.z }); }
+    wp.push(tc);
+    return wp;
+  }
+  // BFS the road net from `start`; return the reachable road tile whose world
+  // position is nearest `world`, so a traveller rides the roads as close to the
+  // destination as they reach before stepping off.
+  _roadTileNearestWorld(start, world) {
+    const seen = new Set([start.x + ',' + start.z]), q = [start];
+    let best = start, bd = Infinity;
+    while (q.length) {
+      const c = q.shift();
+      const w = this.map.tileToWorld(c.x, c.z), d = (w.x - world.x) ** 2 + (w.z - world.z) ** 2;
+      if (d < bd) { bd = d; best = c; }
+      for (const n of roadNeighbors(this.map, c.x, c.z)) { const k = n.x + ',' + n.z; if (!seen.has(k)) { seen.add(k); q.push(n); } }
+    }
+    return best;
+  }
+  // Is the whole run on your own roads? (Both ends have a road door and the net
+  // connects them.) An unpaved run has to cut across open ground.
+  _deliveryPaved(fromB, toB) {
+    const fe = entryRoadTile(this.map, fromB), te = entryRoadTile(this.map, toB);
+    return !!(fe && te && roadPath(this.map, fe, te));
+  }
+  _deliver(fromB, toB, carrying, onArrive) {
+    const paved = this._deliveryPaved(fromB, toB);
+    this.silver = Math.max(0, this.silver - (paved ? DELIVER_COST : UNPAVED_COST)); // every delivery is paid for; unpaved runs cost five times as much
+    this._unpavedRun = !paved; // let the UI flag the costly off-road run on its own layer
+    const person = { name: randomName(false), female: false, carrying, ...personFor('grain_carrier') };
+    const w = new PathWalker(this.map, this._journey(fromB, toB), { type: 'grain_carrier', speed: 2.6, person, onArrive });
+    w.source = fromB; // so _walkersFrom() still caps how many a building has out
+    this.walkers.push(w); this.walkerGroup.add(w.sprite);
+    return w;
+  }
+
+  // Once an orchard stands, barley and apples pool as one "food"; until then it's
+  // plain grain. The carrier's label reflects whichever the ráth is harvesting.
+  _hasOrchard() { return this.buildings.some((b) => b.def.produce === 'apples' && !b.building); }
+  _harvestTag(n) { return this._hasOrchard() ? `🍲 food ×${n}` : `🌾 grain ×${n}`; }
+  // Farm → nearest grain store: one carrier hauls a batch (up to 4) along the road.
   _sendGrain(farm) {
-    const entry = entryRoadTile(this.map, farm);
-    if (!entry) return;
-    let load = Math.round(farm.def.load * this._farmBoost());
-    this._storeFx(farm, null); // a diamond lifts off the field as the hand takes up the grain
-    this._spawn(entry, {
-      type: 'grain_carrier', label: 'G', steps: 26, speed: 2.4, source: farm,
-      onTile: (x, z, w) => {
-        if (load <= 0) return;
-        if (w && w.sprite) this._floatie(w.sprite.position.x, 0.95, w.sprite.position.z, 'food', { sz: 0.12, vy: 0.25, life: 0.55, over: true, shape: 'diamond' }); // grain they carry — follow the trail to the store
-        for (const inst of adjacentBuildings(this.map, x, z)) {
-          if (inst.def.role === 'granary' && inst.stock < GRANARY_CAP) { // stores fill to a cap
-            const add = Math.min(load, GRANARY_CAP - inst.stock);
-            inst.stock += add; load -= add; this._storeFx(inst, w); // show the harvest landing in the store
-            if (load <= 0) break;
-          }
-        }
-      },
-    });
+    let load = Math.min(4, Math.round(farm.def.load * this._farmBoost()));
+    if (load <= 0) return;
+    const stores = this.buildings.filter((b) => b.def.role === 'granary' && !b.building && b.stock < GRANARY_CAP);
+    if (!stores.length) return; // nowhere to store — the field holds its ripe grain
+    const store = this._nearestTo(farm, stores);
+    const add = Math.min(load, GRANARY_CAP - store.stock);
+    this._storeFx(farm, null); // grain taken up off the field
+    this._deliver(farm, store, this._harvestTag(add), () => { store.stock = Math.min(GRANARY_CAP, store.stock + add); this._storeFx(store, null); });
   }
 
   // Well → water_carrier wanders roads, refilling the dwellings it passes.
@@ -675,6 +745,21 @@ export class Game {
       field.sprite.add(chip);
       this._hurlChips.push(chip);
     }
+  }
+
+  wrestlingGreen() { return this.buildings.find((b) => b.key === 'wrestling_ring') || null; }
+  setSparChallenge(on) {
+    if (this._sparChip && this._sparChip.parent) this._sparChip.parent.remove(this._sparChip);
+    this._sparChip = null;
+    const green = on ? this.wrestlingGreen() : null;
+    if (!green || !green.sprite) return;
+    const TS = this.map.tile;
+    const chip = makeWarriorChip('curadh', 1.5); // the roaming champion waits in the ring
+    chip.position.set(0, 0.05, -TS * 0.3);
+    if (chip.faceWorld) chip.faceWorld(0, 1);
+    if (chip.material) chip.material.color.setHex(0xe07a5a);
+    green.sprite.add(chip);
+    this._sparChip = chip;
   }
 
   // A patron god, prayed to at a gallán, manifests at the stones and walks the
@@ -777,6 +862,7 @@ export class Game {
   // Deaglán digs. Then the two slip away.
   roadCrew(path, setHidden) {
     if (!path || path.length < 2) return;
+    if (this.crews.length) return; // only one Deaglán at a time — a further road is laid, but he does not come out again until this one is done
     const tiles = path.map((p) => ({ x: p.x, z: p.z }));
     // Pick the gaps: 2–3 random squares per window of eight (never the start
     // tile). Those are hidden now; the rest of the road stands built.
@@ -788,15 +874,22 @@ export class Game {
       for (let n = 0; n < want && idxs.length; n++) digSet.add(idxs.splice((Math.random() * idxs.length) | 0, 1)[0]);
     }
     if (setHidden) for (const k of digSet) setHidden(tiles[k], true);
-    const w0 = this.map.tileToWorld(tiles[0].x, tiles[0].z);
+    const startTile = this.map.tileToWorld(tiles[0].x, tiles[0].z);
+    // Deaglán lives in Somhairlín's house; he and Finn walk out from there to the
+    // head of the new road before he begins to dig. With no house they appear at
+    // the road itself, as before.
+    const house = this._builderHouse();
+    const home = house ? this._center(house) : null;
+    const spawn = home || startTile;
     // deaglan/finn have no _f set, so force female:false; Finn the dog rides at
     // half a person's height.
     const deagWalk = makeWalkerChip('deaglan', false);
     const deagDig = makeWalkerChip('deaglan_dig', false); deagDig.visible = false;
     const finn = makeWalkerChip('finn_run', false, 0.65);
-    for (const c of [deagWalk, deagDig, finn]) { c.position.set(w0.x, 0.05, w0.z); this.crewGroup.add(c); }
+    for (const c of [deagWalk, deagDig, finn]) { c.position.set(spawn.x, 0.05, spawn.z); this.crewGroup.add(c); }
     this.crews.push({ tiles, digSet, setHidden, deagWalk, deagDig, finn, di: 0, dt: 0,
-      digging: false, digT: 0, fi: 0, fdir: 1, ft: 0, leaving: false, fade: 0 });
+      digging: false, digT: 0, fi: 0, fdir: 1, ft: 0, leaving: false, fade: 0,
+      approach: home ? [{ x: home.x, z: home.z }, { x: startTile.x, z: startTile.z }] : null, ai: 0, at: 0, approaching: !!home });
   }
   _crewMove(chip, a, b, k) {
     const wa = this.map.tileToWorld(a.x, a.z), wb = this.map.tileToWorld(b.x, b.z);
@@ -807,6 +900,20 @@ export class Game {
     const DEAG_SPEED = 1.0, FINN_SPEED = 2.25, DIG_TIME = 2.6; // half the old pace — a calm, watchable build
     for (let i = this.crews.length - 1; i >= 0; i--) {
       const cr = this.crews[i], T = cr.tiles, last = T.length - 1;
+      // Walk out from Somhairlín's house to the head of the road before digging.
+      if (cr.approaching && cr.approach) {
+        const a = cr.approach[cr.ai], b = cr.approach[cr.ai + 1] || a;
+        cr.at += dt * DEAG_SPEED; const k = Math.min(cr.at, 1);
+        cr.deagWalk.visible = true; cr.deagDig.visible = false;
+        if (cr.deagWalk.faceWorld) cr.deagWalk.faceWorld(b.x - a.x, b.z - a.z);
+        cr.deagWalk.position.set(a.x + (b.x - a.x) * k, 0.05, a.z + (b.z - a.z) * k);
+        cr.finn.position.set(a.x + (b.x - a.x) * k - 0.3, 0.05, a.z + (b.z - a.z) * k - 0.3); // the dog trots alongside
+        if (cr.finn.faceWorld) cr.finn.faceWorld(b.x - a.x, b.z - a.z);
+        if (cr.deagWalk.animate) cr.deagWalk.animate(dt, true);
+        if (cr.finn.animate) cr.finn.animate(dt, true);
+        if (cr.at >= 1) { cr.at = 0; cr.ai += 1; if (cr.ai >= cr.approach.length - 1) cr.approaching = false; }
+        continue;
+      }
       // Finn runs the length, but stops to watch whenever Deaglán is digging.
       if (cr.digging && !cr.leaving) {
         const wt = this.map.tileToWorld(T[cr.di].x, T[cr.di].z);
@@ -896,7 +1003,22 @@ export class Game {
     const m = site.sprite && site.sprite.userData && site.sprite.userData.spr && site.sprite.userData.spr.material;
     if (m) { m.opacity = 1; m.transparent = true; }
     if (this.onBuilt) this.onBuilt(site);
-    b.state = 'toHouse'; b.to = b.home; // head home, then free for the next
+    b.chip.position.y = b.baseY; // out of the hammer bob
+    b.state = 'toHouse'; b.path = this._journey(site, b.houseB); b.pi = 0; // follow the road home, then free for the next
+  }
+  // Step a builder along her stored road path; returns true once the last
+  // waypoint is reached. Animates her walk cycle and faces her down the road.
+  _followPath(b, dt, speed) {
+    const wp = b.path || [];
+    if (b.pi >= wp.length) return true;
+    const t = wp[b.pi];
+    const dx = t.x - b.chip.position.x, dz = t.z - b.chip.position.z, dist = Math.hypot(dx, dz);
+    if (b.chip.faceWorld) b.chip.faceWorld(dx, dz);
+    if (b.chip.animate) b.chip.animate(dt, true);
+    b.walkT = (b.walkT || 0) + dt; b.chip.position.y = WALK_BASE_Y + (b.chip.hasWalkCycle ? 0 : gaitBob(b.walkT)); // her art strides; others get a step-bob
+    if (dist < 0.18) { b.pi += 1; return b.pi >= wp.length; }
+    const s = Math.min(dist, speed * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s;
+    return false;
   }
   _updateBuilders(dt) {
     const house = this._builderHouse();
@@ -904,27 +1026,54 @@ export class Game {
     if (!this.builder) {
       const hc = this._center(house), site = this._nextSite(hc);
       if (!site) return;
-      const chip = makeWalkerChip('somhairlin', true, 1.35);
+      const chip = makeWalkerChip('somhairlin', false, 1.35); // her own art — not the female fallback (there is no _f set)
+      chip._walkFps = 0.22; // half the usual leg cadence, to match her slower builder's pace
       chip.position.set(hc.x, 0.05, hc.z); chip.renderOrder = 2; this.walkerGroup.add(chip);
       site._claimed = true;
-      this.builder = { chip, state: 'toSite', home: hc, to: this._center(site), site, timer: 0, dur: 0, spark: 0 };
+      const c = this._center(site), ix = (site.w * this.map.tile) / 2 - 0.5, iz = (site.h * this.map.tile) / 2 - 0.5;
+      const corners = [{ x: c.x - ix, z: c.z - iz }, { x: c.x + ix, z: c.z - iz }, { x: c.x + ix, z: c.z + iz }, { x: c.x - ix, z: c.z + iz }];
+      this.builder = { chip, state: 'toSite', houseB: house, home: hc, site, corners, ci: 0, to: corners[0],
+        cornerDur: this._buildTime(site) / 4, timer: 0, spark: 0, baseY: WALK_BASE_Y, hammerT: 0, walkT: 0,
+        path: this._journey(house, site), pi: 0 }; // walk the roads out to the site, as far as they reach
     }
-    const b = this.builder, BSPEED = 2.2;
+    const b = this.builder, BSPEED = 1.1; // a steady builder's pace — half the old speed
     if (b.state === 'toSite' || b.state === 'toHouse') {
+      if (this._followPath(b, dt, BSPEED)) {
+        if (b.state === 'toHouse') { this._removeBuilder(); return; }
+        b.state = 'toCorner'; b.to = b.corners[b.ci]; // off the road, now hop the site corners
+      }
+    } else if (b.state === 'toCorner') {
       const dx = b.to.x - b.chip.position.x, dz = b.to.z - b.chip.position.z, dist = Math.hypot(dx, dz);
       if (b.chip.faceWorld) b.chip.faceWorld(dx, dz);
       if (b.chip.animate) b.chip.animate(dt, true);
-      if (dist < 0.18) {
-        if (b.state === 'toSite') { b.dur = this._buildTime(b.site); b.timer = b.dur; b.state = 'hammer'; }
-        else this._removeBuilder();
-      } else { const s = Math.min(dist, BSPEED * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s; }
+      b.walkT += dt; b.chip.position.y = WALK_BASE_Y + (b.chip.hasWalkCycle ? 0 : gaitBob(b.walkT)); // her art strides; others get a step-bob
+      if (dist < 0.18) { b.chip.position.y = b.baseY; b.state = 'hammer'; b.timer = b.cornerDur; b.hammerT = 0; } // reached a corner — plant and hammer
+      else { const s = Math.min(dist, BSPEED * dt); b.chip.position.x += (dx / dist) * s; b.chip.position.z += (dz / dist) * s; }
     } else if (b.state === 'hammer') {
-      if (b.chip.animate) b.chip.animate(dt, false);
+      // She faces her work and swings her hammer. With the real swing art loaded
+      // the frames carry the motion; a spark flies on the blow. If the art is
+      // missing we fall back to her walk cycle plus a vertical strike bob.
+      const c = this._center(b.site);
+      if (b.chip.faceWorld) b.chip.faceWorld(c.x - b.chip.position.x, c.z - b.chip.position.z);
+      let struck = false;
+      if (b.chip.hasHammer && b.chip.animateHammer) {
+        struck = b.chip.animateHammer(dt); b.chip.position.y = b.baseY; // planted; the swing art carries the motion
+      } else {
+        if (b.chip.animate) b.chip.animate(dt, true);
+        b.hammerT += dt;
+        const PERIOD = 0.5, p = (b.hammerT % PERIOD) / PERIOD;
+        b.chip.position.y = b.baseY + Math.sin(p * Math.PI) * 0.18; // wind up, then strike down
+      }
       b.timer -= dt; b.spark -= dt;
-      if (b.spark <= 0) { b.spark = 0.3; this._floatie(b.chip.position.x + (Math.random() - 0.5) * 0.5, 1.2, b.chip.position.z, 'food', { sz: 0.1, vy: 0.7, life: 0.45, over: true }); }
+      if (struck || b.spark <= 0) { b.spark = 0.5; this._floatie(b.chip.position.x + (Math.random() - 0.5) * 0.4, 1.1, b.chip.position.z, 'food', { sz: 0.1, vy: 0.7, life: 0.45, over: true }); }
       const m = b.site.sprite && b.site.sprite.userData && b.site.sprite.userData.spr && b.site.sprite.userData.spr.material;
-      if (m) m.opacity = 0.4 + (1 - Math.max(0, b.timer) / b.dur) * 0.6; // ghost firms up as it nears done
-      if (b.timer <= 0) this._finishSite(b);
+      if (m) m.opacity = 0.4 + Math.min(1, (b.ci + (1 - Math.max(0, b.timer) / b.cornerDur)) / 4) * 0.6; // firms up corner by corner
+      if (b.timer <= 0) {
+        b.chip.position.y = b.baseY; // settle before moving on
+        b.ci += 1;
+        if (b.ci >= 4) this._finishSite(b); // all four corners hammered — raised
+        else { b.state = 'toCorner'; b.to = b.corners[b.ci]; }
+      }
     }
   }
 
@@ -943,21 +1092,16 @@ export class Game {
   }
 
   // Market pulls grain from any road-connected granary into its own stock.
+  // Store → market: a carrier walks a load of grain from the nearest granary to the
+  // market (one trip at a time), so you can follow the goods along the chain.
   _restock(market) {
-    if (market.stock >= MARKET_CAP) return;
-    const mEntry = entryRoadTile(this.map, market);
-    if (!mEntry) return;
-    for (const g of this.buildings) {
-      if (g.def.role !== 'granary' || g.stock <= 0) continue;
-      const gEntry = entryRoadTile(this.map, g);
-      if (gEntry && roadConnected(this.map, mEntry, gEntry)) {
-        const take = Math.min(g.stock, MARKET_CAP - market.stock);
-        g.stock -= take;
-        market.stock += take;
-        if (take > 0) this._storeFx(market, null); // goods arriving at the market
-        if (market.stock >= MARKET_CAP) break;
-      }
-    }
+    if (market.stock >= MARKET_CAP || market._restocking || !market.connected) return;
+    const stores = this.buildings.filter((g) => g.def.role === 'granary' && !g.building && g.stock > 0);
+    if (!stores.length) return;
+    const store = this._nearestTo(market, stores);
+    const take = Math.min(store.stock, MARKET_CAP - market.stock);
+    store.stock -= take; market._restocking = true; // reserved and in transit
+    this._deliver(store, market, this._harvestTag(take), () => { market.stock = Math.min(MARKET_CAP, market.stock + take); market._restocking = false; this._storeFx(market, null); });
   }
 
   // Market → market_trader wanders roads, feeding dwellings it passes.
@@ -1043,15 +1187,16 @@ export class Game {
   }
 
   // --- Animation, one call per frame (dt already scaled by game speed) ---
-  // For the seven days from Samhain the dead walk the ráth: risen warriors, pale
-  // and half-there, wander the roads. `deadWalk` is set from the calendar.
+  // Through Samhain (all of November) the dead walk the ráth: mostly the risen
+  // village folk, pale and ghostly-tinted; only rarely the skeletal Sluagh.
   _spawnRisen() {
     const homes = this.buildings.filter((b) => b.def.role === 'dwelling');
     const src = homes.length ? homes[(Math.random() * homes.length) | 0] : this.buildings.find((b) => b.def.role);
     if (!src) return;
     const entry = entryRoadTile(this.map, src);
     if (!entry) return;
-    this._spawn(entry, { type: 'sluagh', personType: 'risen', female: false, steps: 46, speed: 1.35, opacity: 0.85, tag: 'risen' });
+    if (Math.random() < 0.05) this._spawn(entry, { type: 'sluagh', personType: 'risen', female: false, steps: 46, speed: 1.3, opacity: 0.85, tag: 'risen' });
+    else this._spawn(entry, { type: 'villager', personType: 'risen', steps: 46, speed: 1.6, tint: 0xbcd6ff, opacity: 0.5, tag: 'risen' });
   }
 
   update(dt) {
@@ -1061,7 +1206,10 @@ export class Game {
         this._deadWalkT = 4 + Math.random() * 4;
         if (this.walkers.filter((w) => w.tag === 'risen').length < 4) this._spawnRisen();
       }
+    } else if (this._wasDeadWalk) { // the window just closed (December) — clear any lingering dead at once
+      for (let i = this.walkers.length - 1; i >= 0; i--) { const w = this.walkers[i]; if (w.tag === 'risen') { this.walkerGroup.remove(w.sprite); if (w.dispose) w.dispose(); this.walkers.splice(i, 1); } }
     }
+    this._wasDeadWalk = this.deadWalk;
     for (const w of this.walkers) w.update(dt);
     const alive = [];
     for (const w of this.walkers) {

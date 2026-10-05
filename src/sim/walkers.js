@@ -3,6 +3,13 @@ import { roadNeighbors } from './roads.js?v=CBUST';
 
 const MOVE_SCALE = 0.5; // global walker pace (half the old speed)
 
+// The art packs carry no true walk cycle, so a moving figure would just glide.
+// A small vertical step-bob, driven off the walker's age, reads as footsteps —
+// applied to every moving walker in the settlement and on the battlefield.
+export const WALK_BASE_Y = 0.05;
+const STEP_BOB = 0.05, STEP_RATE = 8.5;
+export function gaitBob(t) { return Math.abs(Math.sin((t || 0) * STEP_RATE)) * STEP_BOB; }
+
 // A walker random-walks the road network for a fixed number of steps, running
 // its onTile callback as it enters each tile, then finishes. This one mechanic
 // carries every service in the game.
@@ -31,7 +38,7 @@ export class Walker {
   _moveSpriteTo(a, b, k) {
     const wa = this.map.tileToWorld(a.x, a.z);
     const wb = this.map.tileToWorld(b.x, b.z);
-    this.sprite.position.set(wa.x + (wb.x - wa.x) * k + this.off.x, 0.05, wa.z + (wb.z - wa.z) * k + this.off.z);
+    this.sprite.position.set(wa.x + (wb.x - wa.x) * k + this.off.x, WALK_BASE_Y + ((this.sprite.striding && this.sprite.striding()) ? 0 : gaitBob(this.age)), wa.z + (wb.z - wa.z) * k + this.off.z);
   }
 
   _pickNext(prev) {
@@ -105,11 +112,47 @@ export class Traveler {
     const k = Math.min(this.t, 1);
     this.sprite.position.set(
       this.a.x + (this.b.x - this.a.x) * k + this.off.x,
-      0.05,
+      WALK_BASE_Y + ((this.sprite.striding && this.sprite.striding()) ? 0 : gaitBob(this.age)),
       this.a.z + (this.b.z - this.a.z) * k + this.off.z
     );
     if (this.sprite.animate) this.sprite.animate(dt, true);
     if (this.t >= 1) { this.done = true; if (this.onArrive) this.onArrive(); }
+  }
+
+  dispose() { disposeSprite(this.sprite); }
+}
+
+// Follows a fixed list of world waypoints in order (e.g. a road path), animating
+// its walk cycle, then fires onArrive. Used for directed deliveries that honour
+// the roads instead of wandering or cutting straight across.
+export class PathWalker {
+  constructor(map, waypoints, { type = 'villager', speed = 2.4, onArrive, person } = {}) {
+    this.map = map;
+    this.speed = speed;
+    this.onArrive = onArrive;
+    this.person = person || null;
+    this.done = false;
+    this.i = 0; this.t = 0; this.age = 0;
+    this.wp = waypoints || [];
+    this.off = { x: (Math.random() - 0.5) * 0.3, z: (Math.random() - 0.5) * 0.3 };
+    this.sprite = makeWalkerChip(type, this.person ? this.person.female : undefined);
+    this.sprite.userData = { kind: 'walker', person: this.person, type };
+    const a = this.wp[0] || { x: 0, z: 0 };
+    this.sprite.position.set(a.x + this.off.x, 0.05, a.z + this.off.z);
+  }
+
+  update(dt) {
+    if (this.done) return;
+    this.age += dt;
+    const a = this.wp[this.i], b = this.wp[this.i + 1];
+    if (!a || !b) { this.done = true; if (this.onArrive) this.onArrive(); return; }
+    const dist = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+    this.t += (dt * this.speed * MOVE_SCALE) / dist;
+    if (this.sprite.faceWorld) this.sprite.faceWorld(b.x - a.x, b.z - a.z);
+    const k = Math.min(this.t, 1);
+    this.sprite.position.set(a.x + (b.x - a.x) * k + this.off.x, WALK_BASE_Y + ((this.sprite.striding && this.sprite.striding()) ? 0 : gaitBob(this.age)), a.z + (b.z - a.z) * k + this.off.z);
+    if (this.sprite.animate) this.sprite.animate(dt, true);
+    if (this.t >= 1) { this.t = 0; this.i += 1; if (this.i >= this.wp.length - 1) { this.done = true; if (this.onArrive) this.onArrive(); } }
   }
 
   dispose() { disposeSprite(this.sprite); }

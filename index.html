@@ -43,6 +43,9 @@
 
   <div id="map-controls">
     <div class="mc-row">
+      <button id="walk-btn" class="mc-btn hidden" title="Stroll your ráth">🚶</button>
+    </div>
+    <div class="mc-row">
       <button id="rot-left" class="mc-btn" title="Rotate left">⟲</button>
       <div id="compass" title="View">🧭<span id="compass-label">N</span></div>
       <button id="rot-right" class="mc-btn" title="Rotate right">⟳</button>
@@ -52,6 +55,8 @@
       <button id="zoom-in" class="mc-btn" title="Zoom in">＋</button>
     </div>
   </div>
+  <button id="walk-exit" class="hidden" title="Leave the stroll">✕ Leave the stroll</button>
+  <button id="walk-name" title="Follow another of the folk"></button>
 
   <div id="speedbar">
     <button class="speed-btn" data-speed="0" title="Pause">⏸</button>
@@ -191,6 +196,18 @@
     <div id="hurl-result" class="hidden"></div>
   </div>
 
+  <div id="sparring-screen" class="hidden">
+    <div id="spar-hud" class="hidden">
+      <div class="spar-fighter left"><div class="spar-name" id="spar-p-name"></div><div class="spar-hpbar"><i id="spar-p-bar"></i></div></div>
+      <div id="spar-score"></div>
+      <div class="spar-fighter right"><div class="spar-name" id="spar-c-name"></div><div class="spar-hpbar foe"><i id="spar-c-bar"></i></div></div>
+      <button id="spar-close" title="Leave the bout">✕</button>
+    </div>
+    <div id="spar-card"></div>
+    <div id="spar-status-wrap"><div id="spar-status"></div></div>
+    <div id="spar-result" class="hidden"></div>
+  </div>
+
   <div id="kingdoms-screen" class="modal hidden">
     <div class="kg-wrap">
       <h2 id="kg-title">The Kingdoms of Ériu</h2>
@@ -213,6 +230,13 @@
               <label>Charge <input type="color" id="kg-c2" value="#eae2c8" /></label>
             </div>
             <canvas id="kg-flag" width="60" height="76"></canvas>
+          </div>
+          <button id="kg-oversea-btn" class="continue-btn ghost hidden">⛵ Thar Sáile — beyond Ériu</button>
+          <div id="kg-overseas" class="hidden">
+            <div class="kg-sea-h">Which shore will you fall upon?</div>
+            <button class="kg-sea continue-btn ghost" data-o="lochlann">⬆ North — Lochlann, the Norselands</button>
+            <button class="kg-sea continue-btn ghost" data-o="saxony">➡ East — Saxony</button>
+            <button class="kg-sea continue-btn ghost" data-o="gaul">⬇ South — Gaul</button>
           </div>
           <button id="kg-action" class="continue-btn" disabled>Begin your reign ▸</button>
           <button id="kg-close">✕ Close</button>

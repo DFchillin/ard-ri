@@ -3,6 +3,11 @@ import { tex, spriteFrom, fitWidth, sizeSprite, screenDir, onReady } from './ass
 
 const DIRS = ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'];
 const WALK_CYCLE = [0, 2, 1, 2]; // step1, stand, step2, stand
+// A unit quad standing on its base (pivot at bottom-centre), shared by every
+// building. Its orientation is set each frame by the main loop: screen-aligned to
+// match a sprite under the iso camera, upright-yaw toward the camera in the stroll
+// (so a building stands up straight instead of tilting/overhanging at eye level).
+const BUILD_PLANE = new THREE.PlaneGeometry(1, 1); BUILD_PLANE.translate(0, 0.5, 0);
 const STEP_TIME = 0.42; // seconds per walk frame (slower, calmer gait)
 
 // A screen-facing billboard's width maps to the footprint's diagonal screen
@@ -26,8 +31,17 @@ const WALK_FILE = {
   deaglan: 'deaglan', deaglan_dig: 'deaglan_dig',
   finn: 'finn', finn_run: 'finn_run', vigil: 'vigil', vigil_f: 'vigil_f',
   // Next-gen character art: hurler (f: camogie player) and the sluagh (restless dead).
-  hurler: 'hurler', sluagh: 'sluagh', somhairlin: 'somhairlin',
+  hurler: 'hurler', sluagh: 'sluagh', somhairlin: 'somhairlin', fomorian: 'fomorian',
 };
+
+// Roles drawn as a single figure with no female counterpart (no `<role>_f` set).
+const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluagh', 'somhairlin']);
+// Roles with a real multi-frame stride in their art animate their own legs, so
+// they skip the procedural step-bob (which would just lift a bottom-anchored
+// sprite off the ground and read as floating). Everyone else has only a static
+// frame and leans on the bob to read as walking.
+const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run', 'deaglan', 'finn', 'vigil']);
+const DIAG_DIRS = new Set(['ne', 'nw', 'se', 'sw']); // the facings that carry real walk art
 
 const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },
@@ -76,8 +90,8 @@ export function makeBuildingChip(role, w, h, ts, opts = {}) {
     // width per art generation — so a person reads the same size next to every
     // building and perspective holds, whatever tile footprint the plot occupies.
     const worldW = drawW != null ? drawW * ts : (w + h) * ts * DIAG_FILL * scale;
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: frames[0], transparent: true, alphaTest: 0.12 }));
-    spr.center.set(0.5, 0);
+    const spr = new THREE.Mesh(BUILD_PLANE, new THREE.MeshBasicMaterial({ map: frames[0], transparent: true, alphaTest: 0.12, side: THREE.DoubleSide }));
+    spr.userData.billboard = true; // main loop orients it (iso: screen-aligned; stroll: upright)
     fitWidth(spr, frames[0], worldW);
     g.add(spr);
     g.userData = { spr, frames, worldW, state: 0 };
@@ -120,6 +134,12 @@ const WALKER_COLOR = {
 const WALKER_H = 1.3;   // world height every walker renders at, whatever the art's pixel size
 const WALK_FRAMES = 6;  // walk poses per facing (cardinals repeat their idle)
 const WALK_FPS = 0.11;  // seconds per walk frame
+// Roles that carry an extra 8-facing hammer swing (<dir>_hammer0..N) — the
+// builder's work animation. Only these load it, so no other role 404s on it.
+const HAMMER_FILE = { somhairlin: true };
+const HAMMER_FRAMES = 7;
+const HAMMER_FPS = 0.1;
+const HAMMER_STRIKE = 3; // the frame the hammer falls, for syncing the sparks
 // Regulars have no attack art, so in the clash they jab: a quick lunge toward
 // the foe and back. Cheap, render-side, reads as "having a go".
 const LUNGE_DUR = 0.34;
@@ -131,7 +151,10 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
   // `female` ties the sprite to the person's name; omit it for a random pick.
   // (Roles without an _f set, like the dog, must pass female:false.) `h` sets the
   // world height — the dog rides at half a person's height.
-  const useF = female === undefined ? Math.random() < 0.5 : !!female;
+  // Single-figure roles have no `_f` set, so never randomly pick the female
+  // variant for them (it would 404 to the blank fallback) — only an explicit
+  // female:true would, and callers never pass that for these.
+  const useF = female === undefined ? (!SOLO_ROLES.has(role) && Math.random() < 0.5) : !!female;
   const base = useF ? role + '_f' : role;
   const T = {};
   for (const d of DIRS) T[d] = { stand: tex(`assets/walkers/${base}/${d}_stand.png`),
@@ -153,8 +176,17 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
   });
   // animation state on dedicated props — walkers overwrite userData for inspect
   s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._lunge = 0; s._lunging = false;
+  s._fullCycle = ANIMATED_WALK_ROLES.has(role); // real stride art in every facing
+  // Everyone else has genuine walk frames only on the diagonal facings (ne/nw/se/sw) —
+  // which is exactly how a road-walker reads under the iso camera — while the cardinal
+  // facings are idle copies. So stride on the diagonals (real art, no flicker) and let
+  // the step-bob carry a cardinal-facing figure. `striding` decides both the frame
+  // cycle (here) and whether the walker suppresses its bob (walkers.js reads it).
+  s.striding = () => s._fullCycle || DIAG_DIRS.has(screenDir(s._dx, s._dz));
+  s.hasWalkCycle = s._fullCycle; // back-compat: battle/other callers still read this
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
   s.strike = () => { if (s._lunge <= 0) s._lunge = LUNGE_DUR; }; // no attack frame — jab instead
+  let hammerFrames = null; // set below for roles that carry a hammer swing
   s.animate = (dt, moving) => {
     // The lunge is a position hop toward the foe (a small rise too). Only the
     // battle uses it, where this chip is a child of a group at local (0,0,0); a
@@ -171,15 +203,46 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
       s.position.set(0, 0, 0);
     }
     if (s._failed) return; // fallback colour figure — nothing to swap
+    // A hammer-bearer swings her hammer instead of jabbing: play the swing art
+    // across the lunge so the blow in battle reads as her hammer falling.
+    if (s._lunge > 0 && hammerFrames) {
+      const fr = hammerFrames[screenDir(s._dx, s._dz)] || hammerFrames.s;
+      const k = 1 - Math.max(0, s._lunge) / LUNGE_DUR;
+      s.material.map = fr[Math.min(HAMMER_FRAMES - 1, Math.floor(k * HAMMER_FRAMES))] || fr[0];
+      return;
+    }
     const fr = T[screenDir(s._dx, s._dz)] || T.s;
-    if (moving) {
+    // Only roles with a genuine stride cycle their frames. The rest (villagers,
+    // carriers, …) have walk frames that are just copies of the idle on separate
+    // files — cycling them swaps between distinct textures that look identical and
+    // flickers while they load, for no gain. They hold the stand frame and let the
+    // step-bob carry the motion — just the figure with its load, no flicker.
+    if (moving && s.striding()) {
+      const fps = s._walkFps || WALK_FPS; // a slower-moving figure can set a slower leg cadence
       s._t += dt;
-      if (s._t >= WALK_FPS) { s._t -= WALK_FPS; s._phase = (s._phase + 1) % fr.walk.length; }
+      if (s._t >= fps) { s._t -= fps; s._phase = (s._phase + 1) % fr.walk.length; }
       s.material.map = fr.walk[s._phase] || fr.stand;
     } else {
       s.material.map = fr.stand;
     }
   };
+  // Optional hammer swing for the builder: cycles its own frames (independent of
+  // the walk phase), facing the work. Returns true on the frame the hammer
+  // falls, so the caller can throw a spark in time with the blow.
+  if (HAMMER_FILE[type]) {
+    hammerFrames = {};
+    for (const d of DIRS) hammerFrames[d] = Array.from({ length: HAMMER_FRAMES }, (_, i) => tex(`assets/walkers/${base}/${d}_hammer${i}.png`));
+    s.hasHammer = true; s._hphase = 0; s._ht = 0;
+    s.animateHammer = (dt) => {
+      if (s._failed) return false;
+      let struck = false;
+      s._ht += dt;
+      if (s._ht >= HAMMER_FPS) { s._ht -= HAMMER_FPS; const nx = (s._hphase + 1) % HAMMER_FRAMES; struck = nx === HAMMER_STRIKE; s._hphase = nx; }
+      const fr = hammerFrames[screenDir(s._dx, s._dz)] || hammerFrames.s;
+      const m = fr[s._hphase]; if (m) s.material.map = m;
+      return struck;
+    };
+  }
   return s;
 }
 

@@ -3,6 +3,7 @@ import { createIsoCamera, resizeIsoCamera, rotateIsoCamera, zoomIsoCamera, panIs
 import { Tilemap, T } from '../sim/tilemap.js?v=CBUST';
 import { WorldView } from '../render/world_view.js?v=CBUST';
 import { makeBuildingChip, makeWalkerChip, makeWarriorChip } from '../render/chips.js?v=CBUST';
+import { gaitBob } from '../sim/walkers.js?v=CBUST';
 import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNickname, UPSKILL, EMPLOYEES } from './units.js?v=CBUST';
 
 const MAP = 20;
@@ -68,7 +69,41 @@ const SCENARIOS = {
     ],
     enemyLone: [['fomor', 10, 2]],
   },
+  // Thar Sáile — raids across the sea. Harder hosts than any kingdom of Ériu:
+  // more seasoned ranks and two champions apiece.
+  lochlann: {
+    title: 'Lochlann — the Norse shore', musterMinZ: 6, buildings: [],
+    enemyCompanies: [
+      { name: ['Bjǫrn Járnsíða', 'the sea-wolves'], formation: 'wedge', types: ['seasoned', 'seasoned', 'seasoned', 'seasoned', 'curadh'], x: 7, z: 2 },
+      { name: ['Drengir', 'the shield-wall'], formation: 'line', types: ['seasoned', 'seasoned', 'seasoned', 'seasoned', 'villager', 'villager'], x: 13, z: 2 },
+    ],
+    enemyLone: [['curadh', 10, 1]],
+  },
+  saxony: {
+    title: 'Saxony — the Saxon burhs', musterMinZ: 6, buildings: [],
+    enemyCompanies: [
+      { name: ['Fyrd', 'the levy of the burh'], formation: 'line', types: ['seasoned', 'seasoned', 'seasoned', 'villager', 'villager', 'villager'], x: 6, z: 2 },
+      { name: ['Thegnas', 'the thanes'], formation: 'diamond', types: ['seasoned', 'seasoned', 'seasoned', 'curadh'], x: 13, z: 2 },
+    ],
+    enemyLone: [['curadh', 10, 1]],
+  },
+  gaul: {
+    title: 'Gaul — the Frankish host', musterMinZ: 6, buildings: [],
+    enemyCompanies: [
+      { name: ['Caballarii', 'the Frankish horse'], formation: 'wedge', types: ['seasoned', 'seasoned', 'seasoned', 'seasoned', 'seasoned'], x: 7, z: 2 },
+      { name: ['Leudes', 'the sworn men'], formation: 'line', types: ['seasoned', 'seasoned', 'seasoned', 'villager', 'villager', 'villager'], x: 13, z: 2 },
+    ],
+    enemyLone: [['curadh', 10, 1], ['curadh', 4, 2]],
+  },
 };
+
+// The craftsfolk bond: when Somhairlín and Deaglán — the two who build the
+// roads and the great works — stand in one company, it fights as Lucht Ceirde:
+// their know-how tears the enemy's walls down faster and steadies the line.
+const BOND_TYPES = ['somhairlin', 'deaglan'];
+const BOND_PAIR = ['Lucht Ceirde', 'the craftsfolk'];
+const BOND_BUILD = 1.5;  // company build-damage (vs buildings) while both live
+const BOND_MORALE = 8;   // steadier courage while both live
 
 let _uid = 0;
 
@@ -164,7 +199,13 @@ export class Battle {
     this._randomTerrain((Math.random() * 0x7fffffff) | 0); // a different field every fight
     for (const d of this.cfg.buildings || []) this._spawnBuilding(d);
     for (const c of this.cfg.enemyCompanies || []) this._placeCompany('enemy', c.name, c.formation, c.types, this._worldOf(c.x, c.z));
-    for (const [t, x, z] of this.cfg.enemyLone || []) this._placeCompany('enemy', null, 'line', [t], this._worldOf(x, z));
+    this._menaceUnit = null;
+    for (const [t, x, z] of this.cfg.enemyLone || []) {
+      const co = this._placeCompany('enemy', null, 'line', [t], this._worldOf(x, z));
+      // The Ollphéist carries his wounds between battles: he enters already hurt
+      // by how much you bled him last time, so you wear him down and finish later.
+      if (t === 'fomor' && this.menaceHp != null) { const u = co.units[0]; u.hp = Math.max(1, Math.min(u.hp0, this.menaceHp)); this._menaceUnit = u; drawBar(u.bar, u.hp / u.hp0, u.hp / u.hp0 > 0.5 ? 0x6cc551 : u.hp / u.hp0 > 0.25 ? 0xe0b83a : 0xe0563a); }
+    }
     this.forming = { types: [], name: nextNickname(), formation: 'line' };
     this.pool = Object.assign({}, this.roster); // muster draws from your war-band
     document.getElementById('battle-ui').classList.remove('hidden');
@@ -194,7 +235,7 @@ export class Battle {
   _commence() {
     document.getElementById('parley-overlay').classList.add('hidden');
     // the mustered folk march out of the war-band; survivors return after the battle
-    for (const u of this.units) if (u.team === 'player') this.roster[u.type] = Math.max(0, (this.roster[u.type] || 0) - 1);
+    for (const u of this.units) if (u.team === 'player' && !u.bondGuard) this.roster[u.type] = Math.max(0, (this.roster[u.type] || 0) - 1); // the bond's free guard isn't drawn from the war-band
     this.phase = 'battle'; this.started = true;
     for (const c of this.companies) {
       if (c.team === 'enemy' && this.cfg.defend) { const b = pick(c, this.buildings.filter((x) => !x.dead)); if (b) c.target = { foe: b }; }
@@ -269,18 +310,22 @@ export class Battle {
 
   // ---------- companies & units ----------
   _placeCompany(team, name, formation, types, at) {
-    const co = { id: ++_uid, team, name: name || null, formation, units: [], leader: null, morale: 0, target: null, routing: false, lone: types.length === 1 };
-    const slots = formationSlots(types.length, formation);
+    const bondPair = BOND_TYPES.every((t) => types.includes(t)); // both craftsfolk mustered together
+    if (bondPair) { name = BOND_PAIR; types = [...types, 'warrior']; } // Lucht Ceirde march with a free forge-guard so the craftsfolk aren't alone
+    const co = { id: ++_uid, team, name: name || null, formation, units: [], leader: null, morale: 0, target: null, routing: false, lone: types.length === 1, bondPair };
+    const slots = formationSlots(types.length, formation, types);
     types.forEach((type, i) => {
       const s = slots[i];
       const u = this._makeUnit(team, type, at.x + s.dx, at.z + s.dz, co);
-      u.slot = s; co.units.push(u);
+      u.slot = s;
+      if (bondPair && i === types.length - 1) u.bondGuard = true; // the appended warrior is a free signature guard — never drawn from or returned to the roster
+      co.units.push(u);
     });
     co.leader = co.units.reduce((a, b) => (UNIT_TYPES[b.type].rank >= UNIT_TYPES[a.type].rank ? b : a), co.units[0]);
     const avg = co.units.reduce((n, u) => n + UNIT_TYPES[u.type].morale, 0) / co.units.length;
     const lead = co.lone ? 0 : (UNIT_TYPES[co.leader.type].rank - 1) * 4;
     const aura = Math.max(...co.units.map((u) => UNIT_TYPES[u.type].aura));
-    co.morale = Math.min(100, avg + lead + aura);
+    co.morale = Math.min(100, avg + lead + aura + (bondPair ? BOND_MORALE : 0)); // the master-builders steady the line
     co.morale0 = co.morale;
     co.spectral = co.units.every((u) => UNIT_TYPES[u.type].spectral); // a host of the dead knows no fear
     // a standard borne by the leader marks the company's ground
@@ -367,7 +412,13 @@ export class Battle {
     dt = Math.min(dt, 0.05);
     for (const c of this.companies) if (c.cryT > 0) c.cryT -= dt;
     for (const u of this.units) if (!u.dead) this._move(u, dt);
-    for (const u of this.units) { const spr = u.mesh.userData.spr; if (spr && spr.animate && !u.dead) spr.animate(dt, !!u._moving); }
+    for (const u of this.units) {
+      const spr = u.mesh.userData.spr; if (!spr || !spr.animate || u.dead) continue;
+      spr.animate(dt, !!u._moving);
+      // procedural step-bob so marching figures stride instead of gliding; the
+      // lunge owns the sprite's position while it runs, so leave it be then
+      if (!spr._lunging) { u._gait = (u._gait || 0) + dt; spr.position.y = (u._moving && !spr.hasWalkCycle) ? gaitBob(u._gait) : 0; }
+    }
     for (let i = this._dying.length - 1; i >= 0; i--) {
       const c = this._dying[i]; const spr = c.spr;
       c.ttl -= dt;
@@ -423,7 +474,7 @@ export class Battle {
   _dmgTo(att, def) {
     const f = FORMATIONS[att.company.formation];
     const cry = att.company.cryT > 0 ? 1.25 : 1.0;
-    if (def.kind === 'building') return att.build * (att.company.morale / 100) * f.atk * cry * KB;
+    if (def.kind === 'building') return att.build * (att.company.morale / 100) * f.atk * cry * KB * (att.company.bondPair ? BOND_BUILD : 1);
     return att.atk * (att.company.morale / 100) * f.atk * matchup(att.type, def.type) * cry * KU;
   }
 
@@ -472,7 +523,12 @@ export class Battle {
       if (t.hp <= 0) {
         t.dead = true;
         if (t.kind === 'building') { this.buildingGroup.remove(t.chip); this.buildingGroup.remove(t.bar); }
-        else { t.killed = true; if (t.company.leader === t) took.set(t.company, (took.get(t.company) || 0) + t.hp0 * 2); this._killVisual(t); } // a fallen leader shakes the company
+        else {
+          t.killed = true;
+          if (t.company.leader === t) took.set(t.company, (took.get(t.company) || 0) + t.hp0 * 2); // a fallen leader shakes the company
+          if (t.company.bondPair && BOND_TYPES.includes(t.type)) { t.company.bondPair = false; t.company.morale = Math.max(0, t.company.morale - BOND_MORALE); } // the craftsfolk bond lapses when one falls
+          this._killVisual(t);
+        }
       }
     }
     // collective morale per company
@@ -512,7 +568,7 @@ export class Battle {
   _resolveRoster(won) {
     const grew = {}; let fell = 0, empLost = 0;
     for (const u of this.units) {
-      if (u.team !== 'player') continue;
+      if (u.team !== 'player' || u.bondGuard) continue; // the bond's free guard is signature — never banked, counted among the dead, or returned
       const spectral = UNIT_TYPES[u.type].spectral;
       if (u.killed) { if (spectral) continue; fell++; this.fallen.push({ type: u.type }); if (EMPLOYEES.includes(u.type)) empLost++; continue; } // ghosts banished, not buried
       let t = u.type; // survivors (alive or fled home) return
@@ -628,6 +684,9 @@ export class Battle {
       if (hosted && hosted[h] && Math.random() < chance) { this.roster[h] = 1; this.summoned.push(h); }
     }
   }
+  // The Ollphéist's remaining HP after a menace battle, to carry to the next one
+  // (0 once he is slain). null when there was no menace unit this fight.
+  menaceRemainingHp() { if (!this._menaceUnit) return null; return this._menaceUnit.dead ? 0 : Math.max(0, this._menaceUnit.hp); }
   rotate(d) { rotateIsoCamera(this.camera, d); }
   zoom(f) { zoomIsoCamera(this.camera, f, this.aspect); }
   resize(aspect) { this.aspect = aspect; resizeIsoCamera(this.camera, aspect); }
@@ -668,7 +727,7 @@ export class Battle {
   _renderMuster() {
     const roster = document.getElementById('bs-roster'); roster.innerHTML = '';
     const inForming = (k) => this.forming.types.filter((x) => x === k).length;
-    const order = ['villager', 'water', 'grain', 'deaglan', 'druid', 'fennid', 'warrior', 'seasoned', 'curadh', 'ghost', 'cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan'];
+    const order = ['villager', 'water', 'grain', 'deaglan', 'somhairlin', 'druid', 'fennid', 'warrior', 'seasoned', 'curadh', 'ghost', 'cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan'];
     for (const key of order) {
       if (!((this.pool[key] || 0) > 0 || inForming(key) > 0)) continue; // only what you have a right to muster
       const t = UNIT_TYPES[key]; const left = (this.pool[key] || 0) - inForming(key);
@@ -700,8 +759,9 @@ export class Battle {
     if (!arr.length) { info.innerHTML = '<span class="dim">Tap a company, or drag a box. Two fingers to pan, pinch to zoom.</span>'; return; }
     if (arr.length === 1) {
       const c = arr[0]; const flag = c.morale > 66 ? '<span class="ok">confident</span>' : c.morale > 33 ? '<span class="warn">wavering</span>' : '<span class="rout">breaking</span>';
+      const bond = c.bondPair ? '<br><span class="ok">Lucht Ceirde — the craftsfolk raise the siege and steady the line</span>' : '';
       info.innerHTML = `<b>${c.name ? c.name[0] : UNIT_TYPES[c.leader.type].label}</b> ${c.name ? `<small>${c.name[1]}</small>` : ''}<br>` +
-        `×${c.units.filter((u) => !u.dead).length} · ${FORMATIONS[c.formation].label} · Misneach ${Math.round(c.morale)} ${flag}`;
+        `×${c.units.filter((u) => !u.dead).length} · ${FORMATIONS[c.formation].label} · Misneach ${Math.round(c.morale)} ${flag}${bond}`;
     } else info.innerHTML = `<b>${arr.length} companies</b> in hand`;
     document.querySelectorAll('#bs-formations [data-form]').forEach((b) => b.classList.toggle('on', arr.length === 1 && b.dataset.form === arr[0].formation));
   }
@@ -811,8 +871,12 @@ function drawBar(sprite, frac, color) { const cv = sprite.userData.cv, x = cv.ge
   x.fillStyle = '#' + color.toString(16).padStart(6, '0'); x.fillRect(1, 1, 62 * Math.max(0, Math.min(1, frac)), 8); sprite.userData.tex.needsUpdate = true; }
 
 // formation slot offsets for n units
-function formationSlots(n, shape) {
-  const sp = 0.95, out = [];
+function formationSlots(n, shape, types) {
+  // Spacing scales with the biggest figure in the company: heroes and gods stand
+  // across one or two tiles, so a mortal's 0.95 gap would stack them on top of one
+  // another. Give the whole formation room equal to the largest unit present.
+  const big = types ? types.reduce((m, t) => { const b = UNIT_TYPES[t] && UNIT_TYPES[t].battle; return Math.max(m, (b && b.tiles) || 0); }, 0) : 0;
+  const sp = 0.95 * (1 + big * 0.9), out = [];
   if (shape === 'column') {
     const cols = Math.min(2, n);
     for (let i = 0; i < n; i++) { const c = i % cols, r = (i / cols) | 0; out.push({ dx: (c - (cols - 1) / 2) * sp, dz: r * sp - (Math.ceil(n / cols) - 1) * sp / 2 }); }
