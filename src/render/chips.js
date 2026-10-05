@@ -36,6 +36,7 @@ const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluag
 // sprite off the ground and read as floating). Everyone else has only a static
 // frame and leans on the bob to read as walking.
 const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run', 'deaglan', 'finn', 'vigil']);
+const DIAG_DIRS = new Set(['ne', 'nw', 'se', 'sw']); // the facings that carry real walk art
 
 const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },
@@ -170,7 +171,14 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
   });
   // animation state on dedicated props — walkers overwrite userData for inspect
   s._dx = 0; s._dz = 1; s._phase = 0; s._t = 0; s._lunge = 0; s._lunging = false;
-  s.hasWalkCycle = ANIMATED_WALK_ROLES.has(role); // has real stride art → no procedural bob
+  s._fullCycle = ANIMATED_WALK_ROLES.has(role); // real stride art in every facing
+  // Everyone else has genuine walk frames only on the diagonal facings (ne/nw/se/sw) —
+  // which is exactly how a road-walker reads under the iso camera — while the cardinal
+  // facings are idle copies. So stride on the diagonals (real art, no flicker) and let
+  // the step-bob carry a cardinal-facing figure. `striding` decides both the frame
+  // cycle (here) and whether the walker suppresses its bob (walkers.js reads it).
+  s.striding = () => s._fullCycle || DIAG_DIRS.has(screenDir(s._dx, s._dz));
+  s.hasWalkCycle = s._fullCycle; // back-compat: battle/other callers still read this
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
   s.strike = () => { if (s._lunge <= 0) s._lunge = LUNGE_DUR; }; // no attack frame — jab instead
   let hammerFrames = null; // set below for roles that carry a hammer swing
@@ -204,7 +212,7 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
     // files — cycling them swaps between distinct textures that look identical and
     // flickers while they load, for no gain. They hold the stand frame and let the
     // step-bob carry the motion — just the figure with its load, no flicker.
-    if (moving && s.hasWalkCycle) {
+    if (moving && s.striding()) {
       const fps = s._walkFps || WALK_FPS; // a slower-moving figure can set a slower leg cadence
       s._t += dt;
       if (s._t >= fps) { s._t -= fps; s._phase = (s._phase + 1) % fr.walk.length; }

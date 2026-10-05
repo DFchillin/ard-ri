@@ -91,12 +91,46 @@ const walk = {
         scene.add(this._skyDome);
       }
       this._skyDome.visible = true;
+      this._buildScenery(); this._scenery.visible = true;
       this._savedFog = { color: scene.fog.color.getHex(), near: scene.fog.near, far: scene.fog.far };
-      scene.fog.color.setHex(0x9fb577); scene.fog.near = 7; scene.fog.far = 48;
+      scene.fog.color.setHex(0x9fb577); scene.fog.near = 7; scene.fog.far = 58;
     } else {
       if (this._skyDome) this._skyDome.visible = false;
+      if (this._scenery) this._scenery.visible = false;
       if (this._savedFog) { scene.fog.color.setHex(this._savedFog.color); scene.fog.near = this._savedFog.near; scene.fog.far = this._savedFog.far; this._savedFog = null; }
     }
+  },
+  // Low-poly hills and cone-trees ringing the ráth, drawn once in Three.js geometry.
+  // They sit out past the settlement and are fog-affected, so they read as hazy green
+  // forest and rolling hills beyond the clearing — real depth under the skydome.
+  _scenery: null,
+  _buildScenery() {
+    if (this._scenery) return;
+    const g = new THREE.Group();
+    let seed = 1337; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a4028 });
+    const leafMats = [0x3f6b32, 0x4c7a38, 0x37602c, 0x567f3f].map((c) => new THREE.MeshLambertMaterial({ color: c }));
+    const hillMats = [0x4a6b3a, 0x3e5c32, 0x56763f].map((c) => new THREE.MeshLambertMaterial({ color: c }));
+    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 5);
+    const coneGeo = new THREE.ConeGeometry(2.0, 4.2, 7);
+    // a band of trees ringing the clearing
+    for (let i = 0; i < 150; i++) {
+      const a = rnd() * Math.PI * 2, r = 30 + rnd() * 26; // radius 30–56
+      const x = Math.cos(a) * r, z = Math.sin(a) * r, s = 0.7 + rnd() * 0.9;
+      const t = new THREE.Group();
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.position.y = 1.2 * s; trunk.scale.setScalar(s);
+      const leaf = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf.position.y = (2.4 + 1.6) * s; leaf.scale.setScalar(s);
+      const leaf2 = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf2.position.y = (2.4 + 3.0) * s; leaf2.scale.setScalar(s * 0.72);
+      t.add(trunk, leaf, leaf2); t.position.set(x, 0, z); g.add(t);
+    }
+    // rolling hills further out, rising above the tree-line
+    for (let i = 0; i < 26; i++) {
+      const a = rnd() * Math.PI * 2, r = 58 + rnd() * 34; // radius 58–92
+      const w = 10 + rnd() * 16, h = 5 + rnd() * 9;
+      const hill = new THREE.Mesh(new THREE.ConeGeometry(w, h, 8), hillMats[(rnd() * hillMats.length) | 0]);
+      hill.position.set(Math.cos(a) * r, -1, Math.sin(a) * r); g.add(hill);
+    }
+    g.visible = false; this._scenery = g; scene.add(g);
   },
   exit() {
     this.active = false;
