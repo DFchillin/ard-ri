@@ -120,12 +120,15 @@ const walk = {
     const hillMats = [0x4a6b3a, 0x3e5c32, 0x56763f].map((c) => new THREE.MeshLambertMaterial({ color: c }));
     const trunkGeo = new THREE.CylinderGeometry(0.3, 0.42, 2.0, 5);
     const coneGeo = new THREE.ConeGeometry(2.0, 4.2, 7);
+    // Trees sit out past the ráth's ground plane, so sink them below the horizon:
+    // the trunks drop out of sight and only the canopies crown the treeline.
+    const TREE_SINK = -3.4;
     const tree = (x, z, s) => {
       const t = new THREE.Group();
       const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.position.y = 1.0 * s; trunk.scale.setScalar(s);
       const leaf = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf.position.y = (2.0 + 1.4) * s; leaf.scale.setScalar(s);
       const leaf2 = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf2.position.y = (2.0 + 2.6) * s; leaf2.scale.setScalar(s * 0.72);
-      t.add(trunk, leaf, leaf2); t.position.set(x, 0, z); g.add(t);
+      t.add(trunk, leaf, leaf2); t.position.set(x, TREE_SINK, z); g.add(t);
     };
     // trees ring the clearing in copses — smaller trees, bunched into stands with
     // gaps between, rather than an even picket line.
