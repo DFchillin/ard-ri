@@ -66,6 +66,12 @@ const walk = {
     this._look.set(a.x + this._hx * 6, this.eye, a.z + this._hz * 6);
     this.active = true;
     this._setSky(true);
+    // Tuck away the build-mode markers (road-alert "!" and inspect dots) — they
+    // billboard and would float in the sky over a scenic stroll.
+    for (const b of game.buildings) {
+      if (b.alert) { b._alertWas = b.alert.visible; b.alert.visible = false; }
+      if (b.dot) { b._dotWas = b.dot.visible; b.dot.visible = false; }
+    }
     document.getElementById('ui-overlay').classList.add('in-walk');
     ui.hideInspect();
   },
@@ -135,6 +141,10 @@ const walk = {
   exit() {
     this.active = false;
     this._setSky(false);
+    for (const b of game.buildings) {
+      if (b.alert && b._alertWas !== undefined) { b.alert.visible = b._alertWas; b._alertWas = undefined; }
+      if (b.dot && b._dotWas !== undefined) { b.dot.visible = b._dotWas; b._dotWas = undefined; }
+    }
     document.getElementById('ui-overlay').classList.remove('in-walk');
   },
   update(dt) {
@@ -1936,6 +1946,20 @@ window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, hurli
 let econAcc = 0, dayAcc = 0;
 const clock = new THREE.Clock();
 
+// Buildings are quads we orient ourselves each frame. Under the iso camera we match
+// its view plane (identical to the old billboard sprite). In the first-person stroll
+// we only yaw them to face the camera, keeping them vertically upright — so a building
+// stands straight instead of tilting its top toward you and overhanging the tile.
+function billboardBuildings(cam, upright) {
+  const list = game.buildingGroup.children;
+  for (let i = 0; i < list.length; i++) {
+    const g = list[i], spr = g.userData && g.userData.spr;
+    if (!spr || !spr.userData || !spr.userData.billboard) continue;
+    if (upright) spr.rotation.set(0, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
+    else spr.quaternion.copy(cam.quaternion);
+  }
+}
+
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
@@ -1951,6 +1975,7 @@ function frame() {
   if (walk.active) {
     game.update(dt); game.updateFx(dt);
     walk.update(dt);
+    billboardBuildings(walkCam, true);
     renderer.render(scene, walkCam);
     return;
   }
@@ -1965,6 +1990,7 @@ function frame() {
   if (game._unpavedRun) { game._unpavedRun = false; if (!campaign._unpavedHinted) { campaign._unpavedHinted = true; saveCampaign(); flashNotice('💰 A carrier had to cross open ground — an unpaved run costs 5 silver, not 1. Pave a road all the way to your stores to keep carriage cheap.'); } }
   dayAcc += scaled;
   while (dayAcc >= SECONDS_PER_DAY) { dayAcc -= SECONDS_PER_DAY; advanceDay(); }
+  billboardBuildings(camera, false);
   renderer.render(scene, camera);
 }
 frame();

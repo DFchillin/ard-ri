@@ -3,6 +3,11 @@ import { tex, spriteFrom, fitWidth, sizeSprite, screenDir, onReady } from './ass
 
 const DIRS = ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'];
 const WALK_CYCLE = [0, 2, 1, 2]; // step1, stand, step2, stand
+// A unit quad standing on its base (pivot at bottom-centre), shared by every
+// building. Its orientation is set each frame by the main loop: screen-aligned to
+// match a sprite under the iso camera, upright-yaw toward the camera in the stroll
+// (so a building stands up straight instead of tilting/overhanging at eye level).
+const BUILD_PLANE = new THREE.PlaneGeometry(1, 1); BUILD_PLANE.translate(0, 0.5, 0);
 const STEP_TIME = 0.42; // seconds per walk frame (slower, calmer gait)
 
 // A screen-facing billboard's width maps to the footprint's diagonal screen
@@ -85,8 +90,8 @@ export function makeBuildingChip(role, w, h, ts, opts = {}) {
     // width per art generation — so a person reads the same size next to every
     // building and perspective holds, whatever tile footprint the plot occupies.
     const worldW = drawW != null ? drawW * ts : (w + h) * ts * DIAG_FILL * scale;
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: frames[0], transparent: true, alphaTest: 0.12 }));
-    spr.center.set(0.5, 0);
+    const spr = new THREE.Mesh(BUILD_PLANE, new THREE.MeshBasicMaterial({ map: frames[0], transparent: true, alphaTest: 0.12, side: THREE.DoubleSide }));
+    spr.userData.billboard = true; // main loop orients it (iso: screen-aligned; stroll: upright)
     fitWidth(spr, frames[0], worldW);
     g.add(spr);
     g.userData = { spr, frames, worldW, state: 0 };
