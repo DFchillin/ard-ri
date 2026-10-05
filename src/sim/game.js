@@ -60,7 +60,8 @@ const FARM_MIN_FOLK = 4;   // hands the settlement needs to bring a harvest in
 const MAX_PER_BLD = 2;     // most walkers any one building keeps on the roads (2 druids per shrine)
 const DELIVER_COST = 1;    // silver a carrier is paid for a delivery along a paved line
 const UNPAVED_COST = 5;    // silver when the run has to cross unpaved ground — build proper roads
-const EVICT_SILVER = 10;   // silver a cast-out family takes with them in spite
+const EVICT_SILVER = 300;  // silver a spiteful family makes off with — rare, but a real blow
+const EVICT_SILVER_CHANCE = 0.05; // only one family in twenty raids the treasury on the way out
 const EVICT_COW_CHANCE = 0.4; // chance a departing family also drives off one of your cattle
 const HERD_GROW = 5;       // econ ticks between calvings at the homestead
 const HERD_RADIUS = 3;     // tiles of open pasture around the homestead that count as grazing
@@ -603,7 +604,7 @@ export class Game {
     this.walkers.push(tr);
     this.walkerGroup.add(tr.sprite);
     // A cast-out family leaves bitter, taking what they can on the way out.
-    const silver = Math.min(this.silver, EVICT_SILVER); this.silver -= silver;
+    const silver = Math.random() < EVICT_SILVER_CHANCE ? Math.min(this.silver, EVICT_SILVER) : 0; this.silver -= silver;
     const cow = Math.random() < EVICT_COW_CHANCE;
     if (this.onEvict) this.onEvict({ name: person.name, reason: reason || 'want', silver, cow });
   }
