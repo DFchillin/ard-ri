@@ -42,6 +42,10 @@ const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluag
 // frame and leans on the bob to read as walking.
 const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run', 'deaglan', 'finn', 'vigil']);
 const DIAG_DIRS = new Set(['ne', 'nw', 'se', 'sw']); // the facings that carry real walk art
+// Load-carriers hold their stand frame (sack on the shoulder) and move on the step-
+// bob: their walk frames shift the load low and read like a man with a hoe, so the
+// one stable "man with the bag" from the Phase-1 flicker fix is the right look.
+const HOLD_STAND = new Set(['grain_carrier', 'water_carrier']);
 
 const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },
@@ -182,7 +186,7 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
   // facings are idle copies. So stride on the diagonals (real art, no flicker) and let
   // the step-bob carry a cardinal-facing figure. `striding` decides both the frame
   // cycle (here) and whether the walker suppresses its bob (walkers.js reads it).
-  s.striding = () => s._fullCycle || DIAG_DIRS.has(screenDir(s._dx, s._dz));
+  s.striding = () => s._fullCycle || (!HOLD_STAND.has(role) && DIAG_DIRS.has(screenDir(s._dx, s._dz)));
   s.hasWalkCycle = s._fullCycle; // back-compat: battle/other callers still read this
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
   s.strike = () => { if (s._lunge <= 0) s._lunge = LUNGE_DUR; }; // no attack frame — jab instead
