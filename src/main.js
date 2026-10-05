@@ -97,8 +97,10 @@ const walk = {
       }
       this._skyDome.visible = true;
       this._buildScenery(); this._scenery.visible = true;
+      const sk = SEASON_SKY[curSeason] || SEASON_SKY.earrach;
+      this._skyDome.material.color.setHex(sk.tint); // tint the dome to the season's mood
       this._savedFog = { color: scene.fog.color.getHex(), near: scene.fog.near, far: scene.fog.far };
-      scene.fog.color.setHex(0x9fb577); scene.fog.near = 7; scene.fog.far = 58;
+      scene.fog.color.setHex(sk.fog); scene.fog.near = 7; scene.fog.far = 58;
     } else {
       if (this._skyDome) this._skyDome.visible = false;
       if (this._scenery) this._scenery.visible = false;
@@ -116,24 +118,32 @@ const walk = {
     const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a4028 });
     const leafMats = [0x3f6b32, 0x4c7a38, 0x37602c, 0x567f3f].map((c) => new THREE.MeshLambertMaterial({ color: c }));
     const hillMats = [0x4a6b3a, 0x3e5c32, 0x56763f].map((c) => new THREE.MeshLambertMaterial({ color: c }));
-    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 5);
+    const trunkGeo = new THREE.CylinderGeometry(0.3, 0.42, 2.0, 5);
     const coneGeo = new THREE.ConeGeometry(2.0, 4.2, 7);
-    // a band of trees ringing the clearing
-    for (let i = 0; i < 150; i++) {
-      const a = rnd() * Math.PI * 2, r = 30 + rnd() * 26; // radius 30–56
-      const x = Math.cos(a) * r, z = Math.sin(a) * r, s = 0.7 + rnd() * 0.9;
+    const tree = (x, z, s) => {
       const t = new THREE.Group();
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.position.y = 1.2 * s; trunk.scale.setScalar(s);
-      const leaf = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf.position.y = (2.4 + 1.6) * s; leaf.scale.setScalar(s);
-      const leaf2 = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf2.position.y = (2.4 + 3.0) * s; leaf2.scale.setScalar(s * 0.72);
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.position.y = 1.0 * s; trunk.scale.setScalar(s);
+      const leaf = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf.position.y = (2.0 + 1.4) * s; leaf.scale.setScalar(s);
+      const leaf2 = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf2.position.y = (2.0 + 2.6) * s; leaf2.scale.setScalar(s * 0.72);
       t.add(trunk, leaf, leaf2); t.position.set(x, 0, z); g.add(t);
+    };
+    // trees ring the clearing in copses — smaller trees, bunched into stands with
+    // gaps between, rather than an even picket line.
+    for (let c = 0; c < 26; c++) {
+      const a = rnd() * Math.PI * 2, r = 30 + rnd() * 26; // copse centre, radius 30–56
+      const cx = Math.cos(a) * r, cz = Math.sin(a) * r;
+      const n = 5 + ((rnd() * 7) | 0);
+      for (let i = 0; i < n; i++) {
+        const x = cx + (rnd() - 0.5) * 7, z = cz + (rnd() - 0.5) * 7, s = 0.45 + rnd() * 0.5;
+        tree(x, z, s);
+      }
     }
-    // rolling hills further out, rising above the tree-line
-    for (let i = 0; i < 26; i++) {
-      const a = rnd() * Math.PI * 2, r = 58 + rnd() * 34; // radius 58–92
-      const w = 10 + rnd() * 16, h = 5 + rnd() * 9;
+    // rolling hills further out, bigger now, rising well above the tree-line
+    for (let i = 0; i < 24; i++) {
+      const a = rnd() * Math.PI * 2, r = 54 + rnd() * 34; // radius 54–88
+      const w = 18 + rnd() * 26, h = 12 + rnd() * 18;
       const hill = new THREE.Mesh(new THREE.ConeGeometry(w, h, 8), hillMats[(rnd() * hillMats.length) | 0]);
-      hill.position.set(Math.cos(a) * r, -1, Math.sin(a) * r); g.add(hill);
+      hill.position.set(Math.cos(a) * r, -2, Math.sin(a) * r); g.add(hill);
     }
     g.visible = false; this._scenery = g; scene.add(g);
   },
@@ -201,6 +211,14 @@ const SEASON_ACCENT = {
   samhradh:   { color: 0xffd166, pos: [45, 42, -45] },
   fomhar:     { color: 0xff8a4a, pos: [45, 42, 45] },
   geimhreadh: { color: 0x8fbfff, pos: [-45, 42, 45] },
+};
+// The stroll's sky takes the mood of the season: a tint multiplied over the blue→
+// green skydome, and a matching haze for the fog where ground meets the treeline.
+const SEASON_SKY = {
+  earrach:    { tint: 0xeafff0, fog: 0x9fbf72 }, // spring — fresh green
+  samhradh:   { tint: 0xfff3d6, fog: 0xbcc877 }, // summer — warm gold
+  fomhar:     { tint: 0xffe1ba, fog: 0xc2a46a }, // autumn — amber
+  geimhreadh: { tint: 0xd6e4f2, fog: 0xbcc8c4 }, // winter — cold and pale
 };
 
 // The ráth-land is randomised once, then it is your homeland — the same seed
