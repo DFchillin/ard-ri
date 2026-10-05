@@ -7,7 +7,6 @@ import { Game } from './sim/game.js?v=CBUST';
 import { UI } from './ui.js?v=CBUST';
 import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=CBUST';
 import { setCamera } from './render/assets.js?v=CBUST';
-import { roadNeighbors } from './sim/roads.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
 import { Hurling } from './hurling.js?v=CBUST';
 import { Sparring } from './sparring.js?v=CBUST';
@@ -38,32 +37,31 @@ setCamera(camera); // walkers face by screen direction
 // A perspective camera wanders the road network at eye level; buildings and folk
 // (billboard sprites) turn to face it as you pass. Tap folk to inspect them.
 const walkCam = new THREE.PerspectiveCamera(74, aspect, 0.05, 1000);
+const _tmpV = new THREE.Vector3();
 const walk = {
-  active: false, cur: null, next: null, prev: null, t: 0, speed: 1.6, eye: 0.85,
-  look: new THREE.Vector3(), _look: new THREE.Vector3(),
-  _roadTiles() { const out = []; const m = game.map; for (let z = 0; z < m.size; z++) for (let x = 0; x < m.size; x++) { const t = m.get(x, z); if (t && t.road) out.push({ x, z }); } return out; },
-  _pickNext() {
-    const opts = roadNeighbors(game.map, this.cur.x, this.cur.z);
-    const fwd = this.prev ? opts.filter((n) => !(n.x === this.prev.x && n.z === this.prev.z)) : opts;
-    // Keep walking straight ahead whenever the road allows (old-screensaver feel):
-    // only turn at a junction where straight is blocked, and only double back at a
-    // true dead end.
-    if (this.prev) {
-      const hx = this.cur.x - this.prev.x, hz = this.cur.z - this.prev.z;
-      const straight = fwd.find((n) => n.x - this.cur.x === hx && n.z - this.cur.z === hz);
-      if (straight) { this.next = straight; return; }
-    }
-    const pool = fwd.length ? fwd : opts;
-    this.next = pool.length ? pool[(Math.random() * pool.length) | 0] : this.cur;
+  active: false, follow: null, _hx: 0, _hz: 1, _first: false,
+  _cp: new THREE.Vector3(), _cl: new THREE.Vector3(),
+  // Townsfolk worth following: anyone abroad with a name (never the risen dead).
+  _followable() { return game.walkers.filter((w) => w && !w.done && w.sprite && w.person && w.tag !== 'risen'); },
+  _pickFollow(after) {
+    const list = this._followable(); if (!list.length) return null;
+    if (after) { const i = list.indexOf(after); if (i >= 0) return list[(i + 1) % list.length]; }
+    const c = game.map.tileToWorld((game.map.size / 2) | 0, (game.map.size / 2) | 0);
+    list.sort((a, b) => a.sprite.position.distanceToSquared(c) - b.sprite.position.distanceToSquared(c));
+    return list[0];
+  },
+  cycle() { const n = this._pickFollow(this.follow); if (n) { this.follow = n; this._first = true; this._updateName(); } },
+  _updateName() {
+    const el = document.getElementById('walk-name'); if (!el) return;
+    const p = this.follow && this.follow.person;
+    el.innerHTML = p
+      ? `<b>${p.nick ? `${p.name} ‘${p.nick}’` : p.name}</b><span>${p.roleEn} · tap to follow another</span>`
+      : `<b>Nobody abroad</b><span>waiting for folk…</span>`;
   },
   enter() {
-    const roads = this._roadTiles(); if (!roads.length) { flashNotice('🚶 Lay a road first — there is nowhere to stroll yet.'); return; }
-    const c = { x: (game.map.size / 2) | 0, z: (game.map.size / 2) | 0 };
-    roads.sort((a, b) => ((a.x - c.x) ** 2 + (a.z - c.z) ** 2) - ((b.x - c.x) ** 2 + (b.z - c.z) ** 2));
-    this.cur = roads[0]; this.prev = null; this.t = 0; this._pickNext();
-    const a = game.map.tileToWorld(this.cur.x, this.cur.z), b = game.map.tileToWorld(this.next.x, this.next.z);
-    let hx = b.x - a.x, hz = b.z - a.z; const hl = Math.hypot(hx, hz) || 1; this._hx = hx / hl; this._hz = hz / hl;
-    this._look.set(a.x + this._hx * 6, this.eye, a.z + this._hz * 6);
+    const w = this._pickFollow(null);
+    if (!w) { flashNotice('🚶 No folk are abroad just now — let the ráth bustle a while, then stroll.'); return; }
+    this.follow = w; this._first = true;
     this.active = true;
     this._setSky(true);
     // Tuck away the build-mode markers (road-alert "!" and inspect dots) — they
@@ -73,6 +71,7 @@ const walk = {
       if (b.dot) { b._dotWas = b.dot.visible; b.dot.visible = false; }
     }
     document.getElementById('ui-overlay').classList.add('in-walk');
+    this._updateName();
     ui.hideInspect();
   },
   // Swap the flat settlement sky for a clearing: a gradient skydome (blue overhead
@@ -148,21 +147,31 @@ const walk = {
     document.getElementById('ui-overlay').classList.remove('in-walk');
   },
   update(dt) {
-    this.t += dt * this.speed;
-    while (this.t >= 1) { this.t -= 1; this.prev = this.cur; this.cur = this.next; this._pickNext(); }
-    const a = game.map.tileToWorld(this.cur.x, this.cur.z), b = game.map.tileToWorld(this.next.x, this.next.z);
-    const px = a.x + (b.x - a.x) * this.t, pz = a.z + (b.z - a.z) * this.t;
-    walkCam.position.set(px, this.eye, pz);
-    if (this._skyDome) this._skyDome.position.set(px, 0, pz); // the sky travels with you
-    // Gaze a fixed distance ahead along the direction of travel — never at our own
-    // feet, never degenerate — and ease the turn so junctions and the rare dead-end
-    // about-face read as a smooth pan, not a snap. Heading persists if a step can't
-    // move (isolated tile), so the camera never spins.
-    let dx = b.x - a.x, dz = b.z - a.z; const l = Math.hypot(dx, dz);
-    if (l > 0.0001) { this._hx = dx / l; this._hz = dz / l; }
-    this.look.set(px + this._hx * 6, this.eye, pz + this._hz * 6);
-    this._look.lerp(this.look, Math.min(1, dt * 2.2));
-    walkCam.lookAt(this._look);
+    // Keep a living subject: if the one we follow finished their errand (or was
+    // removed), pick up whoever else is abroad; if nobody is, hold the camera.
+    if (!this.follow || this.follow.done || !game.walkers.includes(this.follow)) {
+      this.follow = this._pickFollow(null); this._first = true; this._updateName();
+      if (!this.follow) return;
+    }
+    const p = this.follow.sprite.position;
+    // Heading from the walker's own facing (world); hold the last one while they stand.
+    const s = this.follow.sprite, hl = Math.hypot(s._dx || 0, s._dz || 0);
+    if (hl > 0.0001) { this._hx = s._dx / hl; this._hz = s._dz / hl; }
+    // Chase pose: behind and a little to one side, so the walker reads as a 3/4 back
+    // view (the diagonal facings that carry real stride art) rather than a flat spine.
+    const rx = -this._hz, rz = this._hx; // heading turned 90° → camera-side offset
+    const DIST = 2.7, SIDE = 1.15, HEIGHT = 1.55, HEAD = 0.78, AHEAD = 1.3;
+    const cx = p.x - this._hx * DIST + rx * SIDE, cz = p.z - this._hz * DIST + rz * SIDE;
+    const tx = p.x + this._hx * AHEAD, tz = p.z + this._hz * AHEAD;
+    if (this._first) { this._cp.set(cx, HEIGHT, cz); this._cl.set(tx, HEAD, tz); this._first = false; }
+    else {
+      const k = Math.min(1, dt * 3.2);
+      this._cp.lerp(_tmpV.set(cx, HEIGHT, cz), k);
+      this._cl.lerp(_tmpV.set(tx, HEAD, tz), k);
+    }
+    walkCam.position.copy(this._cp);
+    walkCam.lookAt(this._cl);
+    if (this._skyDome) this._skyDome.position.set(this._cp.x, 0, this._cp.z); // sky travels with you
   },
 };
 // Show the pegman only when a settlement with roads is on screen; the exit button
@@ -176,6 +185,7 @@ function updateWalkBtn() {
 }
 document.getElementById('walk-btn')?.addEventListener('click', () => walk.enter());
 document.getElementById('walk-exit')?.addEventListener('click', () => walk.exit());
+document.getElementById('walk-name')?.addEventListener('click', () => walk.cycle());
 
 const hemi = new THREE.HemisphereLight(0xd6f0cf, 0x40602f, 1.6);
 scene.add(hemi);
