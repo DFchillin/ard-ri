@@ -734,6 +734,7 @@ function musterFavour() {
   return Math.min(0.97, f);
 }
 function enterBattle(scenario) {
+  if (walk.active) walk.exit(); // a raid ends the stroll — to the field
   // A deity only takes the field if a flourishing Hall of Hosting stands to seat
   // it; heroes (mortal) answer regardless. Strip un-seated gods from the muster.
   let hosted = campaign.hosted;
@@ -869,7 +870,7 @@ function selectOverseas(id) {
 function openKingdomMap(mode, then) {
   buildKingdomMap();
   kg.mode = mode; kg.sel = null; kg.enter = null; kg.then = then || null; kg.overseas = null;
-  { const sb = document.getElementById('kg-oversea-btn'); if (sb) sb.classList.toggle('hidden', !(mode === 'war' && campaign.everArdRi)); }
+  { const sb = document.getElementById('kg-oversea-btn'); if (sb) sb.classList.toggle('hidden', !(mode === 'war' && campaign.ardRi)); }
   { const sp = document.getElementById('kg-overseas'); if (sp) sp.classList.add('hidden'); }
   document.getElementById('kg-title').textContent = mode === 'war' ? 'Raid, or ride home' : 'The Kingdoms of Ériu';
   document.getElementById('kg-hint').textContent = mode === 'war'
@@ -2000,16 +2001,9 @@ function frame() {
   const cam = walk.active ? walkCam : camera;
   setCamera(cam);
   updateWalkBtn();
-  // On a stroll the town keeps moving but the clock and economy are frozen — a
-  // non-destructive living screensaver. Otherwise the world-clock runs whenever
-  // the settlement is the scene you're looking at (title hidden, not in battle).
-  if (walk.active) {
-    game.update(dt); game.updateFx(dt);
-    walk.update(dt);
-    billboardBuildings(walkCam, true);
-    renderer.render(scene, walkCam);
-    return;
-  }
+  // The world-clock and economy run whenever the settlement is the scene you're
+  // looking at — including the stroll, so folk keep spawning and the ráth stays
+  // alive while you follow someone. (Battle/hurling/sparring returned above.)
   const live = titleScreenEl.classList.contains('hidden');
   if (live) started = true; // play has begun — day-saves and onboarding may run
   const scaled = live ? dt * sim.speed : 0;
@@ -2021,8 +2015,14 @@ function frame() {
   if (game._unpavedRun) { game._unpavedRun = false; if (!campaign._unpavedHinted) { campaign._unpavedHinted = true; saveCampaign(); flashNotice('💰 A carrier had to cross open ground — an unpaved run costs 5 silver, not 1. Pave a road all the way to your stores to keep carriage cheap.'); } }
   dayAcc += scaled;
   while (dayAcc >= SECONDS_PER_DAY) { dayAcc -= SECONDS_PER_DAY; advanceDay(); }
-  billboardBuildings(camera, false);
-  renderer.render(scene, camera);
+  if (walk.active) {
+    walk.update(dt);
+    billboardBuildings(walkCam, true);
+    renderer.render(scene, walkCam);
+  } else {
+    billboardBuildings(camera, false);
+    renderer.render(scene, camera);
+  }
 }
 frame();
 
