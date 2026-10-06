@@ -42,10 +42,9 @@ const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluag
 // frame and leans on the bob to read as walking.
 const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run', 'deaglan', 'finn', 'vigil']);
 const DIAG_DIRS = new Set(['ne', 'nw', 'se', 'sw']); // the facings that carry real walk art
-// Load-carriers hold their stand frame (sack on the shoulder) and move on the step-
-// bob: their walk frames shift the load low and read like a man with a hoe, so the
-// one stable "man with the bag" from the Phase-1 flicker fix is the right look.
-const HOLD_STAND = new Set(['grain_carrier', 'water_carrier']);
+// Roles that always hold their stand frame even on a diagonal (none at present —
+// the carriers DO stride on the diagonals; only their cardinal facings are copies).
+const HOLD_STAND = new Set();
 
 const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },

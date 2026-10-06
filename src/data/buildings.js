@@ -3,7 +3,7 @@
 export const BUILDINGS = {
   roundhouse: { label: 'Dwelling', sprite: 'roundhouse', art: 'roundhouse', states: 4, scale: 1.12, icon: '🛖', footprint: [2, 2], cost: 20, role: 'dwelling', folk: 4,
     desc: 'A ráth — a round wattle-and-daub home. Draws folk when fed and watered.' },
-  field: { label: 'Field', sprite: 'fields', art: 'field', states: 4, icon: '🌾', footprint: [2, 2], cost: 15, role: 'farm', produce: 'barley', rate: 5, load: 4,
+  field: { label: 'Field', sprite: 'fields', art: 'field', states: 4, drawW: 3.2, icon: '🌾', footprint: [2, 2], cost: 15, role: 'farm', produce: 'barley', rate: 5, load: 4,
     desc: 'Barley for bread and ale. Sends a grain-carrier to a nearby store.' },
   orchard: { label: 'Orchard', sprite: 'fields', art: 'orchard', states: 4, drawW: 3.2, icon: '🍎', footprint: [2, 2], cost: 18, role: 'farm', produce: 'apples', rate: 5, load: 4, unlockLevel: 4,
     desc: 'An úllghort of apple-trees, grown from grafting-shoots won on your raids. A second harvest — its pickers run the fruit to a nearby store, like a field.' },
