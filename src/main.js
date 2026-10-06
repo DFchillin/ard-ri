@@ -4,6 +4,7 @@ import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=CBUST';
 import { WorldView } from './render/world_view.js?v=CBUST';
 import { BUILDINGS } from './data/buildings.js?v=CBUST';
 import { Game } from './sim/game.js?v=CBUST';
+import { Walker } from './sim/walkers.js?v=CBUST';
 import { UI } from './ui.js?v=CBUST';
 import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=CBUST';
 import { setCamera } from './render/assets.js?v=CBUST';
@@ -51,16 +52,46 @@ const walk = {
     return list[0];
   },
   cycle() { const n = this._pickFollow(this.follow); if (n) { this.follow = n; this._first = true; this._updateName(); } },
+  _nearestRoad(cx, cz) {
+    const m = game.map; let best = null, bd = Infinity;
+    for (let z = 0; z < m.size; z++) for (let x = 0; x < m.size; x++) {
+      const t = m.get(x, z); if (!t || !t.road) continue;
+      const d = (x - cx) ** 2 + (z - cz) ** 2; if (d < bd) { bd = d; best = { x, z }; }
+    }
+    return best;
+  },
+  // Once the folk you were following finish their errands, send out Deaglán or
+  // Somhairlín from the builder's house to simply wander the roads — a tireless
+  // subject so the stroll runs on like a screensaver. Only one at a time; cleared
+  // when the stroll ends.
+  _releaseRoamer() {
+    const live = game.walkers.find((w) => w && w.tag === 'stroll' && !w.done);
+    if (live) return live;
+    const house = game.buildings.find((b) => b.key === 'builder_house' && !b.building);
+    const c = house ? game._center(house) : game.map.tileToWorld((game.map.size / 2) | 0, (game.map.size / 2) | 0);
+    const ct = game.map.worldToTile(c.x, c.z) || { x: (game.map.size / 2) | 0, z: (game.map.size / 2) | 0 };
+    const start = this._nearestRoad(ct.x, ct.z); if (!start) return null;
+    const who = Math.random() < 0.5
+      ? { type: 'somhairlin', name: 'Somhairlín', roleEn: 'the Master Builder', roleGa: 'saor' }
+      : { type: 'deaglan', name: 'Deaglán', roleEn: 'the Road-maker', roleGa: 'bóthaire' };
+    const person = { name: who.name, roleEn: who.roleEn, roleGa: who.roleGa, female: false, phraseGa: '', phraseEn: '' };
+    const w = new Walker(game.map, start, { type: who.type, steps: 999999, speed: 1.9, person });
+    w.tag = 'stroll';
+    game.walkers.push(w); game.walkerGroup.add(w.sprite);
+    return w;
+  },
   _updateName() {
     const el = document.getElementById('walk-name'); if (!el) return;
     const p = this.follow && this.follow.person;
+    const roam = this.follow && this.follow.tag === 'stroll';
     el.innerHTML = p
-      ? `<b>${p.nick ? `${p.name} ‘${p.nick}’` : p.name}</b><span>${p.roleEn} · tap to follow another</span>`
+      ? `<b>${p.nick ? `${p.name} ‘${p.nick}’` : p.name}</b><span>${p.roleEn} · ${roam ? 'roaming the ráth' : 'tap to follow another'}</span>`
       : `<b>Nobody abroad</b><span>waiting for folk…</span>`;
   },
   enter() {
-    const w = this._pickFollow(null);
-    if (!w) { flashNotice('🚶 No folk are abroad just now — let the ráth bustle a while, then stroll.'); return; }
+    let w = this._pickFollow(null);
+    if (!w) w = this._releaseRoamer(); // nobody abroad — send out a roamer so the stroll still runs
+    if (!w) { flashNotice('🚶 Lay a road through your ráth first — there is nowhere to stroll yet.'); return; }
     this.follow = w; this._first = true;
     this.active = true;
     this._setSky(true);
@@ -157,13 +188,21 @@ const walk = {
       if (b.alert && b._alertWas !== undefined) { b.alert.visible = b._alertWas; b._alertWas = undefined; }
       if (b.dot && b._dotWas !== undefined) { b.dot.visible = b._dotWas; b._dotWas = undefined; }
     }
+    // Send the stroll-only roamer(s) home: they exist for the screensaver, not the ráth.
+    for (let i = game.walkers.length - 1; i >= 0; i--) {
+      const w = game.walkers[i];
+      if (w && w.tag === 'stroll') { game.walkerGroup.remove(w.sprite); if (w.dispose) w.dispose(); game.walkers.splice(i, 1); }
+    }
+    this.follow = null;
     document.getElementById('ui-overlay').classList.remove('in-walk');
   },
   update(dt) {
-    // Keep a living subject: if the one we follow finished their errand (or was
-    // removed), pick up whoever else is abroad; if nobody is, hold the camera.
+    // Follow one subject for their whole path. When they finish their errand (or
+    // leave), send out Deaglán/Somhairlín to roam the roads and follow them on —
+    // a tireless subject so the stroll runs like a screensaver.
     if (!this.follow || this.follow.done || !game.walkers.includes(this.follow)) {
-      this.follow = this._pickFollow(null); this._first = true; this._updateName();
+      this.follow = this._releaseRoamer() || this._pickFollow(null);
+      this._first = true; this._updateName();
       if (!this.follow) return;
     }
     const p = this.follow.sprite.position;
