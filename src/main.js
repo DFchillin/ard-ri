@@ -283,8 +283,18 @@ game.onEvict = ({ name, reason, silver, cow }) => {
   if (tookCow) setCattle(campaign.cattle - 1);
   pushStats(); saveSettlement();
   const took = [silver ? `🪙 ${silver} silver` : null, tookCow ? '🐄 a cow' : null].filter(Boolean).join(' and ');
-  const how = reason === 'evicted' ? 'is turned out of a home that can no longer hold them' : 'abandons your ráth, unfed and unwatered';
-  flashNotice(`😠 The ${name} family ${how}${took ? ` — and takes ${took} in spite` : ''}. Keep your homes fed and prospering, ${leaderName()}.`);
+  const how = reason === 'homeless' ? 'finds no roof in your ráth and gives up, leaving at last'
+    : reason === 'evicted' ? 'is turned out of a home that can no longer hold them'
+    : 'abandons your ráth, unfed and unwatered';
+  flashNotice(`😠 ${name} ${how}${took ? ` — and takes ${took} in spite` : ''}. Keep roofs over your folk, ${leaderName()}.`);
+};
+// The harvest overflows your stores — grain lost for want of a granary. Throttled.
+let _lastSpill = 0;
+game.onSpill = (n) => {
+  const t = performance.now();
+  if (t - _lastSpill < 9000) return; // one warning at a time, not a stream
+  _lastSpill = t;
+  flashNotice(`🌾 Your stores are full — this harvest spills and spoils. Raise another granary (each holds three fields' harvest), or grain is lost.`);
 };
 
 const sim = { speed: 1 };

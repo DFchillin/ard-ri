@@ -53,10 +53,12 @@ const DISTRESS_DAYS = 4;   // days with NO food AND NO water before a family lea
 const PROSPER_TIER = 2;    // a home at this prosperity tier or above holds more folk
 const PROSPER_CAP = 6;     // the folk a prospering home can hold
 const FESTIVAL_BONUS = 1.5;
-const GRANARY_CAP = 48;    // grain a store holds before it's full
-const FARM_GROW = 24;      // econ ticks for a field to ripen
-const FARM_HARVESTS = 2;   // grain-carriers a ripe field sends before regrowing
+const GRANARY_CAP = 48;    // a store holds three full field-harvests (so 1 store per ~3 fields)
+const FARM_GROW = 48;      // econ ticks for a field to ripen — fewer, bigger harvests
+const FARM_HARVESTS = 4;   // carrier-loads a ripe field sends before regrowing (a bigger harvest)
 const FARM_MIN_FOLK = 4;   // hands the settlement needs to bring a harvest in
+const HOMELESS_SPEED = 0.85; // a turned-out soul trudges the streets — slow and weary
+const HOMELESS_PATIENCE = 8; // days they wander looking for a roof before giving up on the ráth
 const MAX_PER_BLD = 2;     // most walkers any one building keeps on the roads (2 druids per shrine)
 const DELIVER_COST = 1;    // silver a carrier is paid for a delivery along a paved line
 const UNPAVED_COST = 5;    // silver when the run has to cross unpaved ground — build proper roads
@@ -242,7 +244,54 @@ export class Game {
     else { this.silver = 0; this.broke = wages > 0; } // payroll unmet — public folk go unpaid
     for (const b of this.buildings) if (b.def.role === 'dwelling') this._dwellingDay(b, festival, newMonth);
     for (const b of this.buildings) if (b.def.role === 'hall') this._hallDay(b);
+    this._tendHomeless();
     return { rent, wages, net: rent - wages, festival, broke: this.broke };
+  }
+
+  // --- The homeless: turned out of a shrinking home, they wander the roads slowly
+  // looking for a roof. A home with room takes one back in; patience spent with none,
+  // they trudge off and leave the ráth (and one in twenty still leaves in spite). ---
+  _nearestRoadTile(cx, cz) {
+    const m = this.map; let best = null, bd = Infinity;
+    for (let z = 0; z < m.size; z++) for (let x = 0; x < m.size; x++) {
+      const t = m.get(x, z); if (!t || !t.road) continue;
+      const d = (x - cx) ** 2 + (z - cz) ** 2; if (d < bd) { bd = d; best = { x, z }; }
+    }
+    return best;
+  }
+  _makeHomeless(home) {
+    home.pop = Math.max(0, home.pop - 1);
+    this.folk = Math.max(0, this.folk - 1); // not housed, so not counted until they find a roof again
+    const female = Math.random() < 0.5;
+    const person = { name: randomName(female), female, ...personFor('villager') };
+    person.roleEn = 'Homeless'; person.roleGa = 'gan dídean';
+    person.phraseGa = 'Níl dídean dom — cad a dhéanfaidh mé?';
+    person.phraseEn = "No room left for me, and the cold coming on — whatever shall I do? I am no thief, but a soul must eat.";
+    const start = entryRoadTile(this.map, home) || this._nearestRoadTile(home.x, home.z) || { x: home.x, z: home.z };
+    const w = new Walker(this.map, start, { type: 'villager', speed: HOMELESS_SPEED, steps: 999999, person });
+    w.tag = 'homeless'; w.patience = HOMELESS_PATIENCE;
+    this.walkers.push(w); this.walkerGroup.add(w.sprite);
+  }
+  _tendHomeless() {
+    for (const w of this.walkers) {
+      if (w.tag !== 'homeless' || w.done) continue;
+      const home = this.buildings.find((b) => b.def.role === 'dwelling' && !b.building && b.pop < b.cap);
+      if (home) { // a roof has opened — take them back in
+        home.pop += 1; this.folk += 1; w.done = true;
+        if (this.onRehoused) this.onRehoused(w.person);
+        continue;
+      }
+      if (--w.patience <= 0) { // given up on the ráth — trudge off (folk already uncounted)
+        const t = this.map.worldToTile(w.sprite.position.x, w.sprite.position.z) || { x: w.cur.x, z: w.cur.z };
+        const tr = new Traveler(this.map, t, this._arrivalTile(t), { type: 'villager', speed: 2.0, person: w.person });
+        this.walkers.push(tr); this.walkerGroup.add(tr.sprite);
+        w.done = true;
+        if (Math.random() < EVICT_SPITE_CHANCE) {
+          const silver = Math.min(this.silver, EVICT_SILVER); this.silver -= silver;
+          if (this.onEvict) this.onEvict({ name: w.person.name, reason: 'homeless', silver, cow: true });
+        }
+      }
+    }
   }
 
   // The Hall of Hosting drinks twice a dwelling's share of every offering. While
@@ -284,9 +333,10 @@ export class Game {
     if ((newMonth || festival) && thriving && b.tier < 3) b.tier += 1;
     else if (newMonth && !festival && neglected && b.tier > 0) b.tier -= 1;
     b.cap = b.tier >= PROSPER_TIER ? PROSPER_CAP : (b.def.folk || 4);
-    // A home whose prosperity slips can no longer hold as many: the folk over its
-    // new capacity are turned out, and they leave in spite (see _emigrate).
-    while (b.pop > b.cap) this._emigrate(b, 'evicted');
+    // A home whose prosperity slips can no longer hold as many: one soul over its new
+    // capacity is turned out onto the streets as homeless (not the whole family at
+    // once). They roam looking for a roof; given none, they give up on the ráth.
+    if (b.pop > b.cap) this._makeHomeless(b);
   }
 
   _center(f) {
@@ -505,12 +555,10 @@ export class Game {
           if (++b.grown >= FARM_GROW) { b.ripe = true; b.harvestsLeft = FARM_HARVESTS; b.timer = 0; }
           break;
         }
-        // Ripe: bring the harvest in — needs a road, 4 hands in the settlement,
-        // spare labour, at most 2 carriers on the roads at once, AND a grain store
-        // with room. When every store is full the field simply holds its ripe
-        // crop and waits, rather than sending a carrier that spills the harvest
-        // into a full store — so a good year is never silently lost.
-        if (b.connected && this.folk >= FARM_MIN_FOLK && this._labour > 0 && this._storeHasRoom() &&
+        // Ripe: bring the harvest in — needs a road, 4 hands in the settlement, spare
+        // labour, and one carrier per field at a time. Whatever won't fit in a store
+        // spoils (see _sendGrain) — a full harvest wants storage waiting for it.
+        if (b.connected && this.folk >= FARM_MIN_FOLK && this._labour > 0 &&
             this._walkersFrom(b) === 0 && ++b.timer >= 3) {
           b.timer = 0; this._labour--; this._sendGrain(b);
           if (--b.harvestsLeft <= 0) { b.ripe = false; b.grown = 0; } // back to growing
@@ -675,17 +723,19 @@ export class Game {
   // plain grain. The carrier's label reflects whichever the ráth is harvesting.
   _hasOrchard() { return this.buildings.some((b) => b.def.produce === 'apples' && !b.building); }
   _harvestTag(n) { return this._hasOrchard() ? `🍲 food ×${n}` : `🌾 grain ×${n}`; }
-  // Farm → nearest grain store: one carrier hauls a batch (up to 4) along the road.
+  // Farm → nearest grain store: one carrier hauls a batch along the road. What won't
+  // fit in a store is lost — a warning fires so the player raises more granaries.
   _sendGrain(farm) {
-    let load = Math.min(4, Math.round(farm.def.load * this._farmBoost()));
-    if (load <= 0) return;
+    const load = Math.max(1, Math.round((farm.def.load || 4) * this._farmBoost()));
     const stores = this.buildings.filter((b) => b.def.role === 'granary' && !b.building && b.stock < GRANARY_CAP);
-    if (!stores.length) return; // nowhere to store — the field holds its ripe grain
+    if (!stores.length) { this._spill(load); return; } // no store with room — the whole load spoils
     const store = this._nearestTo(farm, stores);
     const add = Math.min(load, GRANARY_CAP - store.stock);
+    if (load - add > 0) this._spill(load - add); // only part fit — the rest spoils
     this._storeFx(farm, null); // grain taken up off the field
     this._deliver(farm, store, this._harvestTag(add), () => { store.stock = Math.min(GRANARY_CAP, store.stock + add); this._storeFx(store, null); });
   }
+  _spill(n) { if (n > 0 && this.onSpill) this.onSpill(n); }
 
   // Well → water_carrier wanders roads, refilling the dwellings it passes.
   _sendWater(well) {
