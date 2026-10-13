@@ -37,6 +37,21 @@ const AGGRO = 6;
 const KU = 0.15;           // gentler casualties — battles breathe
 const KB = 0.35;
 const TEAM = { player: 0x4a86ff, enemy: 0xe0563a };
+const FORM_ICON = { line: '▬', column: '▮', wedge: '▲', diamond: '◆' };
+// How to read the enemy's shape (counter-oriented), shown in the muster.
+const FORM_FOE_HINT = {
+  line: 'a steady front — meet it line-for-line, or flank it',
+  column: 'a fast column — light guard; break it before it re-forms',
+  wedge: 'a spear-point — hits hard but brittle; a diamond blunts it, then counter',
+  diamond: 'an all-round guard — hard to break; out-tier it or grind it with numbers',
+};
+// What your own chosen shape does, shown under the formation picker.
+const FORM_OWN_HINT = {
+  line: 'Líne — a steady, balanced front. The reliable default.',
+  column: 'Colún — a fast, deep column: quick to reposition, lighter guard.',
+  wedge: 'Rinn — the spear-point: +35% damage to crack a line, but brittle and quick to break.',
+  diamond: 'Fáinne — the anvil: very hard to kill and to break, but slow and soft-hitting.',
+};
 // Each side has two livery colours; every company flies them in a different
 // pattern so warbands read apart on the field.
 const LIVERY = { player: [0x2f5fc0, 0xeae2c8], enemy: [0xb0362a, 0x141414] };
@@ -432,7 +447,7 @@ export class Battle {
     }
     this._updateEmbers(dt);
     this._clashAcc += dt;
-    if (this._clashAcc >= CLASH_DT) { this._clashAcc -= CLASH_DT; this._clash(); this._checkEnd(); }
+    if (this._clashAcc >= CLASH_DT) { this._clashAcc -= CLASH_DT; this._enemyTactics(); this._clash(); this._checkEnd(); }
     if (this.selected.size) this._renderCommand();
   }
 
@@ -476,6 +491,24 @@ export class Battle {
     const cry = att.company.cryT > 0 ? 1.25 : 1.0;
     if (def.kind === 'building') return att.build * (att.company.morale / 100) * f.atk * cry * KB * (att.company.bondPair ? BOND_BUILD : 1);
     return att.atk * (att.company.morale / 100) * f.atk * matchup(att.type, def.type) * cry * KU;
+  }
+
+  // The enemy reads the local fight and shifts its shape: a steady line while
+  // marching, a diamond to turtle up when pressed or outnumbered, a wedge to press
+  // the spear-point home when it has the upper hand. Near-even scrums hold, so the
+  // host doesn't flip-flop each clash.
+  _enemyTactics() {
+    for (const c of this._liveCompanies('enemy')) {
+      if (c.lone) continue; // a lone power (a god, the menace) keeps its stance
+      const cp = this._companyPos(c); if (!cp) continue;
+      let foes = 0, friends = 0;
+      for (const o of this.units) if (!o.dead && !o.company.routing && dist2(o.pos, cp) < 20) (o.team === 'enemy' ? friends++ : foes++);
+      let want = c.formation;
+      if (foes === 0) want = 'line';
+      else if (foes >= friends + 2 || c.morale < 48) want = 'diamond';
+      else if (friends >= foes + 1) want = 'wedge';
+      if (want !== c.formation) c.formation = want;
+    }
   }
 
   _clash() {
@@ -744,6 +777,20 @@ export class Battle {
       s.title = 'remove'; s.addEventListener('click', () => { this.forming.types.splice(i, 1); this._renderMuster(); }); tray.appendChild(s); });
     if (!this.forming.types.length) tray.innerHTML = '<span class="dim">tap folk above to raise a company (up to 6)</span>';
     document.querySelectorAll('#bs-formations [data-form]').forEach((b) => b.classList.toggle('on', b.dataset.form === this.forming.formation));
+    const hint = document.getElementById('bs-form-hint'); if (hint) hint.textContent = FORM_OWN_HINT[this.forming.formation] || '';
+    // Read the foe: their companies and the shape each has taken, so you can answer it.
+    const foe = document.getElementById('bs-foe');
+    if (foe) {
+      const enemies = this.companies.filter((x) => x.team === 'enemy' && x.units.some((u) => !u.dead));
+      foe.innerHTML = enemies.length
+        ? `<div class="bs-sec">The foe’s host — read their shape</div>` + enemies.map((c) => {
+            const f = FORMATIONS[c.formation], lone = c.lone;
+            const shape = lone ? '' : ` · ${FORM_ICON[c.formation]} ${f.label}`;
+            const tip = lone ? 'a lone power — bring your best, and gang up' : FORM_FOE_HINT[c.formation];
+            return `<div class="bs-co foe"><b>${c.name ? c.name[0] : 'a host'}</b> <small>×${c.units.length}${shape} · led by ${UNIT_TYPES[c.leader.type].label}</small><i class="bs-foe-hint">${tip}</i></div>`;
+          }).join('')
+        : '';
+    }
     const place = document.getElementById('bs-place');
     place.textContent = this.placing ? 'Tap your side to set down…' : 'Set down ▸';
     place.classList.toggle('armed', this.placing);
