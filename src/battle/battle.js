@@ -517,7 +517,8 @@ export class Battle {
     for (const [t, raw] of dmg) {
       const focus = Math.min(FOCUS_CAP, 1 + FOCUS_BONUS * Math.max(0, (attackers.get(t) || 1) - 1));
       const shield = t.kind === 'unit' ? 1 / (1 + RESERVE_DEF * (reserves.get(t.company) || 0)) : 1;
-      const n = raw * focus * shield;
+      const tough = t.kind === 'unit' ? FORMATIONS[t.company.formation].tough : 1; // a tight shape (diamond) soaks blows; a wedge is brittle
+      const n = raw * focus * shield / tough;
       t.hp -= n;
       if (t.kind === 'unit') took.set(t.company, (took.get(t.company) || 0) + n);
       if (t.hp <= 0) {
@@ -541,7 +542,7 @@ export class Battle {
         const cp = this._companyPos(c);
         let foes = 0, friends = 0;
         for (const o of this.units) if (!o.dead && !o.company.routing && dist2(o.pos, cp) < 16) (o.team === c.team ? friends++ : foes++);
-        c.morale -= (dealt / c.morale0) * 26 + Math.max(0, foes - friends) * 1.5;
+        c.morale -= ((dealt / c.morale0) * 26 + Math.max(0, foes - friends) * 1.5) / FORMATIONS[c.formation].hold; // a holding shape keeps its nerve; a wedge breaks sooner
       } else c.morale += 4 * CLASH_DT;
       c.morale = Math.max(0, Math.min(100, c.morale));
       if (c.spectral) c.morale = Math.max(c.morale, ROUT_MISNEACH + 1); // the dead never break
