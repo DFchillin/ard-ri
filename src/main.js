@@ -2078,13 +2078,21 @@ const clock = new THREE.Clock();
 // its view plane (identical to the old billboard sprite). In the first-person stroll
 // we only yaw them to face the camera, keeping them vertically upright — so a building
 // stands straight instead of tilting its top toward you and overhanging the tile.
+// The building art is painted for the iso camera, which looks down at ISO_RECLINE
+// (atan(ISO_Y / √2) ≈ 31.5°). In the iso view the sprite copies that camera, so it
+// sits reclined by that angle and its roof reads right. In the stroll we yaw the
+// sprite to face the walker but recline it by the same angle, so the baked-in
+// perspective lands correctly (roof leans back, not forward over the path) — no
+// overhang, and the art itself gives the sense of depth.
+const ISO_RECLINE = Math.atan(0.866 / Math.SQRT2);
 function billboardBuildings(cam, upright) {
   const list = game.buildingGroup.children;
   for (let i = 0; i < list.length; i++) {
     const g = list[i], u = g.userData; if (!u) continue;
     const spr = u.spr; if (!spr || !spr.userData || !spr.userData.billboard) continue;
-    if (upright) { // the stroll: a single upright billboard spun to face the camera, planted by its contact shadow
-      spr.rotation.set(0, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
+    if (upright) { // the stroll: yaw to face the walker, reclined to the art's own angle, planted by its contact shadow
+      spr.rotation.order = 'YXZ';
+      spr.rotation.set(-ISO_RECLINE, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
       if (u.shadow) u.shadow.visible = true;
     } else { // the iso view: the flat billboard, screen-aligned; no ground shadow
       spr.quaternion.copy(cam.quaternion);
