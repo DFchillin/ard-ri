@@ -51,7 +51,13 @@ const walk = {
     list.sort((a, b) => a.sprite.position.distanceToSquared(c) - b.sprite.position.distanceToSquared(c));
     return list[0];
   },
-  cycle() { const n = this._pickFollow(this.follow); if (n) { this.follow = n; this._first = true; this._updateName(); } },
+  cycle() { // rotate through the folk abroad, then up into the raven, then round again
+    const list = [...this._followable(), this._raven()];
+    let i = list.findIndex((s) => s === this.follow || (s.raven && this.follow && this.follow.raven));
+    let next = list[(i + 1) % list.length];
+    if (next && !next.raven && next.done) next = this._releaseRoamer() || next;
+    this.follow = next; this._first = true; this._updateName();
+  },
   _nearestRoad(cx, cz) {
     const m = game.map; let best = null, bd = Infinity;
     for (let z = 0; z < m.size; z++) for (let x = 0; x < m.size; x++) {
@@ -71,21 +77,59 @@ const walk = {
     const c = house ? game._center(house) : game.map.tileToWorld((game.map.size / 2) | 0, (game.map.size / 2) | 0);
     const ct = game.map.worldToTile(c.x, c.z) || { x: (game.map.size / 2) | 0, z: (game.map.size / 2) | 0 };
     const start = this._nearestRoad(ct.x, ct.z); if (!start) return null;
-    const who = Math.random() < 0.5
-      ? { type: 'somhairlin', name: 'Somhairlín', roleEn: 'the Master Builder', roleGa: 'saor' }
-      : { type: 'deaglan', name: 'Deaglán', roleEn: 'the Road-maker', roleGa: 'bóthaire' };
+    const roamers = [
+      { type: 'somhairlin', name: 'Somhairlín', roleEn: 'the Master Builder', roleGa: 'saor' },
+      { type: 'deaglan', name: 'Deaglán', roleEn: 'the Road-maker', roleGa: 'bóthaire' },
+      { type: 'finn', name: 'Fionn', roleEn: 'lord of the Fianna', roleGa: 'rí na Féinne' },
+    ];
+    const who = roamers[(Math.random() * roamers.length) | 0];
     const person = { name: who.name, roleEn: who.roleEn, roleGa: who.roleGa, female: false, phraseGa: '', phraseEn: '' };
     const w = new Walker(game.map, start, { type: who.type, steps: 999999, speed: 1.9, person });
     w.tag = 'stroll';
     game.walkers.push(w); game.walkerGroup.add(w.sprite);
     return w;
   },
+  // The Mhórrígan rides the air as a raven — no sprite, just her eye: the camera
+  // wheels over the ráth, swooping between points at a bird's height until you switch.
+  _rav: new THREE.Vector3(), _ravTo: new THREE.Vector3(), _ravT: 0,
+  _raven() {
+    if (!this._ravenS) this._ravenS = { raven: true, person: { name: 'An Mhórrígan', roleEn: 'phantom queen of war', roleGa: 'badhbh', phraseGa: '', phraseEn: '' } };
+    return this._ravenS;
+  },
+  _pickRavTarget() {
+    const m = game.map;
+    const tx = (5 + Math.random() * (m.size - 10)) | 0, tz = (5 + Math.random() * (m.size - 10)) | 0;
+    const w = m.tileToWorld(tx, tz); this._ravTo.set(w.x, 8 + Math.random() * 8, w.z);
+  },
+  _updateRaven(dt) {
+    if (this._first) {
+      const c = game.map.tileToWorld((game.map.size / 2) | 0, (game.map.size / 2) | 0);
+      this._rav.set(c.x, 12, c.z); this._pickRavTarget(); this._ravT = 0;
+      this._cl.set(c.x, 1, c.z); this._hx = 0; this._hz = 1; this._first = false;
+    }
+    this._ravT += dt;
+    let dx = this._ravTo.x - this._rav.x, dz = this._ravTo.z - this._rav.z;
+    const flat = Math.hypot(dx, dz);
+    if (flat < 3) this._pickRavTarget();
+    if (flat > 0.001) { dx /= flat; dz /= flat; this._hx += (dx - this._hx) * Math.min(1, dt * 1.6); this._hz += (dz - this._hz) * Math.min(1, dt * 1.6); }
+    const spd = 7;
+    this._rav.x += this._hx * spd * dt; this._rav.z += this._hz * spd * dt;
+    const bob = Math.sin(this._ravT * 0.9) * 1.6;              // the lazy rise and fall of wings
+    this._rav.y += ((this._ravTo.y + bob) - this._rav.y) * Math.min(1, dt * 0.9);
+    walkCam.position.copy(this._rav);
+    _tmpV.set(this._rav.x + this._hx * 9, 1.2, this._rav.z + this._hz * 9); // survey ahead and down over the ráth
+    this._cl.lerp(_tmpV, Math.min(1, dt * 2.2));
+    walkCam.lookAt(this._cl);
+    if (this._skyDome) this._skyDome.position.set(this._rav.x, 0, this._rav.z);
+  },
   _updateName() {
     const el = document.getElementById('walk-name'); if (!el) return;
-    const p = this.follow && this.follow.person;
-    const roam = this.follow && this.follow.tag === 'stroll';
+    const f = this.follow, p = f && f.person;
+    const sub = f && f.raven ? 'wheeling over the ráth · tap to walk'
+      : f && f.tag === 'stroll' ? 'roaming the ráth · tap for another'
+      : 'tap to follow another';
     el.innerHTML = p
-      ? `<b>${p.nick ? `${p.name} ‘${p.nick}’` : p.name}</b><span>${p.roleEn} · ${roam ? 'roaming the ráth' : 'tap to follow another'}</span>`
+      ? `<b>${p.nick ? `${p.name} ‘${p.nick}’` : p.name}</b><span>${p.roleEn} · ${sub}</span>`
       : `<b>Nobody abroad</b><span>waiting for folk…</span>`;
   },
   enter() {
@@ -94,6 +138,7 @@ const walk = {
     if (!w) { flashNotice('🚶 Lay a road through your ráth first — there is nowhere to stroll yet.'); return; }
     this.follow = w; this._first = true;
     this.active = true;
+    game._hideMarkers = true; // the economy ticks through the stroll — keep it from re-showing the road "!" each tick
     this._setSky(true);
     // Tuck away the build-mode markers (road-alert "!" and inspect dots) — they
     // billboard and would float in the sky over a scenic stroll.
@@ -183,6 +228,7 @@ const walk = {
   },
   exit() {
     this.active = false;
+    game._hideMarkers = false;
     this._setSky(false);
     for (const b of game.buildings) {
       if (b.alert && b._alertWas !== undefined) { b.alert.visible = b._alertWas; b._alertWas = undefined; }
@@ -197,8 +243,9 @@ const walk = {
     document.getElementById('ui-overlay').classList.remove('in-walk');
   },
   update(dt) {
+    if (this.follow && this.follow.raven) { this._updateRaven(dt); return; } // the raven flies, no ground subject
     // Follow one subject for their whole path. When they finish their errand (or
-    // leave), send out Deaglán/Somhairlín to roam the roads and follow them on —
+    // leave), send out Deaglán/Somhairlín/Fionn to roam the roads and follow them on —
     // a tireless subject so the stroll runs like a screensaver.
     if (!this.follow || this.follow.done || !game.walkers.includes(this.follow)) {
       this.follow = this._releaseRoamer() || this._pickFollow(null);
@@ -2034,10 +2081,16 @@ const clock = new THREE.Clock();
 function billboardBuildings(cam, upright) {
   const list = game.buildingGroup.children;
   for (let i = 0; i < list.length; i++) {
-    const g = list[i], spr = g.userData && g.userData.spr;
-    if (!spr || !spr.userData || !spr.userData.billboard) continue;
-    if (upright) spr.rotation.set(0, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
-    else spr.quaternion.copy(cam.quaternion);
+    const g = list[i], u = g.userData; if (!u) continue;
+    const spr = u.spr; if (!spr || !spr.userData || !spr.userData.billboard) continue;
+    if (upright) { // the stroll: show the solid block, hide the flat billboard
+      if (u.box) { u.box.visible = true; spr.visible = false; }
+      else spr.rotation.set(0, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
+    } else { // the iso view: the flat billboard, screen-aligned; block hidden
+      if (u.box) u.box.visible = false;
+      spr.visible = true;
+      spr.quaternion.copy(cam.quaternion);
+    }
   }
 }
 

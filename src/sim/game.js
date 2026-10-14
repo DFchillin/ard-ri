@@ -514,7 +514,7 @@ export class Game {
     for (const b of this.buildings) {
       const connected = !!entryRoadTile(this.map, b);
       b.connected = connected;
-      if (b.alert) b.alert.visible = !connected && b.def.role !== 'homestead' && b.def.role !== 'gallan'; // homestead and standing-stone need no road
+      if (b.alert) b.alert.visible = !this._hideMarkers && !connected && b.def.role !== 'homestead' && b.def.role !== 'gallan'; // homestead and standing-stone need no road
       // dwellings rise when occupied; a field only shows its golden crop when ripe; else road-connected
       const active = b.building ? false // an unfinished site produces nothing until Somhairlín raises it
         : b.def.role === 'dwelling' ? b.pop > 0

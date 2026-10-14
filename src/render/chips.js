@@ -8,6 +8,10 @@ const WALK_CYCLE = [0, 2, 1, 2]; // step1, stand, step2, stand
 // match a sprite under the iso camera, upright-yaw toward the camera in the stroll
 // (so a building stands up straight instead of tilting/overhanging at eye level).
 const BUILD_PLANE = new THREE.PlaneGeometry(1, 1); BUILD_PLANE.translate(0, 0.5, 0);
+// A unit cube on its base, shown only in the first-person stroll: the building art
+// is painted on all four sides and the roof so the town reads as solid blocks you
+// walk and fly among. (The four sides share one image — accepted for the look.)
+const BUILD_BOX = new THREE.BoxGeometry(1, 1, 1); BUILD_BOX.translate(0, 0.5, 0);
 const STEP_TIME = 0.42; // seconds per walk frame (slower, calmer gait)
 
 // A screen-facing billboard's width maps to the footprint's diagonal screen
@@ -93,11 +97,22 @@ export function makeBuildingChip(role, w, h, ts, opts = {}) {
     // width per art generation — so a person reads the same size next to every
     // building and perspective holds, whatever tile footprint the plot occupies.
     const worldW = drawW != null ? drawW * ts : (w + h) * ts * DIAG_FILL * scale;
-    const spr = new THREE.Mesh(BUILD_PLANE, new THREE.MeshBasicMaterial({ map: frames[0], transparent: true, alphaTest: 0.12, side: THREE.DoubleSide }));
+    const mat = new THREE.MeshBasicMaterial({ map: frames[0], transparent: true, alphaTest: 0.12, side: THREE.DoubleSide });
+    const spr = new THREE.Mesh(BUILD_PLANE, mat);
     spr.userData.billboard = true; // main loop orients it (iso: screen-aligned; stroll: upright)
     fitWidth(spr, frames[0], worldW);
     g.add(spr);
-    g.userData = { spr, frames, worldW, state: 0 };
+    // the solid-block version for the stroll — same art on all 4 sides + roof, a dark
+    // underside; hidden in the iso view, shown (unrotated) while walking/flying.
+    const cap = new THREE.MeshBasicMaterial({ color: 0x3a2f22 });
+    const box = new THREE.Mesh(BUILD_BOX, [mat, mat, mat, cap, mat, mat]);
+    box.scale.set(Math.max(0.8, w * ts * 0.95), worldW, Math.max(0.8, h * ts * 0.95));
+    box.visible = false; box.renderOrder = -1;
+    // height follows the box's own footprint width × the art's aspect, so a block is
+    // proportioned like its sprite (never a tall thin sliver) and stays on its plot.
+    onReady(frames[0], () => { const i = frames[0].image; if (i && i.width) box.scale.y = box.scale.x * (i.height / i.width); });
+    g.add(box);
+    g.userData = { spr, box, frames, worldW, state: 0 };
   } else {
     g.add(fallbackBody(FALLBACK[role] || { color: 0x999999, h: 1 }, w, h, ts));
   }
