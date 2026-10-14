@@ -2083,13 +2083,12 @@ function billboardBuildings(cam, upright) {
   for (let i = 0; i < list.length; i++) {
     const g = list[i], u = g.userData; if (!u) continue;
     const spr = u.spr; if (!spr || !spr.userData || !spr.userData.billboard) continue;
-    if (upright) { // the stroll: show the solid block, hide the flat billboard
-      if (u.box) { u.box.visible = true; spr.visible = false; }
-      else spr.rotation.set(0, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
-    } else { // the iso view: the flat billboard, screen-aligned; block hidden
-      if (u.box) u.box.visible = false;
-      spr.visible = true;
+    if (upright) { // the stroll: a single upright billboard spun to face the camera, planted by its contact shadow
+      spr.rotation.set(0, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
+      if (u.shadow) u.shadow.visible = true;
+    } else { // the iso view: the flat billboard, screen-aligned; no ground shadow
       spr.quaternion.copy(cam.quaternion);
+      if (u.shadow) u.shadow.visible = false;
     }
   }
 }
