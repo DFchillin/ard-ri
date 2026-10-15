@@ -80,11 +80,11 @@ const walk = {
     const roamers = [
       { type: 'somhairlin', name: 'Somhairlín', roleEn: 'the Master Builder', roleGa: 'saor' },
       { type: 'deaglan', name: 'Deaglán', roleEn: 'the Road-maker', roleGa: 'bóthaire' },
-      { type: 'finn', name: 'Fionn', roleEn: 'lord of the Fianna', roleGa: 'rí na Féinne' },
+      { type: 'finn_run', name: 'Finn', roleEn: 'the ráth’s hound', roleGa: 'cú an ráth' },
     ];
     const who = roamers[(Math.random() * roamers.length) | 0];
     const person = { name: who.name, roleEn: who.roleEn, roleGa: who.roleGa, female: false, phraseGa: '', phraseEn: '' };
-    const w = new Walker(game.map, start, { type: who.type, steps: 999999, speed: 1.9, person });
+    const w = new Walker(game.map, start, { type: who.type, steps: 999999, speed: 1.9, person, freeRoam: true });
     w.tag = 'stroll';
     game.walkers.push(w); game.walkerGroup.add(w.sprite);
     return w;

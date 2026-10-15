@@ -153,7 +153,10 @@ const WALKER_COLOR = {
   water_carrier: 0x6fb0e0, druid: 0xb07ad0,
 };
 
-const WALKER_H = 1.3;   // world height every walker renders at, whatever the art's pixel size
+const WALKER_H = 1.3;   // world height a person renders at, whatever the art's pixel size
+// Non-human walkers ride at their own height. Finn the hound is about a quarter of
+// a person — a small dog bounding the roads, not a man-sized beast.
+const WALKER_HEIGHT = { finn: 0.34, finn_run: 0.34 };
 const WALK_FRAMES = 6;  // walk poses per facing (cardinals repeat their idle)
 const WALK_FPS = 0.11;  // seconds per walk frame
 // Roles that carry an extra 8-facing hammer swing (<dir>_hammer0..N) — the
@@ -166,7 +169,7 @@ const HAMMER_STRIKE = 3; // the frame the hammer falls, for syncing the sparks
 // the foe and back. Cheap, render-side, reads as "having a go".
 const LUNGE_DUR = 0.34;
 const LUNGE_DIST = 0.38;
-export function makeWalkerChip(type, female, h = WALKER_H) {
+export function makeWalkerChip(type, female, h = WALKER_HEIGHT[type] || WALKER_H) {
   const role = WALK_FILE[type] || 'villager';
   // Half the folk are women — every role has a matching female sprite set in a
   // <role>_f folder, so the streets read as families, not a town of one gender.
