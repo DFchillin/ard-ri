@@ -166,6 +166,7 @@ const walk = {
         g.addColorStop(0.66, '#aec489'); g.addColorStop(0.76, '#86a65c'); g.addColorStop(1.0, '#5c7d40');
         x.fillStyle = g; x.fillRect(0, 0, 16, 256);
         const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
+        this._gradTex = tx; // the procedural fallback sky, kept for seasons with no painted panorama
         const mat = new THREE.MeshBasicMaterial({ map: tx, side: THREE.BackSide, fog: false, depthWrite: false });
         this._skyDome = new THREE.Mesh(new THREE.SphereGeometry(300, 24, 16), mat);
         this._skyDome.renderOrder = -10;
@@ -174,7 +175,12 @@ const walk = {
       this._skyDome.visible = true;
       this._buildScenery(); this._scenery.visible = true;
       const sk = SEASON_SKY[curSeason] || SEASON_SKY.earrach;
-      this._skyDome.material.color.setHex(sk.tint); // tint the dome to the season's mood
+      // A painted equirectangular panorama for the season drapes the dome if we have
+      // one; otherwise the gradient dome, tinted to the season's mood, stands in.
+      const pano = this._seasonSky(curSeason);
+      if (pano) { this._skyDome.material.map = pano; this._skyDome.material.color.setHex(0xffffff); }
+      else { this._skyDome.material.map = this._gradTex; this._skyDome.material.color.setHex(sk.tint); }
+      this._skyDome.material.needsUpdate = true;
       this._savedFog = { color: scene.fog.color.getHex(), near: scene.fog.near, far: scene.fog.far };
       scene.fog.color.setHex(sk.fog); scene.fog.near = 7; scene.fog.far = 58;
     } else {
@@ -182,6 +188,23 @@ const walk = {
       if (this._scenery) this._scenery.visible = false;
       if (this._savedFog) { scene.fog.color.setHex(this._savedFog.color); scene.fog.near = this._savedFog.near; scene.fog.far = this._savedFog.far; this._savedFog = null; }
     }
+  },
+  // The season's painted sky, loaded once and cached. Returns the texture if ready,
+  // else null (the gradient stands in) and kicks off the load — which, once decoded,
+  // drapes the dome if that season is still the one on show.
+  _skyTex: {}, _skyTried: {},
+  _seasonSky(season) {
+    if (this._skyTex[season]) return this._skyTex[season];
+    if (!this._skyTried[season]) {
+      this._skyTried[season] = true;
+      new THREE.TextureLoader().load(`assets/sky/sky_${season}.jpg?v=CBUST`, (t) => {
+        t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; this._skyTex[season] = t;
+        if (this.active && curSeason === season && this._skyDome) {
+          this._skyDome.material.map = t; this._skyDome.material.color.setHex(0xffffff); this._skyDome.material.needsUpdate = true;
+        }
+      }, undefined, () => { this._skyTried[season] = 'fail'; }); // no file → keep the gradient
+    }
+    return null;
   },
   // Low-poly hills and cone-trees ringing the ráth, drawn once in Three.js geometry.
   // They sit out past the settlement and are fog-affected, so they read as hazy green
