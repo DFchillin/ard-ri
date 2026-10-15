@@ -51,12 +51,17 @@ const walk = {
     list.sort((a, b) => a.sprite.position.distanceToSquared(c) - b.sprite.position.distanceToSquared(c));
     return list[0];
   },
-  cycle() { // rotate through the folk abroad, then up into the raven, then round again
-    const list = [...this._followable(), this._raven()];
-    let i = list.findIndex((s) => s === this.follow || (s.raven && this.follow && this.follow.raven));
-    let next = list[(i + 1) % list.length];
-    if (next && !next.raven && next.done) next = this._releaseRoamer() || next;
-    this.follow = next; this._first = true; this._updateName();
+  cycle() { // rotate through the folk abroad, with the Mhórrígan coming round every third subject so she's never buried behind a crowd
+    this._tapN = (this._tapN || 0) + 1;
+    if (!(this.follow && this.follow.raven) && this._tapN % 3 === 0) {
+      this.follow = this._raven(); this._first = true; this._updateName(); return;
+    }
+    const list = this._followable();
+    if (!list.length) { const r = this._releaseRoamer(); if (r) { this.follow = r; this._first = true; this._updateName(); } return; }
+    const after = (this.follow && !this.follow.raven) ? this.follow : this._lastCit;
+    let next = this._pickFollow(after) || list[0];
+    if (next && next.done) next = this._releaseRoamer() || next;
+    this._lastCit = next; this.follow = next; this._first = true; this._updateName();
   },
   _nearestRoad(cx, cz) {
     const m = game.map; let best = null, bd = Infinity;
@@ -96,29 +101,47 @@ const walk = {
     if (!this._ravenS) this._ravenS = { raven: true, person: { name: 'An Mhórrígan', roleEn: 'phantom queen of war', roleGa: 'badhbh', phraseGa: '', phraseEn: '' } };
     return this._ravenS;
   },
-  _pickRavTarget() {
-    const m = game.map;
-    const tx = (5 + Math.random() * (m.size - 10)) | 0, tz = (5 + Math.random() * (m.size - 10)) | 0;
-    const w = m.tileToWorld(tx, tz); this._ravTo.set(w.x, 8 + Math.random() * 8, w.z);
+  // The Mhórrígan's flight is a slow, searching sweep along the ráth's diagonals —
+  // corner to opposite corner through the middle, rising from a low skim to a high
+  // wheel and stooping again, as if she were hunting a face below. Diagonal legs
+  // match the axis the iso art is drawn for, and the buildings hold their iso
+  // facing during the flyover (see billboardBuildings), so nothing spins.
+  _ravRoute() {
+    const m = game.map, N = m.size, pad = Math.max(5, Math.round(N * 0.2));
+    const a = pad, b = N - 1 - pad, c = N >> 1, LO = 2.6, MID = 9, HI = 16;
+    const V = (tx, tz, y) => { const p = m.tileToWorld(tx, tz); return new THREE.Vector3(p.x, y, p.z); };
+    return [
+      V(a, b, LO),  // SW, a low skim
+      V(c, c, MID), // climbing to the middle
+      V(b, a, HI),  // up to the NE corner, high
+      V(c, c, LO),  // stooping back through the middle, searching
+      V(a, a, HI),  // climbing to the NW corner
+      V(c, c, MID), // the middle again
+      V(b, b, LO),  // a low stoop to the SE corner
+      V(c, c, HI),  // rising slow over the middle, then round again
+    ];
   },
   _updateRaven(dt) {
     if (this._first) {
-      const c = game.map.tileToWorld((game.map.size / 2) | 0, (game.map.size / 2) | 0);
-      this._rav.set(c.x, 12, c.z); this._pickRavTarget(); this._ravT = 0;
-      this._cl.set(c.x, 1, c.z); this._hx = 0; this._hz = 1; this._first = false;
+      if (!this._ravWps) this._ravWps = this._ravRoute();
+      this._ravI = 1; const s = this._ravWps[0];
+      this._rav.copy(s); this._ravT = 0; this._cl.set(s.x, 1, s.z);
+      const n = this._ravWps[1]; const h = Math.hypot(n.x - s.x, n.z - s.z) || 1;
+      this._hx = (n.x - s.x) / h; this._hz = (n.z - s.z) / h; this._first = false;
     }
     this._ravT += dt;
-    let dx = this._ravTo.x - this._rav.x, dz = this._ravTo.z - this._rav.z;
+    const tgt = this._ravWps[this._ravI];
+    let dx = tgt.x - this._rav.x, dz = tgt.z - this._rav.z;
     const flat = Math.hypot(dx, dz);
-    if (flat < 3) this._pickRavTarget();
-    if (flat > 0.001) { dx /= flat; dz /= flat; this._hx += (dx - this._hx) * Math.min(1, dt * 1.6); this._hz += (dz - this._hz) * Math.min(1, dt * 1.6); }
-    const spd = 7;
+    if (flat < 2.5) this._ravI = (this._ravI + 1) % this._ravWps.length; // reached this leg → on to the next
+    if (flat > 0.001) { dx /= flat; dz /= flat; this._hx += (dx - this._hx) * Math.min(1, dt * 0.8); this._hz += (dz - this._hz) * Math.min(1, dt * 0.8); }
+    const spd = 3.4; // slow, searching
     this._rav.x += this._hx * spd * dt; this._rav.z += this._hz * spd * dt;
-    const bob = Math.sin(this._ravT * 0.9) * 1.6;              // the lazy rise and fall of wings
-    this._rav.y += ((this._ravTo.y + bob) - this._rav.y) * Math.min(1, dt * 0.9);
+    const bob = Math.sin(this._ravT * 0.6) * 1.2;             // the lazy rise and fall of wings
+    this._rav.y += ((tgt.y + bob) - this._rav.y) * Math.min(1, dt * 0.5); // ease height toward the leg, slowly
     walkCam.position.copy(this._rav);
-    _tmpV.set(this._rav.x + this._hx * 9, 1.2, this._rav.z + this._hz * 9); // survey ahead and down over the ráth
-    this._cl.lerp(_tmpV, Math.min(1, dt * 2.2));
+    _tmpV.set(this._rav.x + this._hx * 10, Math.max(0.6, this._rav.y - 6), this._rav.z + this._hz * 10); // gaze ahead and down over the ráth
+    this._cl.lerp(_tmpV, Math.min(1, dt * 1.4));
     walkCam.lookAt(this._cl);
     if (this._skyDome) this._skyDome.position.set(this._rav.x, 0, this._rav.z);
   },
@@ -2108,12 +2131,15 @@ const clock = new THREE.Clock();
 // perspective lands correctly (roof leans back, not forward over the path) — no
 // overhang, and the art itself gives the sense of depth.
 const ISO_RECLINE = Math.atan(0.866 / Math.SQRT2);
-function billboardBuildings(cam, upright) {
+function billboardBuildings(cam, upright, raven) {
   const list = game.buildingGroup.children;
   for (let i = 0; i < list.length; i++) {
     const g = list[i], u = g.userData; if (!u) continue;
     const spr = u.spr; if (!spr || !spr.userData || !spr.userData.billboard) continue;
-    if (upright) { // the stroll: yaw to face the walker, reclined to the art's own angle, planted by its contact shadow
+    if (raven) { // the Mhórrígan's flyover: hold the iso facing (screen-aligned, as in build mode) so buildings read correctly from the air instead of spinning to track the moving camera
+      spr.quaternion.copy(cam.quaternion);
+      if (u.shadow) u.shadow.visible = true; // keep the contact shadow — it reads as a footprint from above
+    } else if (upright) { // the ground stroll: yaw to face the walker, reclined to the art's own angle, planted by its contact shadow
       spr.rotation.order = 'YXZ';
       spr.rotation.set(-ISO_RECLINE, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
       if (u.shadow) u.shadow.visible = true;
@@ -2149,7 +2175,7 @@ function frame() {
   while (dayAcc >= SECONDS_PER_DAY) { dayAcc -= SECONDS_PER_DAY; advanceDay(); }
   if (walk.active) {
     walk.update(dt);
-    billboardBuildings(walkCam, true);
+    billboardBuildings(walkCam, true, !!(walk.follow && walk.follow.raven));
     renderer.render(scene, walkCam);
   } else {
     billboardBuildings(camera, false);
