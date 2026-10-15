@@ -154,9 +154,9 @@ const WALKER_COLOR = {
 };
 
 const WALKER_H = 1.3;   // world height a person renders at, whatever the art's pixel size
-// Non-human walkers ride at their own height. Finn the hound is about a quarter of
-// a person — a small dog bounding the roads, not a man-sized beast.
-const WALKER_HEIGHT = { finn: 0.34, finn_run: 0.34 };
+// Non-human walkers ride at their own height. Finn the hound is about half a
+// person — a proper dog bounding the roads, not a man-sized beast nor a mouse.
+const WALKER_HEIGHT = { finn: 0.68, finn_run: 0.68 };
 const WALK_FRAMES = 6;  // walk poses per facing (cardinals repeat their idle)
 const WALK_FPS = 0.11;  // seconds per walk frame
 // Roles that carry an extra 8-facing hammer swing (<dir>_hammer0..N) — the

@@ -108,36 +108,61 @@ const walk = {
   // facing during the flyover (see billboardBuildings), so nothing spins.
   _ravRoute() {
     const m = game.map, N = m.size, pad = Math.max(5, Math.round(N * 0.2));
-    const a = pad, b = N - 1 - pad, c = N >> 1, LO = 2.6, MID = 9, HI = 16;
-    const V = (tx, tz, y) => { const p = m.tileToWorld(tx, tz); return new THREE.Vector3(p.x, y, p.z); };
+    const a = pad, b = N - 1 - pad, c = N >> 1, LO = 2.0, HI = 12;
+    // perch legs sit in the corners (she sets down there); transit legs cross the
+    // middle high. LO is only the approach floor — the true perch height is chosen
+    // on landing (a treetop if one is near, else a low skim).
+    const V = (tx, tz, y, perch) => { const p = m.tileToWorld(tx, tz); return { v: new THREE.Vector3(p.x, y, p.z), perch: !!perch }; };
     return [
-      V(a, b, LO),  // SW, a low skim
-      V(c, c, MID), // climbing to the middle
-      V(b, a, HI),  // up to the NE corner, high
-      V(c, c, LO),  // stooping back through the middle, searching
-      V(a, a, HI),  // climbing to the NW corner
-      V(c, c, MID), // the middle again
-      V(b, b, LO),  // a low stoop to the SE corner
-      V(c, c, HI),  // rising slow over the middle, then round again
+      V(a, b, LO, true),  // SW corner — set down and watch
+      V(c, c, HI),        // rise and cross the middle, high
+      V(b, a, LO, true),  // NE corner — set down and watch
+      V(c, c, HI),        // back high over the middle
+      V(a, a, LO, true),  // NW corner
+      V(c, c, HI),        // the middle again
+      V(b, b, LO, true),  // SE corner
+      V(c, c, HI),        // middle, then round again
     ];
+  },
+  // The nearest treetop to a corner, if one is close enough to alight on; else a low
+  // skim just above the ground there.
+  _perchFor(c) {
+    let best = null, bd = Infinity;
+    for (const t of (this._treePts || [])) { const d = (t.x - c.x) ** 2 + (t.z - c.z) ** 2; if (d < bd) { bd = d; best = t; } }
+    if (best && bd < 24 * 24) return new THREE.Vector3(best.x, Math.max(1.4, best.top + 0.4), best.z);
+    return new THREE.Vector3(c.x, 1.6, c.z);
   },
   _updateRaven(dt) {
     if (this._first) {
+      this._buildScenery(); // the treetops she may perch on
       if (!this._ravWps) this._ravWps = this._ravRoute();
-      this._ravI = 1; const s = this._ravWps[0];
+      this._ravI = 1; this._perchT = 0; const s = this._ravWps[0].v;
       this._rav.copy(s); this._ravT = 0; this._cl.set(s.x, 1, s.z);
-      const n = this._ravWps[1]; const h = Math.hypot(n.x - s.x, n.z - s.z) || 1;
+      const n = this._ravWps[1].v; const h = Math.hypot(n.x - s.x, n.z - s.z) || 1;
       this._hx = (n.x - s.x) / h; this._hz = (n.z - s.z) / h; this._first = false;
     }
     this._ravT += dt;
-    const tgt = this._ravWps[this._ravI];
+    const C = game.map.tileToWorld((game.map.size / 2) | 0, (game.map.size / 2) | 0); // the ráth, to gaze at while perched
+    if (this._perchT > 0) { // settled on a branch, watching the ráth for a couple of seconds
+      this._perchT -= dt; const pt = this._perchPt, k = Math.min(1, dt * 2.4);
+      this._rav.x += (pt.x - this._rav.x) * k; this._rav.y += (pt.y - this._rav.y) * k; this._rav.z += (pt.z - this._rav.z) * k;
+      walkCam.position.copy(this._rav);
+      _tmpV.set(C.x, 2.0, C.z); this._cl.lerp(_tmpV, Math.min(1, dt * 1.5)); walkCam.lookAt(this._cl);
+      if (this._skyDome) this._skyDome.position.set(this._rav.x, 0, this._rav.z);
+      if (this._perchT <= 0) this._ravI = (this._ravI + 1) % this._ravWps.length; // rested — lift off to the next leg
+      return;
+    }
+    const wp = this._ravWps[this._ravI], tgt = wp.v;
     let dx = tgt.x - this._rav.x, dz = tgt.z - this._rav.z;
     const flat = Math.hypot(dx, dz);
-    if (flat < 2.5) this._ravI = (this._ravI + 1) % this._ravWps.length; // reached this leg → on to the next
-    if (flat > 0.001) { dx /= flat; dz /= flat; this._hx += (dx - this._hx) * Math.min(1, dt * 0.8); this._hz += (dz - this._hz) * Math.min(1, dt * 0.8); }
-    const spd = 3.4; // slow, searching
+    if (flat < 2.5) {
+      if (wp.perch) { this._perchPt = this._perchFor(tgt); this._perchT = 2.6; return; } // reached a corner → set down and watch
+      this._ravI = (this._ravI + 1) % this._ravWps.length; // a transit point → carry on
+    }
+    if (flat > 0.001) { dx /= flat; dz /= flat; this._hx += (dx - this._hx) * Math.min(1, dt * 0.7); this._hz += (dz - this._hz) * Math.min(1, dt * 0.7); }
+    const spd = 2.4; // slower, searching
     this._rav.x += this._hx * spd * dt; this._rav.z += this._hz * spd * dt;
-    const bob = Math.sin(this._ravT * 0.6) * 1.2;             // the lazy rise and fall of wings
+    const bob = Math.sin(this._ravT * 0.5) * 1.0;            // the lazy rise and fall of wings
     this._rav.y += ((tgt.y + bob) - this._rav.y) * Math.min(1, dt * 0.5); // ease height toward the leg, slowly
     walkCam.position.copy(this._rav);
     _tmpV.set(this._rav.x + this._hx * 10, Math.max(0.6, this._rav.y - 6), this._rav.z + this._hz * 10); // gaze ahead and down over the ráth
@@ -236,6 +261,7 @@ const walk = {
   _buildScenery() {
     if (this._scenery) return;
     const g = new THREE.Group();
+    this._treePts = []; // canopy-top points the Mhórrígan can alight on
     let seed = 1337; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
     const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a4028 });
     const leafMats = [0x3f6b32, 0x4c7a38, 0x37602c, 0x567f3f].map((c) => new THREE.MeshLambertMaterial({ color: c }));
@@ -251,6 +277,7 @@ const walk = {
       const leaf = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf.position.y = (2.0 + 1.4) * s; leaf.scale.setScalar(s);
       const leaf2 = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf2.position.y = (2.0 + 2.6) * s; leaf2.scale.setScalar(s * 0.72);
       t.add(trunk, leaf, leaf2); t.position.set(x, TREE_SINK, z); g.add(t);
+      this._treePts.push({ x, z, top: TREE_SINK + 6.0 * s }); // where a raven would settle, atop the crown
     };
     // trees ring the clearing in copses — smaller trees, bunched into stands with
     // gaps between, rather than an even picket line.
