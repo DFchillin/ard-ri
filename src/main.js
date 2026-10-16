@@ -107,8 +107,10 @@ const walk = {
   // match the axis the iso art is drawn for, and the buildings hold their iso
   // facing during the flyover (see billboardBuildings), so nothing spins.
   _ravRoute() {
-    const m = game.map, N = m.size, pad = Math.max(5, Math.round(N * 0.2));
-    const a = pad, b = N - 1 - pad, c = N >> 1, LO = 2.0, HI = 12;
+    // Keep the corners well inside the ráth — a wider pad holds the flight over the
+    // green so she never ranges out to the platform's edge and shows the void beyond.
+    const m = game.map, N = m.size, pad = Math.max(7, Math.round(N * 0.3));
+    const a = pad, b = N - 1 - pad, c = N >> 1, LO = 2.0, HI = 11;
     // perch legs sit in the corners (she sets down there); transit legs cross the
     // middle high. LO is only the approach floor — the true perch height is chosen
     // on landing (a treetop if one is near, else a low skim).
@@ -124,17 +126,15 @@ const walk = {
       V(c, c, HI),        // middle, then round again
     ];
   },
-  // The nearest treetop to a corner, if one is close enough to alight on; else a low
-  // skim just above the ground there.
-  _perchFor(c) {
-    let best = null, bd = Infinity;
-    for (const t of (this._treePts || [])) { const d = (t.x - c.x) ** 2 + (t.z - c.z) ** 2; if (d < bd) { bd = d; best = t; } }
-    if (best && bd < 24 * 24) return new THREE.Vector3(best.x, Math.max(1.4, best.top + 0.4), best.z);
-    return new THREE.Vector3(c.x, 1.6, c.z);
-  },
+  // Where she sets down in a corner: a low skim over the green at the inset corner,
+  // looking in. The scenery trees all ring OUTSIDE the platform, so alighting on one
+  // would carry the camera off the edge and expose the void — instead she settles low
+  // on the grass with the treeline framing the distance.
+  _perchFor(c) { return new THREE.Vector3(c.x, 1.7, c.z); },
   _updateRaven(dt) {
+    if (walkCam.fov !== 52) { walkCam.fov = 52; walkCam.updateProjectionMatrix(); } // a tighter eye on the flyover keeps the platform edges out of frame
     if (this._first) {
-      this._buildScenery(); // the treetops she may perch on
+      this._buildScenery(); // the ring of trees framing the clearing
       if (!this._ravWps) this._ravWps = this._ravRoute();
       this._ravI = 1; this._perchT = 0; const s = this._ravWps[0].v;
       this._rav.copy(s); this._ravT = 0; this._cl.set(s.x, 1, s.z);
@@ -317,6 +317,7 @@ const walk = {
   },
   update(dt) {
     if (this.follow && this.follow.raven) { this._updateRaven(dt); return; } // the raven flies, no ground subject
+    if (walkCam.fov !== 74) { walkCam.fov = 74; walkCam.updateProjectionMatrix(); } // ground stroll: the wide, immersive eye
     // Follow one subject for their whole path. When they finish their errand (or
     // leave), send out Deaglán/Somhairlín/Fionn to roam the roads and follow them on —
     // a tireless subject so the stroll runs like a screensaver.
