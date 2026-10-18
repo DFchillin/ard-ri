@@ -143,14 +143,16 @@ export class Eachtra {
     this._btnStrike = mkBtn('⚔', 110, 40);
     this._btnThrow = mkBtn('🗡', 30, 96);
     // exit
-    const ex = document.createElement('button'); ex.textContent = '✕ Leave the wood';
+    const ex = document.createElement('button'); ex.textContent = '✕ Leave the wood'; this._exitBtn = ex;
     ex.style.cssText = 'position:absolute;left:50%;top:10px;transform:translateX(-50%);background:#0009;color:#fff;border:1px solid #fff3;border-radius:8px;padding:6px 14px;font-size:14px';
     ex.addEventListener('click', () => this.close()); h.appendChild(ex);
     document.body.appendChild(h);
   }
 
   // ---- lifecycle -----------------------------------------------------------
-  open() {
+  open(opts = {}) {
+    this._onExit = opts.onExit || (() => {});
+    this._result = 'quit';
     this.active = true;
     this.pos.set(0, 0, PLAY_R - 7); this.yaw = 0; this.pitch = 0; // face into the clearing
     this.hp = 100; this.spearN = SPEAR_START; this._dead = false; this._cleared = false;
@@ -158,8 +160,9 @@ export class Eachtra {
     for (const s of this.spears) this.scene.remove(s.mesh);
     for (const pk of this.pickups) this.scene.remove(pk.mesh);
     this.enemies = []; this.spears = []; this.pickups = [];
-    this._spawnWave(5);
+    this._spawnWave(opts.enemies || 5);
     this.hud.style.display = 'block'; this._banner.style.display = 'none';
+    this._exitBtn.textContent = '✕ Leave the wood';
     this._hint.textContent = 'WASD / left-stick to move · drag to look · ⚔ strike · 🗡 throw (walk over a spear to take it up)';
     this._bind(); this._setHud();
     this.onResize();
@@ -168,7 +171,8 @@ export class Eachtra {
     this.active = false;
     this.hud.style.display = 'none';
     this._unbind();
-    this.onClose();
+    const r = this._result;
+    this._onExit(r);
   }
   renderCam() { return this.camera; }
   render(renderer) { renderer.render(this.scene, this.camera); }
@@ -273,7 +277,9 @@ export class Eachtra {
     if (this.hp <= 0) { this.hp = 0; this._dead = true; this._end(false); }
   }
   _end(won) {
-    this._cleared = won; this._banner.style.display = 'block';
+    this._cleared = won; this._result = won ? 'clear' : 'die';
+    if (this._exitBtn) this._exitBtn.textContent = 'Continue ▸';
+    this._banner.style.display = 'block';
     this._banner.innerHTML = won
       ? '<div style="color:#e4c76a">The wood is cleared</div><div style="font-size:15px;opacity:.85;margin-top:8px">The sluagh are laid to rest. Tap ✕ to return to the ráth.</div>'
       : '<div style="color:#d9534f">You have fallen</div><div style="font-size:15px;opacity:.85;margin-top:8px">The dead close over you. Tap ✕ to return.</div>';

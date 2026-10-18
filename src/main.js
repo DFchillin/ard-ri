@@ -12,6 +12,7 @@ import { Battle } from './battle/battle.js?v=CBUST';
 import { Hurling } from './hurling.js?v=CBUST';
 import { Sparring } from './sparring.js?v=CBUST';
 import { Eachtra } from './eachtra.js?v=CBUST';
+import { CHAPTERS } from './data/eachtra_chapters.js?v=CBUST';
 import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById, OVERSEAS, overseasById } from './data/kingdoms.js?v=CBUST';
 import { CODEX } from './data/codex.js?v=CBUST';
 import { UNIT_TYPES } from './battle/units.js?v=CBUST';
@@ -766,10 +767,95 @@ function openSparring() {
   if (game.countBuilt('builder_house') > 0) roster.somhairlin = Math.max(1, roster.somhairlin || 0);
   sparring.open(roster, campaign.hosted, { grit: campaign.raidsWon || 0 });
 }
-// --- Eachtra: the hero's-journey mode — a champion afoot in the wood of the sluagh ---
-const eachtra = new Eachtra({ onClose: () => { document.getElementById('ui-overlay').style.display = ''; resumeGame(); } });
-function openEachtra() { pauseGame(); ui.hideInspect(); document.getElementById('ui-overlay').style.display = 'none'; eachtra.open(); }
-document.getElementById('eachtra-btn')?.addEventListener('click', openEachtra);
+// --- Eachtra: the hero's-journey mode — a named champion through chapters of story ---
+const eachtra = new Eachtra();
+const HERO_KEY = 'ardri_hero';
+function loadHero() { try { const h = JSON.parse(localStorage.getItem(HERO_KEY) || '{}'); return { name: h.name || null, chapter: h.chapter || 1 }; } catch (e) { return { name: null, chapter: 1 }; } }
+function saveHero() { try { localStorage.setItem(HERO_KEY, JSON.stringify(hero.save)); } catch (e) {} }
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const hero = {
+  save: loadHero(),
+  fromTitle: true,
+  el: document.getElementById('hero-screen'),
+  // open the hub, from the title screen or from within the settlement
+  openHub(fromTitle) {
+    this.fromTitle = fromTitle;
+    if (!fromTitle) { pauseGame(); ui.hideInspect(); document.getElementById('ui-overlay').style.display = 'none'; }
+    if (titleScreenEl) titleScreenEl.classList.add('hidden');
+    this.el.classList.remove('hidden');
+    if (!this.save.name) this._renderName(); else this._renderHub();
+  },
+  closeHub() {
+    this.el.classList.add('hidden');
+    if (this.fromTitle) { if (titleScreenEl) titleScreenEl.classList.remove('hidden'); refreshCampaignButton(); }
+    else { document.getElementById('ui-overlay').style.display = ''; resumeGame(); }
+  },
+  _card(html) { this.el.innerHTML = `<div class="hero-card">${html}</div>`; },
+  _renderName() {
+    this._card(`<h2>Become a Celtic Hero</h2><p class="hero-sub">Every eachtra begins with a name.</p>
+      <input class="hero-name" id="hero-name-in" maxlength="22" placeholder="Name your champion…" />
+      <div class="hero-chapters"><button class="menu-btn" id="hero-begin">Begin the journey ▸</button>
+      <button class="menu-btn" id="hero-back">✕ Back</button></div>`);
+    const inp = document.getElementById('hero-name-in'); inp.focus();
+    const go = () => { const n = (inp.value || '').trim(); if (!n) { inp.focus(); return; } this.save.name = n; this.save.chapter = 1; saveHero(); this._renderHub(); };
+    document.getElementById('hero-begin').addEventListener('click', go);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    document.getElementById('hero-back').addEventListener('click', () => this.closeHub());
+  },
+  _renderHub() {
+    const done = this.save.chapter > CHAPTERS.length;
+    const rows = CHAPTERS.map((c) => {
+      const unlocked = c.n <= this.save.chapter, cleared = c.n < this.save.chapter;
+      const cls = 'menu-btn hero-chip' + (unlocked ? ' unlocked' : '') + (cleared ? ' cleared' : '');
+      const mark = cleared ? '✓ ' : unlocked ? '▸ ' : '🔒 ';
+      return `<button class="${cls}" ${unlocked ? '' : 'disabled'} data-ch="${c.n}">${mark}${c.n}. ${esc(c.title)} — <i>${esc(c.titleEn)}</i></button>`;
+    }).join('');
+    this._card(`<h2>${esc(this.save.name)}</h2><p class="hero-sub">${done ? 'Hero of Ériu — every chapter won. Walk them again as you will.' : 'Choose your chapter.'}</p>
+      <div class="hero-chapters">${rows}</div>
+      <div class="hero-chapters"><button class="menu-btn" id="hero-leave">✕ Leave</button></div>`);
+    this.el.querySelectorAll('[data-ch]').forEach((b) => b.addEventListener('click', () => this._renderIntro(+b.dataset.ch)));
+    document.getElementById('hero-leave').addEventListener('click', () => this.closeHub());
+  },
+  _renderIntro(n) {
+    const c = CHAPTERS[n - 1];
+    this._card(`<p class="hero-sub">Chapter ${c.n}</p><h2>${esc(c.title)}</h2><p class="hero-sub">${esc(c.titleEn)}</p>
+      <p class="hero-story">${esc(c.intro)}</p>
+      <div class="hero-chapters"><button class="menu-btn" id="hero-enter">Into the wood ▸</button>
+      <button class="menu-btn" id="hero-back">← The chapters</button></div>`);
+    document.getElementById('hero-enter').addEventListener('click', () => this._play(n));
+    document.getElementById('hero-back').addEventListener('click', () => this._renderHub());
+  },
+  _play(n) {
+    const c = CHAPTERS[n - 1];
+    this.el.classList.add('hidden');
+    eachtra.open({ enemies: c.enemies, onExit: (res) => this._result(n, res) });
+  },
+  _result(n, res) {
+    this.el.classList.remove('hidden');
+    if (res === 'clear') { if (n >= this.save.chapter && n <= CHAPTERS.length) { this.save.chapter = n + 1; saveHero(); } this._renderOutro(n); }
+    else if (res === 'die') { this._renderFallen(n); }
+    else this._renderHub();
+  },
+  _renderOutro(n) {
+    const c = CHAPTERS[n - 1], next = CHAPTERS[n];
+    this._card(`<p class="hero-sub">Chapter ${c.n} — won</p><h2>${esc(c.title)}</h2>
+      <p class="hero-story">${esc(c.outro)}</p>
+      <div class="hero-chapters">${next ? `<button class="menu-btn" id="hero-next">Chapter ${next.n}: ${esc(next.title)} ▸</button>` : '<p class="hero-sub">You have won every chapter. The ráth will remember your name.</p>'}
+      <button class="menu-btn" id="hero-hub">The chapters</button></div>`);
+    if (next) document.getElementById('hero-next').addEventListener('click', () => this._renderIntro(n + 1));
+    document.getElementById('hero-hub').addEventListener('click', () => this._renderHub());
+  },
+  _renderFallen(n) {
+    const c = CHAPTERS[n - 1];
+    this._card(`<h2 style="color:#d9534f">You have fallen</h2><p class="hero-sub">${esc(c.title)} — the dead close over you.</p>
+      <div class="hero-chapters"><button class="menu-btn" id="hero-retry">↻ Stand again</button>
+      <button class="menu-btn" id="hero-hub">The chapters</button></div>`);
+    document.getElementById('hero-retry').addEventListener('click', () => this._play(n));
+    document.getElementById('hero-hub').addEventListener('click', () => this._renderHub());
+  },
+};
+document.getElementById('hero-open')?.addEventListener('click', () => hero.openHub(true));
+document.getElementById('eachtra-btn')?.addEventListener('click', () => hero.openHub(false));
 
 const SPAR_CHANCE = 1 / 3; // one in three each season a champion comes calling
 function maybeSparChallenge() {
@@ -2141,7 +2227,7 @@ window.addEventListener('resize', () => {
   sparring.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, hurling, sparring, eachtra, openEachtra, openSparring, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
+window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, hurling, sparring, eachtra, hero, openSparring, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
   _dbg: { foundColony, collectColonyTribute, replenishWarband, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
     layRow: (key, sx, sz, ex, ez) => { const before = game.buildings.length; tool = key; showBuildRow({ x: sx, z: sz }, { x: ex, z: ez }); const shown = pendingBuildRow ? pendingBuildRow.length : 0; confirmBuild(); return { shown, placed: game.buildings.length - before }; } },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
