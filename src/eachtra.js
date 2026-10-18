@@ -91,7 +91,7 @@ export class Eachtra {
     for (let i = 0; i < 70; i++) {                                                         // the inner wood, with a loose clearing in the middle
       const a = rnd() * Math.PI * 2, r = 5 + rnd() * (PLAY_R - 6);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (x * x + z * z < 16) continue; // keep the heart of the clearing open
+      if (x * x + z * z < 36) continue; // keep the heart of the clearing open (room to spawn and move)
       addTree(x, z, 0.7 + rnd() * 0.7);
     }
   }
@@ -139,7 +139,7 @@ export class Eachtra {
     this._nub = document.createElement('div');
     this._nub.style.cssText = 'position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:#fff6';
     this._stick.appendChild(this._nub); h.appendChild(this._stick);
-    const mkBtn = (label, right, bottom) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = `position:absolute;right:${right}px;bottom:${bottom}px;width:76px;height:76px;border-radius:50%;border:2px solid #fff4;background:#0008;color:#fff;font-size:28px`; h.appendChild(b); return b; };
+    const mkBtn = (label, right, bottom) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = `position:absolute;right:${right}px;bottom:${bottom}px;width:76px;height:76px;border-radius:50%;border:2px solid #fff4;background:#0008;color:#fff;font-size:28px;touch-action:none;-webkit-tap-highlight-color:transparent`; h.appendChild(b); return b; };
     this._btnStrike = mkBtn('⚔', 110, 40);
     this._btnThrow = mkBtn('🗡', 30, 96);
     // exit
@@ -154,7 +154,7 @@ export class Eachtra {
     this._onExit = opts.onExit || (() => {});
     this._result = 'quit';
     this.active = true;
-    this.pos.set(0, 0, PLAY_R - 7); this.yaw = 0; this.pitch = 0; // face into the clearing
+    this.pos.set(0, 0, 0); this.yaw = 0; this.pitch = 0; // stand in the clear heart of the wood, the host closing from all sides
     this.hp = 100; this.spearN = SPEAR_START; this._dead = false; this._cleared = false;
     for (const e of this.enemies) this.chipGroup.remove(e.chip);
     for (const s of this.spears) this.scene.remove(s.mesh);
@@ -191,20 +191,30 @@ export class Eachtra {
     H.pu = (e) => this._pointerUp(e);
     H.rz = () => this.onResize();
     window.addEventListener('keydown', H.kd); window.addEventListener('keyup', H.ku);
-    this.hud.addEventListener('pointerdown', H.pd); window.addEventListener('pointermove', H.pm); window.addEventListener('pointerup', H.pu);
+    // All pointer events stay on the HUD and the pointer is captured on press, so a
+    // touch drag (move stick / look) is delivered reliably on mobile — window-level
+    // move/up miss touches once the browser hands implicit capture to the HUD.
+    this.hud.addEventListener('pointerdown', H.pd);
+    this.hud.addEventListener('pointermove', H.pm);
+    this.hud.addEventListener('pointerup', H.pu);
+    this.hud.addEventListener('pointercancel', H.pu);
     window.addEventListener('resize', H.rz);
-    this._btnStrike.addEventListener('pointerdown', (e) => { e.stopPropagation(); this._strike(); });
-    this._btnThrow.addEventListener('pointerdown', (e) => { e.stopPropagation(); this._throw(); });
+    const btn = (b, fn) => b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); fn(); });
+    btn(this._btnStrike, () => this._strike());
+    btn(this._btnThrow, () => this._throw());
   }
   _unbind() {
     const H = this._handlers;
     window.removeEventListener('keydown', H.kd); window.removeEventListener('keyup', H.ku);
-    this.hud.removeEventListener('pointerdown', H.pd); window.removeEventListener('pointermove', H.pm); window.removeEventListener('pointerup', H.pu);
+    this.hud.removeEventListener('pointerdown', H.pd); this.hud.removeEventListener('pointermove', H.pm);
+    this.hud.removeEventListener('pointerup', H.pu); this.hud.removeEventListener('pointercancel', H.pu);
     window.removeEventListener('resize', H.rz);
     this._keys.clear(); this._joy = null; this._look = null;
   }
   _pointerDown(e) {
     if (e.target === this._btnStrike || e.target === this._btnThrow) return;
+    e.preventDefault();
+    try { this.hud.setPointerCapture(e.pointerId); } catch (_) {} // keep this finger's moves coming to the HUD
     if (e.clientX < window.innerWidth * 0.42) { // left: the move stick springs up where you press
       this._joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: 0, z: 0 };
       this._stick.style.display = 'block'; this._stick.style.left = (e.clientX - 60) + 'px'; this._stick.style.top = (e.clientY - 60) + 'px';
