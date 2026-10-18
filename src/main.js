@@ -780,15 +780,17 @@ const hero = {
   // open the hub, from the title screen or from within the settlement
   openHub(fromTitle) {
     this.fromTitle = fromTitle;
-    if (!fromTitle) { pauseGame(); ui.hideInspect(); document.getElementById('ui-overlay').style.display = 'none'; }
+    pauseGame(); ui.hideInspect();
+    document.getElementById('ui-overlay').style.display = 'none'; // the settlement chrome stays hidden for the whole hero session (hub + levels)
     if (titleScreenEl) titleScreenEl.classList.add('hidden');
     this.el.classList.remove('hidden');
     if (!this.save.name) this._renderName(); else this._renderHub();
   },
   closeHub() {
     this.el.classList.add('hidden');
-    if (this.fromTitle) { if (titleScreenEl) titleScreenEl.classList.remove('hidden'); refreshCampaignButton(); }
-    else { document.getElementById('ui-overlay').style.display = ''; resumeGame(); }
+    document.getElementById('ui-overlay').style.display = '';
+    resumeGame();
+    if (this.fromTitle && titleScreenEl) { titleScreenEl.classList.remove('hidden'); refreshCampaignButton(); }
   },
   _card(html) { this.el.innerHTML = `<div class="hero-card">${html}</div>`; },
   _renderName() {
