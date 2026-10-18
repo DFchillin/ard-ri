@@ -278,8 +278,6 @@
     </div>
   </div>
 
-  <div id="hero-screen" class="hidden"></div>
-
   <div id="manage-screen" class="modal hidden">
     <div class="modal-card">
       <h3>Manage Campaign</h3>
@@ -298,6 +296,9 @@
     </div>
   </div>
 </div>
+
+<!-- top-level, outside #ui-overlay, so the hero mode can hide the settlement chrome without hiding itself -->
+<div id="hero-screen" class="hidden"></div>
 
 <script type="module" src="src/main.js?v=CBUST" data-cfasync="false"></script>
 </body>
