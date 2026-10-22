@@ -15,7 +15,13 @@ const LOOK_SENS = 0.0026;  // drag-look radians per pixel
 const SPEAR_START = 3;
 const MELEE_RANGE = 2.4, MELEE_ARC = 0.6; // reach and half-angle of a sword swing
 const MELEE_DMG = 34, SPEAR_DMG = 55;
-const ENEMY_HP = 60, ENEMY_SPD = 1.85, ENEMY_REACH = 1.6, ENEMY_DMG = 11;
+// The host comes in kinds: the shuffling sluagh, and the heavier fomhóraigh brutes
+// that soak more and hit harder. More kinds slot in here as their art lands.
+const ENEMY_TYPES = {
+  sluagh:   { art: 'sluagh',   hp: 55,  spd: 1.95, reach: 1.6, dmg: 10, h: 1.3 },
+  wraith:   { art: 'sluagh',   hp: 34,  spd: 2.7,  reach: 1.5, dmg: 7,  h: 1.1 }, // a swift, frail shade (sluagh art, smaller/faster)
+  fomorian: { art: 'fomorian', hp: 120, spd: 1.25, reach: 1.95, dmg: 19, h: 1.95 },
+};
 const TMP = new THREE.Vector3(), TMP2 = new THREE.Vector3();
 
 export class Eachtra {
@@ -87,7 +93,12 @@ export class Eachtra {
       this.scene.add(t); this.trees.push({ x, z, r: 0.7 * s });
     };
     let seed = 90210; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-    for (let a = 0; a < Math.PI * 2; a += 0.12) { const r = PLAY_R + (rnd() - 0.5) * 2; addTree(Math.cos(a) * r, Math.sin(a) * r, 1.1 + rnd() * 0.5); } // the wall of trees
+    // the wall of trees — a close-packed double ring, tall, so the wood reads as
+    // enclosing and you can't see out past the edge of the world
+    for (let a = 0; a < Math.PI * 2; a += 0.07) {
+      addTree(Math.cos(a) * (PLAY_R + (rnd() - 0.5) * 1.5), Math.sin(a) * (PLAY_R + (rnd() - 0.5) * 1.5), 1.35 + rnd() * 0.5);
+      addTree(Math.cos(a + 0.035) * (PLAY_R + 2.4 + rnd() * 1.5), Math.sin(a + 0.035) * (PLAY_R + 2.4 + rnd() * 1.5), 1.5 + rnd() * 0.5);
+    }
     for (let i = 0; i < 70; i++) {                                                         // the inner wood, with a loose clearing in the middle
       const a = rnd() * Math.PI * 2, r = 5 + rnd() * (PLAY_R - 6);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
@@ -109,6 +120,13 @@ export class Eachtra {
     cross.style.cssText = 'position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;pointer-events:none;opacity:.7';
     cross.innerHTML = '<svg viewBox="0 0 18 18" width="18" height="18"><g stroke="#fff" stroke-width="1.6"><line x1="9" y1="1" x2="9" y2="6"/><line x1="9" y1="12" x2="9" y2="17"/><line x1="1" y1="9" x2="6" y2="9"/><line x1="12" y1="9" x2="17" y2="9"/></g></svg>';
     h.appendChild(cross);
+    // the giant's health, a broad bar across the top, shown only while it stands
+    this._bossWrap = document.createElement('div');
+    this._bossWrap.style.cssText = 'position:absolute;left:50%;top:44px;transform:translateX(-50%);width:76%;max-width:560px;display:none;pointer-events:none;text-align:center';
+    this._bossWrap.innerHTML = '<div style="font-size:13px;color:#e8c06a;text-shadow:0 1px 3px #000;margin-bottom:3px">Fathach · the Fomorian giant</div>';
+    const bw = document.createElement('div'); bw.style.cssText = 'height:12px;border:2px solid #000a;border-radius:4px;background:#2a0f0f;overflow:hidden';
+    this._bossBar = document.createElement('div'); this._bossBar.style.cssText = 'height:100%;width:100%;background:linear-gradient(90deg,#8a2b6b,#c43a2e)'; bw.appendChild(this._bossBar);
+    this._bossWrap.appendChild(bw); h.appendChild(this._bossWrap);
     // first-person sword, swung with a CSS transform
     const wc = document.createElement('canvas'); wc.width = 180; wc.height = 200;
     const x = wc.getContext('2d');
@@ -159,7 +177,11 @@ export class Eachtra {
     for (const e of this.enemies) this.chipGroup.remove(e.chip);
     for (const s of this.spears) this.scene.remove(s.mesh);
     for (const pk of this.pickups) this.scene.remove(pk.mesh);
-    this.enemies = []; this.spears = []; this.pickups = [];
+    if (this._boss) this.chipGroup.remove(this._boss.chip);
+    for (const p of (this._bossProj || [])) this.scene.remove(p.mesh);
+    this.enemies = []; this.spears = []; this.pickups = []; this._bossProj = [];
+    this._boss = null; this._bossDone = false; this._wantBoss = !!opts.boss;
+    if (this._bossWrap) this._bossWrap.style.display = 'none';
     this._spawnWave(opts.enemies || 5);
     this.hud.style.display = 'block'; this._banner.style.display = 'none';
     this._exitBtn.textContent = '✕ Leave the wood';
@@ -243,12 +265,17 @@ export class Eachtra {
   // ---- combat --------------------------------------------------------------
   _spawnWave(n) {
     for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, r = 12 + Math.random() * (PLAY_R - 14);
-      const chip = makeWalkerChip('sluagh', false);
-      chip.position.set(Math.cos(a) * r, 0.05, Math.sin(a) * r);
-      this.chipGroup.add(chip);
-      this.enemies.push({ chip, hp: ENEMY_HP, cd: 0, dead: 0 });
+      const roll = Math.random();
+      this._spawnEnemy(roll < 0.2 ? 'fomorian' : roll < 0.48 ? 'wraith' : 'sluagh');
     }
+  }
+  _spawnEnemy(key) {
+    const t = ENEMY_TYPES[key];
+    const a = Math.random() * Math.PI * 2, r = 12 + Math.random() * (PLAY_R - 14);
+    const chip = makeWalkerChip(t.art, false, t.h);
+    chip.position.set(Math.cos(a) * r, 0.05, Math.sin(a) * r);
+    this.chipGroup.add(chip);
+    this.enemies.push({ chip, hp: t.hp, cd: 0, dead: 0, spd: t.spd, reach: t.reach, dmg: t.dmg });
   }
   _forward() { this.camera.getWorldDirection(TMP); TMP.y = 0; return TMP.normalize(); }
   _strike() {
@@ -262,6 +289,10 @@ export class Eachtra {
       TMP2.subVectors(e.chip.position, this.pos); TMP2.y = 0; const d = TMP2.length();
       if (d > MELEE_RANGE) continue;
       TMP2.normalize(); if (f.dot(TMP2) > 1 - MELEE_ARC) this._damage(e, MELEE_DMG);
+    }
+    if (this._boss && this._boss.state === 'active') { // the giant is a broad target, reached from a little further
+      TMP2.subVectors(this._boss.chip.position, this.pos); TMP2.y = 0; const d = TMP2.length();
+      if (d <= MELEE_RANGE + 1.8) { TMP2.normalize(); if (f.dot(TMP2) > 1 - MELEE_ARC) this._damageBoss(MELEE_DMG); }
     }
   }
   _throw() {
@@ -317,16 +348,22 @@ export class Eachtra {
       const fwd = this._forward(); TMP2.set(fwd.z, 0, -fwd.x); // right = forward × up
       let vx = fwd.x * mf + TMP2.x * ms, vz = fwd.z * mf + TMP2.z * ms;
       const m = Math.hypot(vx, vz);
-      if (m > 0.001) {
+      this._moving = m > 0.001;
+      if (this._moving) {
         vx = vx / m * MOVE_SPD * dt; vz = vz / m * MOVE_SPD * dt;
         let nx = this.pos.x + vx, nz = this.pos.z + vz;
         const rr = Math.hypot(nx, nz); if (rr > PLAY_R - 1.5) { const k = (PLAY_R - 1.5) / rr; nx *= k; nz *= k; }
         if (!this._collide(nx, this.pos.z)) this.pos.x = nx;
         if (!this._collide(this.pos.x, nz)) this.pos.z = nz;
       }
-    }
-    this.camera.position.set(this.pos.x, EYE, this.pos.z);
+    } else this._moving = false;
+    // Doom-style head-bob: a gentle vertical lope while on the move, eased out at rest.
+    this._bobT = (this._bobT || 0) + (this._moving ? dt * 9.5 : 0);
+    const bobAmt = (this._bobTarget = (this._bobTarget || 0) + ((this._moving ? 1 : 0) - (this._bobTarget || 0)) * Math.min(1, dt * 6));
+    const bob = Math.abs(Math.sin(this._bobT)) * 0.07 * bobAmt;
+    this.camera.position.set(this.pos.x, EYE + bob, this.pos.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0);
+    if (this._weap) this._weap.style.marginBottom = (-Math.abs(Math.sin(this._bobT)) * 10 * bobAmt) + 'px'; // the blade lopes with the stride
 
     // ---- spears in flight ----
     for (let i = this.spears.length - 1; i >= 0; i--) {
@@ -337,6 +374,7 @@ export class Eachtra {
         if (e.dead) continue;
         if (s.mesh.position.distanceToSquared(TMP.copy(e.chip.position).setY(EYE - 0.15)) < 0.7 * 0.7) { this._damage(e, SPEAR_DMG); hit = true; break; }
       }
+      if (!hit && this._boss && this._boss.state === 'active' && s.mesh.position.distanceToSquared(TMP.copy(this._boss.chip.position).setY(2.2)) < 1.7 * 1.7) { this._damageBoss(SPEAR_DMG); hit = true; }
       const r2 = s.mesh.position.x ** 2 + s.mesh.position.z ** 2;
       if (hit || s.life <= 0 || s.mesh.position.y < 0.1 || r2 > (PLAY_R + 2) ** 2 || this._collide(s.mesh.position.x, s.mesh.position.z)) {
         this.scene.remove(s.mesh); this.spears.splice(i, 1);
@@ -367,20 +405,76 @@ export class Eachtra {
       TMP2.subVectors(this.pos, e.chip.position); TMP2.y = 0; const d = TMP2.length(); TMP2.normalize();
       e.cd = Math.max(0, e.cd - dt);
       if (this._dead) { /* stand over the fallen */ }
-      else if (d > ENEMY_REACH) {
-        let nx = e.chip.position.x + TMP2.x * ENEMY_SPD * dt, nz = e.chip.position.z + TMP2.z * ENEMY_SPD * dt;
+      else if (d > e.reach) {
+        let nx = e.chip.position.x + TMP2.x * e.spd * dt, nz = e.chip.position.z + TMP2.z * e.spd * dt;
         if (!this._collide(nx, nz)) { e.chip.position.x = nx; e.chip.position.z = nz; }
         if (e.chip.faceWorld) e.chip.faceWorld(TMP2.x, TMP2.z);
         if (e.chip.animate) e.chip.animate(dt, true);
       } else { // in reach — strike on cooldown
         if (e.chip.faceWorld) e.chip.faceWorld(TMP2.x, TMP2.z);
         if (e.chip.animate) e.chip.animate(dt, false);
-        if (e.cd <= 0) { e.cd = 1.1; if (e.chip.strike) e.chip.strike(); this._hurt(ENEMY_DMG); }
+        if (e.cd <= 0) { e.cd = 1.1; if (e.chip.strike) e.chip.strike(); this._hurt(e.dmg); }
       }
     }
     this.enemies = this.enemies.filter((e) => !(e.dead && e.dead >= 0.72));
-    if (!this._dead && !this._cleared && alive === 0 && this.enemies.every((e) => e.dead)) this._end(true);
+    if (this._boss) this._updateBoss(dt);
+    this._updateBossProj(dt);
+    // the chapter clears once the wave is down AND the giant (if any) is laid low
+    const waveClear = !this._dead && alive === 0 && this.enemies.every((e) => e.dead);
+    if (waveClear && this._wantBoss && !this._boss && !this._bossDone) this._spawnBoss();
+    else if (waveClear && (!this._wantBoss || this._bossDone) && !this._cleared) this._end(true);
   }
+  // ---- the giant: a Fomorian that erupts from the ground once the wave is cleared,
+  // lumbers after the champion and hurls boulders until it is brought down ----
+  _spawnBoss() {
+    const chip = makeWalkerChip('fomorian', false, 4.6);
+    chip.position.set(0, -5, 0); this.chipGroup.add(chip);
+    this._boss = { chip, hp: 420, maxHp: 420, state: 'rising', t: 0, cd: 2.2, mcd: 0 };
+    this._bossWrap.style.display = 'block'; this._updateBossHud();
+    this._hint.textContent = 'A giant of the Fomhóraigh tears itself from the earth — strike and hurl to fell it!';
+  }
+  _updateBoss(dt) {
+    const B = this._boss; if (!B || this._dead) return;
+    if (B.state === 'rising') {
+      B.t += dt; const k = Math.min(1, B.t / 1.7); B.chip.position.set(0, -5 + k * 5.05, 0);
+      if (B.chip.faceWorld) B.chip.faceWorld(this.pos.x, this.pos.z);
+      if (k >= 1) { B.state = 'active'; B.t = 0; } return;
+    }
+    if (B.state === 'dying') {
+      B.t += dt; const k = Math.min(1, B.t / 1.5); B.chip.material.opacity = 1 - k; B.chip.position.y = 0.05 - k * 3.5;
+      if (k >= 1) { this.chipGroup.remove(B.chip); this._boss = null; this._bossDone = true; this._bossWrap.style.display = 'none'; } return;
+    }
+    TMP2.subVectors(this.pos, B.chip.position); TMP2.y = 0; const d = TMP2.length(); TMP2.normalize();
+    if (d > 3.3) { B.chip.position.x += TMP2.x * 1.5 * dt; B.chip.position.z += TMP2.z * 1.5 * dt; }
+    if (B.chip.faceWorld) B.chip.faceWorld(TMP2.x, TMP2.z);
+    if (B.chip.animate) B.chip.animate(dt, d > 3.3);
+    B.mcd = Math.max(0, B.mcd - dt);
+    if (d < 3.6 && B.mcd <= 0) { B.mcd = 1.5; if (B.chip.strike) B.chip.strike(); this._hurt(22); }
+    B.cd -= dt; if (B.cd <= 0) { B.cd = 2.1 + Math.random() * 0.9; this._bossLob(); }
+  }
+  _bossLob() {
+    const from = TMP.copy(this._boss.chip.position); from.y = 3.2;
+    const tx = this.pos.x, tz = this.pos.z, ty = EYE - 0.2;
+    const flat = Math.hypot(tx - from.x, tz - from.z), g = 16, t = Math.max(0.55, flat / 11);
+    const vx = (tx - from.x) / t, vz = (tz - from.z) / t, vy = (ty - from.y) / t + 0.5 * g * t;
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), new THREE.MeshLambertMaterial({ color: 0x6b6256 }));
+    rock.position.copy(from); this.scene.add(rock);
+    this._bossProj.push({ mesh: rock, vel: new THREE.Vector3(vx, vy, vz), g, life: 4 });
+  }
+  _updateBossProj(dt) {
+    for (let i = this._bossProj.length - 1; i >= 0; i--) {
+      const p = this._bossProj[i]; p.vel.y -= p.g * dt; p.mesh.position.addScaledVector(p.vel, dt); p.life -= dt;
+      p.mesh.rotation.x += dt * 6; p.mesh.rotation.y += dt * 4;
+      if (!this._dead && p.mesh.position.distanceToSquared(TMP.set(this.pos.x, EYE - 0.2, this.pos.z)) < 1.05 * 1.05) { this._hurt(16); this.scene.remove(p.mesh); this._bossProj.splice(i, 1); }
+      else if (p.mesh.position.y < 0.15 || p.life <= 0) { this.scene.remove(p.mesh); this._bossProj.splice(i, 1); }
+    }
+  }
+  _damageBoss(amt) {
+    const B = this._boss; if (!B || B.state !== 'active') return;
+    B.hp -= amt; if (B.chip.strike) B.chip.strike(); this._updateBossHud();
+    if (B.hp <= 0) { B.state = 'dying'; B.t = 0; }
+  }
+  _updateBossHud() { if (this._boss) this._bossBar.style.width = Math.max(0, (this._boss.hp / this._boss.maxHp) * 100) + '%'; }
   _setHud() {
     this._hpBar.style.width = Math.max(0, this.hp) + '%';
     this._spearLbl.textContent = '🗡 × ' + this.spearN;

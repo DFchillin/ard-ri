@@ -3,9 +3,9 @@
 // closed with an outro beat. Enemy counts escalate toward the final stand.
 export const CHAPTERS = [
   {
-    n: 1, title: 'An Glaoch', titleEn: 'The Call', enemies: 4,
-    intro: 'A keening rides the night wind — the caoineadh of the unburied dead. The sluagh, the restless host, sweep low over the wood to bear off any soul left wandering. You are no one yet: a wanderer with a borrowed spear. But the cry will not let you sleep. You take up iron and step beneath the trees.',
-    outro: 'The first of the host are laid to rest. High in the branches a single raven watches, unblinking — and does not fly.',
+    n: 1, title: 'An Glaoch', titleEn: 'The Call', enemies: 5, boss: 'giant',
+    intro: 'A keening rides the night wind — the caoineadh of the unburied dead. The sluagh, the restless host, sweep low over the wood to bear off any soul left wandering. You are no one yet: a wanderer with a borrowed spear. But the cry will not let you sleep. You take up iron and step beneath the trees — and something older than the host stirs beneath the roots.',
+    outro: 'The giant is felled, the host laid to rest. High in the branches a single raven watches, unblinking — and does not fly.',
   },
   {
     n: 2, title: 'Coill na Marbh', titleEn: 'The Wood of the Dead', enemies: 6,

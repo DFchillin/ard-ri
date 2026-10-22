@@ -830,7 +830,7 @@ const hero = {
   _play(n) {
     const c = CHAPTERS[n - 1];
     this.el.classList.add('hidden');
-    eachtra.open({ enemies: c.enemies, onExit: (res) => this._result(n, res) });
+    eachtra.open({ enemies: c.enemies, boss: c.boss, onExit: (res) => this._result(n, res) });
   },
   _result(n, res) {
     this.el.classList.remove('hidden');
