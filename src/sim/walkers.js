@@ -14,12 +14,13 @@ export function gaitBob(t) { return Math.abs(Math.sin((t || 0) * STEP_RATE)) * S
 // its onTile callback as it enters each tile, then finishes. This one mechanic
 // carries every service in the game.
 export class Walker {
-  constructor(map, spawn, { type, label, steps = 20, speed = 2.5, onTile, person } = {}) {
+  constructor(map, spawn, { type, label, steps = 20, speed = 2.5, onTile, person, freeRoam = false } = {}) {
     this.map = map;
     this.steps = steps;
     this.speed = speed;
     this.onTile = onTile;
     this.person = person || null;
+    this.freeRoam = freeRoam; // stroll roamers ignore a Cros so they wander the whole ráth
     this.cur = { x: spawn.x, z: spawn.z };
     this.next = null;
     this.t = 0;
@@ -46,8 +47,12 @@ export class Walker {
     let opts = roadNeighbors(this.map, this.cur.x, this.cur.z);
     // Prefer to skirt a Cros; only step onto one when it's the sole way through, so
     // an errand is never fully broken (a Cros shapes routes, it doesn't strand folk).
-    const open = opts.filter((n) => { const t = this.map.get(n.x, n.z); return t && !t.blocked; });
-    if (open.length) opts = open;
+    // Stroll roamers (freeRoam) ignore the Cros entirely and walk on through, so the
+    // screensaver shows the whole ráth instead of being penned behind a barrier.
+    if (!this.freeRoam) {
+      const open = opts.filter((n) => { const t = this.map.get(n.x, n.z); return t && !t.blocked; });
+      if (open.length) opts = open;
+    }
     const forward = prev ? opts.filter((n) => !(n.x === prev.x && n.z === prev.z)) : opts;
     const pool = forward.length ? forward : opts;
     if (!pool.length) { this.next = null; return; }

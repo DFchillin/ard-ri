@@ -4,12 +4,15 @@ import { Tilemap, TERRAIN_INFO } from './sim/tilemap.js?v=CBUST';
 import { WorldView } from './render/world_view.js?v=CBUST';
 import { BUILDINGS } from './data/buildings.js?v=CBUST';
 import { Game } from './sim/game.js?v=CBUST';
+import { Walker } from './sim/walkers.js?v=CBUST';
 import { UI } from './ui.js?v=CBUST';
 import { MONTHS_EN, SEASONS, seasonOfMonth, FESTIVALS } from './sim/calendar.js?v=CBUST';
 import { setCamera } from './render/assets.js?v=CBUST';
 import { Battle } from './battle/battle.js?v=CBUST';
 import { Hurling } from './hurling.js?v=CBUST';
 import { Sparring } from './sparring.js?v=CBUST';
+import { Eachtra } from './eachtra.js?v=CBUST';
+import { CHAPTERS } from './data/eachtra_chapters.js?v=CBUST';
 import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById, OVERSEAS, overseasById } from './data/kingdoms.js?v=CBUST';
 import { CODEX } from './data/codex.js?v=CBUST';
 import { UNIT_TYPES } from './battle/units.js?v=CBUST';
@@ -50,19 +53,142 @@ const walk = {
     list.sort((a, b) => a.sprite.position.distanceToSquared(c) - b.sprite.position.distanceToSquared(c));
     return list[0];
   },
-  cycle() { const n = this._pickFollow(this.follow); if (n) { this.follow = n; this._first = true; this._updateName(); } },
+  cycle() { // rotate through the folk abroad, with the Mhórrígan coming round every third subject so she's never buried behind a crowd
+    this._tapN = (this._tapN || 0) + 1;
+    if (!(this.follow && this.follow.raven) && this._tapN % 3 === 0) {
+      this.follow = this._raven(); this._first = true; this._updateName(); return;
+    }
+    const list = this._followable();
+    if (!list.length) { const r = this._releaseRoamer(); if (r) { this.follow = r; this._first = true; this._updateName(); } return; }
+    const after = (this.follow && !this.follow.raven) ? this.follow : this._lastCit;
+    let next = this._pickFollow(after) || list[0];
+    if (next && next.done) next = this._releaseRoamer() || next;
+    this._lastCit = next; this.follow = next; this._first = true; this._updateName();
+  },
+  _nearestRoad(cx, cz) {
+    const m = game.map; let best = null, bd = Infinity;
+    for (let z = 0; z < m.size; z++) for (let x = 0; x < m.size; x++) {
+      const t = m.get(x, z); if (!t || !t.road) continue;
+      const d = (x - cx) ** 2 + (z - cz) ** 2; if (d < bd) { bd = d; best = { x, z }; }
+    }
+    return best;
+  },
+  // Once the folk you were following finish their errands, send out Deaglán or
+  // Somhairlín from the builder's house to simply wander the roads — a tireless
+  // subject so the stroll runs on like a screensaver. Only one at a time; cleared
+  // when the stroll ends.
+  _releaseRoamer() {
+    const live = game.walkers.find((w) => w && w.tag === 'stroll' && !w.done);
+    if (live) return live;
+    const house = game.buildings.find((b) => b.key === 'builder_house' && !b.building);
+    const c = house ? game._center(house) : game.map.tileToWorld((game.map.size / 2) | 0, (game.map.size / 2) | 0);
+    const ct = game.map.worldToTile(c.x, c.z) || { x: (game.map.size / 2) | 0, z: (game.map.size / 2) | 0 };
+    const start = this._nearestRoad(ct.x, ct.z); if (!start) return null;
+    const roamers = [
+      { type: 'somhairlin', name: 'Somhairlín', roleEn: 'the Master Builder', roleGa: 'saor' },
+      { type: 'deaglan', name: 'Deaglán', roleEn: 'the Road-maker', roleGa: 'bóthaire' },
+      { type: 'finn_run', name: 'Finn', roleEn: 'the ráth’s hound', roleGa: 'cú an ráth' },
+    ];
+    const who = roamers[(Math.random() * roamers.length) | 0];
+    const person = { name: who.name, roleEn: who.roleEn, roleGa: who.roleGa, female: false, phraseGa: '', phraseEn: '' };
+    const w = new Walker(game.map, start, { type: who.type, steps: 999999, speed: 1.9, person, freeRoam: true });
+    w.tag = 'stroll';
+    game.walkers.push(w); game.walkerGroup.add(w.sprite);
+    return w;
+  },
+  // The Mhórrígan rides the air as a raven — no sprite, just her eye: the camera
+  // wheels over the ráth, swooping between points at a bird's height until you switch.
+  _rav: new THREE.Vector3(), _ravTo: new THREE.Vector3(), _ravT: 0,
+  _raven() {
+    if (!this._ravenS) this._ravenS = { raven: true, person: { name: 'An Mhórrígan', roleEn: 'phantom queen of war', roleGa: 'badhbh', phraseGa: '', phraseEn: '' } };
+    return this._ravenS;
+  },
+  // The Mhórrígan's flight is a slow, searching sweep along the ráth's diagonals —
+  // corner to opposite corner through the middle, rising from a low skim to a high
+  // wheel and stooping again, as if she were hunting a face below. Diagonal legs
+  // match the axis the iso art is drawn for, and the buildings hold their iso
+  // facing during the flyover (see billboardBuildings), so nothing spins.
+  _ravRoute() {
+    // Keep the corners well inside the ráth — a wider pad holds the flight over the
+    // green so she never ranges out to the platform's edge and shows the void beyond.
+    const m = game.map, N = m.size, pad = Math.max(7, Math.round(N * 0.3));
+    const a = pad, b = N - 1 - pad, c = N >> 1, LO = 2.0, HI = 11;
+    // perch legs sit in the corners (she sets down there); transit legs cross the
+    // middle high. LO is only the approach floor — the true perch height is chosen
+    // on landing (a treetop if one is near, else a low skim).
+    const V = (tx, tz, y, perch) => { const p = m.tileToWorld(tx, tz); return { v: new THREE.Vector3(p.x, y, p.z), perch: !!perch }; };
+    return [
+      V(a, b, LO, true),  // SW corner — set down and watch
+      V(c, c, HI),        // rise and cross the middle, high
+      V(b, a, LO, true),  // NE corner — set down and watch
+      V(c, c, HI),        // back high over the middle
+      V(a, a, LO, true),  // NW corner
+      V(c, c, HI),        // the middle again
+      V(b, b, LO, true),  // SE corner
+      V(c, c, HI),        // middle, then round again
+    ];
+  },
+  // Where she sets down in a corner: a low skim over the green at the inset corner,
+  // looking in. The scenery trees all ring OUTSIDE the platform, so alighting on one
+  // would carry the camera off the edge and expose the void — instead she settles low
+  // on the grass with the treeline framing the distance.
+  _perchFor(c) { return new THREE.Vector3(c.x, 1.7, c.z); },
+  _updateRaven(dt) {
+    if (walkCam.fov !== 52) { walkCam.fov = 52; walkCam.updateProjectionMatrix(); } // a tighter eye on the flyover keeps the platform edges out of frame
+    if (this._first) {
+      this._buildScenery(); // the ring of trees framing the clearing
+      if (!this._ravWps) this._ravWps = this._ravRoute();
+      this._ravI = 1; this._perchT = 0; const s = this._ravWps[0].v;
+      this._rav.copy(s); this._ravT = 0; this._cl.set(s.x, 1, s.z);
+      const n = this._ravWps[1].v; const h = Math.hypot(n.x - s.x, n.z - s.z) || 1;
+      this._hx = (n.x - s.x) / h; this._hz = (n.z - s.z) / h; this._first = false;
+    }
+    this._ravT += dt;
+    const C = game.map.tileToWorld((game.map.size / 2) | 0, (game.map.size / 2) | 0); // the ráth, to gaze at while perched
+    if (this._perchT > 0) { // settled on a branch, watching the ráth for a couple of seconds
+      this._perchT -= dt; const pt = this._perchPt, k = Math.min(1, dt * 2.4);
+      this._rav.x += (pt.x - this._rav.x) * k; this._rav.y += (pt.y - this._rav.y) * k; this._rav.z += (pt.z - this._rav.z) * k;
+      walkCam.position.copy(this._rav);
+      _tmpV.set(C.x, 2.0, C.z); this._cl.lerp(_tmpV, Math.min(1, dt * 1.5)); walkCam.lookAt(this._cl);
+      if (this._skyDome) this._skyDome.position.set(this._rav.x, 0, this._rav.z);
+      if (this._perchT <= 0) this._ravI = (this._ravI + 1) % this._ravWps.length; // rested — lift off to the next leg
+      return;
+    }
+    const wp = this._ravWps[this._ravI], tgt = wp.v;
+    let dx = tgt.x - this._rav.x, dz = tgt.z - this._rav.z;
+    const flat = Math.hypot(dx, dz);
+    if (flat < 2.5) {
+      if (wp.perch) { this._perchPt = this._perchFor(tgt); this._perchT = 2.6; return; } // reached a corner → set down and watch
+      this._ravI = (this._ravI + 1) % this._ravWps.length; // a transit point → carry on
+    }
+    if (flat > 0.001) { dx /= flat; dz /= flat; this._hx += (dx - this._hx) * Math.min(1, dt * 0.7); this._hz += (dz - this._hz) * Math.min(1, dt * 0.7); }
+    const spd = 2.4; // slower, searching
+    this._rav.x += this._hx * spd * dt; this._rav.z += this._hz * spd * dt;
+    const bob = Math.sin(this._ravT * 0.5) * 1.0;            // the lazy rise and fall of wings
+    this._rav.y += ((tgt.y + bob) - this._rav.y) * Math.min(1, dt * 0.5); // ease height toward the leg, slowly
+    walkCam.position.copy(this._rav);
+    _tmpV.set(this._rav.x + this._hx * 10, Math.max(0.6, this._rav.y - 6), this._rav.z + this._hz * 10); // gaze ahead and down over the ráth
+    this._cl.lerp(_tmpV, Math.min(1, dt * 1.4));
+    walkCam.lookAt(this._cl);
+    if (this._skyDome) this._skyDome.position.set(this._rav.x, 0, this._rav.z);
+  },
   _updateName() {
     const el = document.getElementById('walk-name'); if (!el) return;
-    const p = this.follow && this.follow.person;
+    const f = this.follow, p = f && f.person;
+    const sub = f && f.raven ? 'wheeling over the ráth · tap to walk'
+      : f && f.tag === 'stroll' ? 'roaming the ráth · tap for another'
+      : 'tap to follow another';
     el.innerHTML = p
-      ? `<b>${p.nick ? `${p.name} ‘${p.nick}’` : p.name}</b><span>${p.roleEn} · tap to follow another</span>`
+      ? `<b>${p.nick ? `${p.name} ‘${p.nick}’` : p.name}</b><span>${p.roleEn} · ${sub}</span>`
       : `<b>Nobody abroad</b><span>waiting for folk…</span>`;
   },
   enter() {
-    const w = this._pickFollow(null);
-    if (!w) { flashNotice('🚶 No folk are abroad just now — let the ráth bustle a while, then stroll.'); return; }
+    let w = this._pickFollow(null);
+    if (!w) w = this._releaseRoamer(); // nobody abroad — send out a roamer so the stroll still runs
+    if (!w) { flashNotice('🚶 Lay a road through your ráth first — there is nowhere to stroll yet.'); return; }
     this.follow = w; this._first = true;
     this.active = true;
+    game._hideMarkers = true; // the economy ticks through the stroll — keep it from re-showing the road "!" each tick
     this._setSky(true);
     // Tuck away the build-mode markers (road-alert "!" and inspect dots) — they
     // billboard and would float in the sky over a scenic stroll.
@@ -90,6 +216,7 @@ const walk = {
         g.addColorStop(0.66, '#aec489'); g.addColorStop(0.76, '#86a65c'); g.addColorStop(1.0, '#5c7d40');
         x.fillStyle = g; x.fillRect(0, 0, 16, 256);
         const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
+        this._gradTex = tx; // the procedural fallback sky, kept for seasons with no painted panorama
         const mat = new THREE.MeshBasicMaterial({ map: tx, side: THREE.BackSide, fog: false, depthWrite: false });
         this._skyDome = new THREE.Mesh(new THREE.SphereGeometry(300, 24, 16), mat);
         this._skyDome.renderOrder = -10;
@@ -98,7 +225,12 @@ const walk = {
       this._skyDome.visible = true;
       this._buildScenery(); this._scenery.visible = true;
       const sk = SEASON_SKY[curSeason] || SEASON_SKY.earrach;
-      this._skyDome.material.color.setHex(sk.tint); // tint the dome to the season's mood
+      // A painted equirectangular panorama for the season drapes the dome if we have
+      // one; otherwise the gradient dome, tinted to the season's mood, stands in.
+      const pano = this._seasonSky(curSeason);
+      if (pano) { this._skyDome.material.map = pano; this._skyDome.material.color.setHex(0xffffff); }
+      else { this._skyDome.material.map = this._gradTex; this._skyDome.material.color.setHex(sk.tint); }
+      this._skyDome.material.needsUpdate = true;
       this._savedFog = { color: scene.fog.color.getHex(), near: scene.fog.near, far: scene.fog.far };
       scene.fog.color.setHex(sk.fog); scene.fog.near = 7; scene.fog.far = 58;
     } else {
@@ -107,6 +239,23 @@ const walk = {
       if (this._savedFog) { scene.fog.color.setHex(this._savedFog.color); scene.fog.near = this._savedFog.near; scene.fog.far = this._savedFog.far; this._savedFog = null; }
     }
   },
+  // The season's painted sky, loaded once and cached. Returns the texture if ready,
+  // else null (the gradient stands in) and kicks off the load — which, once decoded,
+  // drapes the dome if that season is still the one on show.
+  _skyTex: {}, _skyTried: {},
+  _seasonSky(season) {
+    if (this._skyTex[season]) return this._skyTex[season];
+    if (!this._skyTried[season]) {
+      this._skyTried[season] = true;
+      new THREE.TextureLoader().load(`assets/sky/sky_${season}.jpg?v=CBUST`, (t) => {
+        t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; this._skyTex[season] = t;
+        if (this.active && curSeason === season && this._skyDome) {
+          this._skyDome.material.map = t; this._skyDome.material.color.setHex(0xffffff); this._skyDome.material.needsUpdate = true;
+        }
+      }, undefined, () => { this._skyTried[season] = 'fail'; }); // no file → keep the gradient
+    }
+    return null;
+  },
   // Low-poly hills and cone-trees ringing the ráth, drawn once in Three.js geometry.
   // They sit out past the settlement and are fog-affected, so they read as hazy green
   // forest and rolling hills beyond the clearing — real depth under the skydome.
@@ -114,6 +263,7 @@ const walk = {
   _buildScenery() {
     if (this._scenery) return;
     const g = new THREE.Group();
+    this._treePts = []; // canopy-top points the Mhórrígan can alight on
     let seed = 1337; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
     const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a4028 });
     const leafMats = [0x3f6b32, 0x4c7a38, 0x37602c, 0x567f3f].map((c) => new THREE.MeshLambertMaterial({ color: c }));
@@ -129,6 +279,7 @@ const walk = {
       const leaf = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf.position.y = (2.0 + 1.4) * s; leaf.scale.setScalar(s);
       const leaf2 = new THREE.Mesh(coneGeo, leafMats[(rnd() * leafMats.length) | 0]); leaf2.position.y = (2.0 + 2.6) * s; leaf2.scale.setScalar(s * 0.72);
       t.add(trunk, leaf, leaf2); t.position.set(x, TREE_SINK, z); g.add(t);
+      this._treePts.push({ x, z, top: TREE_SINK + 6.0 * s }); // where a raven would settle, atop the crown
     };
     // trees ring the clearing in copses — smaller trees, bunched into stands with
     // gaps between, rather than an even picket line.
@@ -152,18 +303,29 @@ const walk = {
   },
   exit() {
     this.active = false;
+    game._hideMarkers = false;
     this._setSky(false);
     for (const b of game.buildings) {
       if (b.alert && b._alertWas !== undefined) { b.alert.visible = b._alertWas; b._alertWas = undefined; }
       if (b.dot && b._dotWas !== undefined) { b.dot.visible = b._dotWas; b._dotWas = undefined; }
     }
+    // Send the stroll-only roamer(s) home: they exist for the screensaver, not the ráth.
+    for (let i = game.walkers.length - 1; i >= 0; i--) {
+      const w = game.walkers[i];
+      if (w && w.tag === 'stroll') { game.walkerGroup.remove(w.sprite); if (w.dispose) w.dispose(); game.walkers.splice(i, 1); }
+    }
+    this.follow = null;
     document.getElementById('ui-overlay').classList.remove('in-walk');
   },
   update(dt) {
-    // Keep a living subject: if the one we follow finished their errand (or was
-    // removed), pick up whoever else is abroad; if nobody is, hold the camera.
+    if (this.follow && this.follow.raven) { this._updateRaven(dt); return; } // the raven flies, no ground subject
+    if (walkCam.fov !== 74) { walkCam.fov = 74; walkCam.updateProjectionMatrix(); } // ground stroll: the wide, immersive eye
+    // Follow one subject for their whole path. When they finish their errand (or
+    // leave), send out Deaglán/Somhairlín/Fionn to roam the roads and follow them on —
+    // a tireless subject so the stroll runs like a screensaver.
     if (!this.follow || this.follow.done || !game.walkers.includes(this.follow)) {
-      this.follow = this._pickFollow(null); this._first = true; this._updateName();
+      this.follow = this._releaseRoamer() || this._pickFollow(null);
+      this._first = true; this._updateName();
       if (!this.follow) return;
     }
     const p = this.follow.sprite.position;
@@ -191,7 +353,7 @@ const walk = {
 // only while strolling.
 function updateWalkBtn() {
   const peg = document.getElementById('walk-btn'), ex = document.getElementById('walk-exit');
-  const inSettlement = titleScreenEl.classList.contains('hidden') && !battle.active && !hurling.active && !sparring.active;
+  const inSettlement = titleScreenEl.classList.contains('hidden') && !battle.active && !hurling.active && !sparring.active && !eachtra.active;
   const hasRoads = !!(game.map && game.map.tiles && game.map.tiles.some((t) => t && t.road));
   if (peg) peg.classList.toggle('hidden', !(inSettlement && !walk.active && hasRoads));
   if (ex) ex.classList.toggle('hidden', !walk.active);
@@ -244,8 +406,18 @@ game.onEvict = ({ name, reason, silver, cow }) => {
   if (tookCow) setCattle(campaign.cattle - 1);
   pushStats(); saveSettlement();
   const took = [silver ? `🪙 ${silver} silver` : null, tookCow ? '🐄 a cow' : null].filter(Boolean).join(' and ');
-  const how = reason === 'evicted' ? 'is turned out of a home that can no longer hold them' : 'abandons your ráth, unfed and unwatered';
-  flashNotice(`😠 The ${name} family ${how}${took ? ` — and takes ${took} in spite` : ''}. Keep your homes fed and prospering, ${leaderName()}.`);
+  const how = reason === 'homeless' ? 'finds no roof in your ráth and gives up, leaving at last'
+    : reason === 'evicted' ? 'is turned out of a home that can no longer hold them'
+    : 'abandons your ráth, unfed and unwatered';
+  flashNotice(`😠 ${name} ${how}${took ? ` — and takes ${took} in spite` : ''}. Keep roofs over your folk, ${leaderName()}.`);
+};
+// The harvest overflows your stores — grain lost for want of a granary. Throttled.
+let _lastSpill = 0;
+game.onSpill = (n) => {
+  const t = performance.now();
+  if (t - _lastSpill < 9000) return; // one warning at a time, not a stream
+  _lastSpill = t;
+  flashNotice(`🌾 Your stores are full — this harvest spills and spoils. Raise another granary (each holds three fields' harvest), or grain is lost.`);
 };
 
 const sim = { speed: 1 };
@@ -260,8 +432,8 @@ let missionDone = false;
 const ui = new UI({
   onTool: (kind) => { cancelPending(); tool = kind; if (!(tool === 'road' || BUILDINGS[tool])) preview.visible = false; game.showInspectDots(kind === 'inspect'); },
   onSpeed: (s) => { sim.speed = s; savedSpeed = null; },
-  onRotate: (d) => { if (sparring.active) return; if (hurling.active) { rotateIsoCamera(hurling.camera, d); return; } if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
-  onZoom: (f) => { if (sparring.active) return; if (hurling.active) { hurling.zoom(f); return; } if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
+  onRotate: (d) => { if (sparring.active || eachtra.active) return; if (hurling.active) { rotateIsoCamera(hurling.camera, d); return; } if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
+  onZoom: (f) => { if (sparring.active || eachtra.active) return; if (hurling.active) { hurling.zoom(f); return; } if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
   onInspectClose: () => { _inspectDwelling = null; resumeGame(); },
   onFestivalContinue: () => { if (battleWon) { battleWon = false; battle.exit(); } else resumeGame(); },
   onStartMission: (n) => startMission(n),
@@ -595,6 +767,98 @@ function openSparring() {
   if (game.countBuilt('builder_house') > 0) roster.somhairlin = Math.max(1, roster.somhairlin || 0);
   sparring.open(roster, campaign.hosted, { grit: campaign.raidsWon || 0 });
 }
+// --- Eachtra: the hero's-journey mode — a named champion through chapters of story ---
+const eachtra = new Eachtra();
+const HERO_KEY = 'ardri_hero';
+function loadHero() { try { const h = JSON.parse(localStorage.getItem(HERO_KEY) || '{}'); return { name: h.name || null, chapter: h.chapter || 1 }; } catch (e) { return { name: null, chapter: 1 }; } }
+function saveHero() { try { localStorage.setItem(HERO_KEY, JSON.stringify(hero.save)); } catch (e) {} }
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const hero = {
+  save: loadHero(),
+  fromTitle: true,
+  el: document.getElementById('hero-screen'),
+  // open the hub, from the title screen or from within the settlement
+  openHub(fromTitle) {
+    this.fromTitle = fromTitle;
+    pauseGame(); ui.hideInspect();
+    document.getElementById('ui-overlay').style.display = 'none'; // the settlement chrome stays hidden for the whole hero session (hub + levels)
+    if (titleScreenEl) titleScreenEl.classList.add('hidden');
+    this.el.classList.remove('hidden');
+    if (!this.save.name) this._renderName(); else this._renderHub();
+  },
+  closeHub() {
+    this.el.classList.add('hidden');
+    document.getElementById('ui-overlay').style.display = '';
+    resumeGame();
+    if (this.fromTitle && titleScreenEl) { titleScreenEl.classList.remove('hidden'); refreshCampaignButton(); }
+  },
+  _card(html) { this.el.innerHTML = `<div class="hero-card">${html}</div>`; },
+  _renderName() {
+    this._card(`<h2>Become a Celtic Hero</h2><p class="hero-sub">Every eachtra begins with a name.</p>
+      <input class="hero-name" id="hero-name-in" maxlength="22" placeholder="Name your champion…" />
+      <div class="hero-chapters"><button class="menu-btn" id="hero-begin">Begin the journey ▸</button>
+      <button class="menu-btn" id="hero-back">✕ Back</button></div>`);
+    const inp = document.getElementById('hero-name-in'); inp.focus();
+    const go = () => { const n = (inp.value || '').trim(); if (!n) { inp.focus(); return; } this.save.name = n; this.save.chapter = 1; saveHero(); this._renderHub(); };
+    document.getElementById('hero-begin').addEventListener('click', go);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    document.getElementById('hero-back').addEventListener('click', () => this.closeHub());
+  },
+  _renderHub() {
+    const done = this.save.chapter > CHAPTERS.length;
+    const rows = CHAPTERS.map((c) => {
+      const unlocked = c.n <= this.save.chapter, cleared = c.n < this.save.chapter;
+      const cls = 'menu-btn hero-chip' + (unlocked ? ' unlocked' : '') + (cleared ? ' cleared' : '');
+      const mark = cleared ? '✓ ' : unlocked ? '▸ ' : '🔒 ';
+      return `<button class="${cls}" ${unlocked ? '' : 'disabled'} data-ch="${c.n}">${mark}${c.n}. ${esc(c.title)} — <i>${esc(c.titleEn)}</i></button>`;
+    }).join('');
+    this._card(`<h2>${esc(this.save.name)}</h2><p class="hero-sub">${done ? 'Hero of Ériu — every chapter won. Walk them again as you will.' : 'Choose your chapter.'}</p>
+      <div class="hero-chapters">${rows}</div>
+      <div class="hero-chapters"><button class="menu-btn" id="hero-leave">✕ Leave</button></div>`);
+    this.el.querySelectorAll('[data-ch]').forEach((b) => b.addEventListener('click', () => this._renderIntro(+b.dataset.ch)));
+    document.getElementById('hero-leave').addEventListener('click', () => this.closeHub());
+  },
+  _renderIntro(n) {
+    const c = CHAPTERS[n - 1];
+    this._card(`<p class="hero-sub">Chapter ${c.n}</p><h2>${esc(c.title)}</h2><p class="hero-sub">${esc(c.titleEn)}</p>
+      <p class="hero-story">${esc(c.intro)}</p>
+      <div class="hero-chapters"><button class="menu-btn" id="hero-enter">Into the wood ▸</button>
+      <button class="menu-btn" id="hero-back">← The chapters</button></div>`);
+    document.getElementById('hero-enter').addEventListener('click', () => this._play(n));
+    document.getElementById('hero-back').addEventListener('click', () => this._renderHub());
+  },
+  _play(n) {
+    const c = CHAPTERS[n - 1];
+    this.el.classList.add('hidden');
+    eachtra.open({ enemies: c.enemies, onExit: (res) => this._result(n, res) });
+  },
+  _result(n, res) {
+    this.el.classList.remove('hidden');
+    if (res === 'clear') { if (n >= this.save.chapter && n <= CHAPTERS.length) { this.save.chapter = n + 1; saveHero(); } this._renderOutro(n); }
+    else if (res === 'die') { this._renderFallen(n); }
+    else this._renderHub();
+  },
+  _renderOutro(n) {
+    const c = CHAPTERS[n - 1], next = CHAPTERS[n];
+    this._card(`<p class="hero-sub">Chapter ${c.n} — won</p><h2>${esc(c.title)}</h2>
+      <p class="hero-story">${esc(c.outro)}</p>
+      <div class="hero-chapters">${next ? `<button class="menu-btn" id="hero-next">Chapter ${next.n}: ${esc(next.title)} ▸</button>` : '<p class="hero-sub">You have won every chapter. The ráth will remember your name.</p>'}
+      <button class="menu-btn" id="hero-hub">The chapters</button></div>`);
+    if (next) document.getElementById('hero-next').addEventListener('click', () => this._renderIntro(n + 1));
+    document.getElementById('hero-hub').addEventListener('click', () => this._renderHub());
+  },
+  _renderFallen(n) {
+    const c = CHAPTERS[n - 1];
+    this._card(`<h2 style="color:#d9534f">You have fallen</h2><p class="hero-sub">${esc(c.title)} — the dead close over you.</p>
+      <div class="hero-chapters"><button class="menu-btn" id="hero-retry">↻ Stand again</button>
+      <button class="menu-btn" id="hero-hub">The chapters</button></div>`);
+    document.getElementById('hero-retry').addEventListener('click', () => this._play(n));
+    document.getElementById('hero-hub').addEventListener('click', () => this._renderHub());
+  },
+};
+document.getElementById('hero-open')?.addEventListener('click', () => hero.openHub(true));
+document.getElementById('eachtra-btn')?.addEventListener('click', () => hero.openHub(false));
+
 const SPAR_CHANCE = 1 / 3; // one in three each season a champion comes calling
 function maybeSparChallenge() {
   if (campaign.sparChallenge || !game.wrestlingGreen()) return;
@@ -1822,7 +2086,7 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture?.(e.pointerId);
-  if (sparring.active) return;
+  if (sparring.active || eachtra.active) return;
   if (hurling.active) { hurling.pointerDown(e); return; }
   if (battle.active) { battle.pointerDown(e); return; }
   if (walk.active) { inspectAt(e); return; } // on a stroll, a tap just looks at who/what you pass
@@ -1850,7 +2114,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
-  if (sparring.active) return;
+  if (sparring.active || eachtra.active) return;
   if (hurling.active) { hurling.pointerMove(e); return; }
   if (battle.active) { battle.pointerMove(e); return; }
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1879,7 +2143,7 @@ canvas.addEventListener('pointermove', (e) => {
 
 function endPointer(e) {
   canvas.releasePointerCapture?.(e.pointerId);
-  if (sparring.active) return;
+  if (sparring.active || eachtra.active) return;
   if (hurling.active) { hurling.pointerUp(e); return; }
   if (battle.active) { battle.pointerUp(e); return; }
   pointers.delete(e.pointerId);
@@ -1905,7 +2169,7 @@ canvas.addEventListener('pointerleave', () => { if (!pendingBuild) preview.visib
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  if (sparring.active) return;
+  if (sparring.active || eachtra.active) return;
   if (hurling.active) { hurling.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   if (battle.active) { battle.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   zoomIsoCamera(camera, e.deltaY > 0 ? 1.1 : 0.9, aspect);
@@ -1965,7 +2229,7 @@ window.addEventListener('resize', () => {
   sparring.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, hurling, sparring, openSparring, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
+window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, hurling, sparring, eachtra, hero, openSparring, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
   _dbg: { foundColony, collectColonyTribute, replenishWarband, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
     layRow: (key, sx, sz, ex, ez) => { const before = game.buildings.length; tool = key; showBuildRow({ x: sx, z: sz }, { x: ex, z: ez }); const shown = pendingBuildRow ? pendingBuildRow.length : 0; confirmBuild(); return { shown, placed: game.buildings.length - before }; } },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
@@ -1982,13 +2246,29 @@ const clock = new THREE.Clock();
 // its view plane (identical to the old billboard sprite). In the first-person stroll
 // we only yaw them to face the camera, keeping them vertically upright — so a building
 // stands straight instead of tilting its top toward you and overhanging the tile.
-function billboardBuildings(cam, upright) {
+// The building art is painted for the iso camera, which looks down at ISO_RECLINE
+// (atan(ISO_Y / √2) ≈ 31.5°). In the iso view the sprite copies that camera, so it
+// sits reclined by that angle and its roof reads right. In the stroll we yaw the
+// sprite to face the walker but recline it by the same angle, so the baked-in
+// perspective lands correctly (roof leans back, not forward over the path) — no
+// overhang, and the art itself gives the sense of depth.
+const ISO_RECLINE = Math.atan(0.866 / Math.SQRT2);
+function billboardBuildings(cam, upright, raven) {
   const list = game.buildingGroup.children;
   for (let i = 0; i < list.length; i++) {
-    const g = list[i], spr = g.userData && g.userData.spr;
-    if (!spr || !spr.userData || !spr.userData.billboard) continue;
-    if (upright) spr.rotation.set(0, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
-    else spr.quaternion.copy(cam.quaternion);
+    const g = list[i], u = g.userData; if (!u) continue;
+    const spr = u.spr; if (!spr || !spr.userData || !spr.userData.billboard) continue;
+    if (raven) { // the Mhórrígan's flyover: hold the iso facing (screen-aligned, as in build mode) so buildings read correctly from the air instead of spinning to track the moving camera
+      spr.quaternion.copy(cam.quaternion);
+      if (u.shadow) u.shadow.visible = true; // keep the contact shadow — it reads as a footprint from above
+    } else if (upright) { // the ground stroll: yaw to face the walker, reclined to the art's own angle, planted by its contact shadow
+      spr.rotation.order = 'YXZ';
+      spr.rotation.set(-ISO_RECLINE, Math.atan2(cam.position.x - g.position.x, cam.position.z - g.position.z), 0);
+      if (u.shadow) u.shadow.visible = true;
+    } else { // the iso view: the flat billboard, screen-aligned; no ground shadow
+      spr.quaternion.copy(cam.quaternion);
+      if (u.shadow) u.shadow.visible = false;
+    }
   }
 }
 
@@ -1998,6 +2278,7 @@ function frame() {
   if (battle.active) { setCamera(battle.camera); battle.update(dt); battle.render(renderer); return; }
   if (hurling.active) { setCamera(hurling.renderCam()); hurling.update(dt); hurling.render(renderer); return; }
   if (sparring.active) { setCamera(sparring.renderCam()); sparring.update(dt); sparring.render(renderer); return; }
+  if (eachtra.active) { setCamera(eachtra.renderCam()); eachtra.update(dt); eachtra.render(renderer); return; }
   const cam = walk.active ? walkCam : camera;
   setCamera(cam);
   updateWalkBtn();
@@ -2017,7 +2298,7 @@ function frame() {
   while (dayAcc >= SECONDS_PER_DAY) { dayAcc -= SECONDS_PER_DAY; advanceDay(); }
   if (walk.active) {
     walk.update(dt);
-    billboardBuildings(walkCam, true);
+    billboardBuildings(walkCam, true, !!(walk.follow && walk.follow.raven));
     renderer.render(scene, walkCam);
   } else {
     billboardBuildings(camera, false);

@@ -44,6 +44,7 @@
   <div id="map-controls">
     <div class="mc-row">
       <button id="walk-btn" class="mc-btn hidden" title="Stroll your ráth">🚶</button>
+      <button id="eachtra-btn" class="mc-btn" title="Your hero's journey — the Eachtra">🗡️</button>
     </div>
     <div class="mc-row">
       <button id="rot-left" class="mc-btn" title="Rotate left">⟲</button>
@@ -132,7 +133,9 @@
         <button data-form="wedge" title="Rinn — a V / spear-point, hits hard">▲ Rinn</button>
         <button data-form="diamond" title="Fáinne — diamond, all-round guard">◆ Fáinne</button>
       </div>
+      <div id="bs-form-hint"></div>
       <div id="bs-muster">
+        <div id="bs-foe"></div>
         <div class="bs-sec">Muster the folk</div>
         <div id="bs-roster"></div>
         <div class="bs-sec">Forming company</div>
@@ -261,6 +264,7 @@
       <p class="title-sub">Rise from a lone ráth to High King of Ériu</p>
       <div class="mission-menu">
         <button class="mission-btn menu-btn" data-mission="1">⚔ Play the Campaign</button>
+        <button id="hero-open" class="menu-btn">🗡️ Become a Celtic Hero</button>
         <button id="codex-open" class="menu-btn">📖 The Celtapedia</button>
         <button id="manage-open" class="menu-btn">💾 Load / Save</button>
       </div>
@@ -292,6 +296,9 @@
     </div>
   </div>
 </div>
+
+<!-- top-level, outside #ui-overlay, so the hero mode can hide the settlement chrome without hiding itself -->
+<div id="hero-screen" class="hidden"></div>
 
 <script type="module" src="src/main.js?v=CBUST" data-cfasync="false"></script>
 </body>

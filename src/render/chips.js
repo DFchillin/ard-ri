@@ -8,6 +8,18 @@ const WALK_CYCLE = [0, 2, 1, 2]; // step1, stand, step2, stand
 // match a sprite under the iso camera, upright-yaw toward the camera in the stroll
 // (so a building stands up straight instead of tilting/overhanging at eye level).
 const BUILD_PLANE = new THREE.PlaneGeometry(1, 1); BUILD_PLANE.translate(0, 0.5, 0);
+// A soft round contact shadow laid flat on the ground under every building, so a
+// yaw-billboard sprite reads as planted on its plot (not a floating cutout) during
+// the stroll. One shared radial-gradient texture + one flat unit quad for all.
+const SHADOW_GEO = new THREE.PlaneGeometry(1, 1); SHADOW_GEO.rotateX(-Math.PI / 2);
+const SHADOW_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d');
+  const grd = x.createRadialGradient(32, 32, 2, 32, 32, 31);
+  grd.addColorStop(0, 'rgba(0,0,0,0.55)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = grd; x.beginPath(); x.arc(32, 32, 31, 0, Math.PI * 2); x.fill();
+  return new THREE.CanvasTexture(c);
+})();
 const STEP_TIME = 0.42; // seconds per walk frame (slower, calmer gait)
 
 // A screen-facing billboard's width maps to the footprint's diagonal screen
@@ -42,6 +54,9 @@ const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluag
 // frame and leans on the bob to read as walking.
 const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run', 'deaglan', 'finn', 'vigil']);
 const DIAG_DIRS = new Set(['ne', 'nw', 'se', 'sw']); // the facings that carry real walk art
+// Roles that always hold their stand frame even on a diagonal (none at present —
+// the carriers DO stride on the diagonals; only their cardinal facings are copies).
+const HOLD_STAND = new Set();
 
 const FALLBACK = {
   dwelling: { color: 0xc98a3a, h: 1.2 }, farm: { color: 0x8ea63a, h: 0.35 },
@@ -90,11 +105,18 @@ export function makeBuildingChip(role, w, h, ts, opts = {}) {
     // width per art generation — so a person reads the same size next to every
     // building and perspective holds, whatever tile footprint the plot occupies.
     const worldW = drawW != null ? drawW * ts : (w + h) * ts * DIAG_FILL * scale;
-    const spr = new THREE.Mesh(BUILD_PLANE, new THREE.MeshBasicMaterial({ map: frames[0], transparent: true, alphaTest: 0.12, side: THREE.DoubleSide }));
-    spr.userData.billboard = true; // main loop orients it (iso: screen-aligned; stroll: upright)
+    const mat = new THREE.MeshBasicMaterial({ map: frames[0], transparent: true, alphaTest: 0.12, side: THREE.DoubleSide });
+    const spr = new THREE.Mesh(BUILD_PLANE, mat);
+    spr.userData.billboard = true; // main loop orients it (iso: screen-aligned; stroll: upright-yaw toward the camera)
     fitWidth(spr, frames[0], worldW);
     g.add(spr);
-    g.userData = { spr, frames, worldW, state: 0 };
+    // contact shadow — an ellipse matching the footprint, shown only in the stroll
+    // so each billboard sits on its plot instead of floating at eye level.
+    const shadow = new THREE.Mesh(SHADOW_GEO, new THREE.MeshBasicMaterial({ map: SHADOW_TEX, transparent: true, depthWrite: false, opacity: 0.5, fog: true }));
+    shadow.scale.set(Math.max(0.9, w * ts), Math.max(0.9, h * ts), 1);
+    shadow.position.y = 0.03; shadow.renderOrder = -1; shadow.visible = false;
+    g.add(shadow);
+    g.userData = { spr, shadow, frames, worldW, state: 0 };
   } else {
     g.add(fallbackBody(FALLBACK[role] || { color: 0x999999, h: 1 }, w, h, ts));
   }
@@ -131,7 +153,10 @@ const WALKER_COLOR = {
   water_carrier: 0x6fb0e0, druid: 0xb07ad0,
 };
 
-const WALKER_H = 1.3;   // world height every walker renders at, whatever the art's pixel size
+const WALKER_H = 1.3;   // world height a person renders at, whatever the art's pixel size
+// Non-human walkers ride at their own height. Finn the hound is about half a
+// person — a proper dog bounding the roads, not a man-sized beast nor a mouse.
+const WALKER_HEIGHT = { finn: 0.68, finn_run: 0.68 };
 const WALK_FRAMES = 6;  // walk poses per facing (cardinals repeat their idle)
 const WALK_FPS = 0.11;  // seconds per walk frame
 // Roles that carry an extra 8-facing hammer swing (<dir>_hammer0..N) — the
@@ -144,7 +169,7 @@ const HAMMER_STRIKE = 3; // the frame the hammer falls, for syncing the sparks
 // the foe and back. Cheap, render-side, reads as "having a go".
 const LUNGE_DUR = 0.34;
 const LUNGE_DIST = 0.38;
-export function makeWalkerChip(type, female, h = WALKER_H) {
+export function makeWalkerChip(type, female, h = WALKER_HEIGHT[type] || WALKER_H) {
   const role = WALK_FILE[type] || 'villager';
   // Half the folk are women — every role has a matching female sprite set in a
   // <role>_f folder, so the streets read as families, not a town of one gender.
@@ -182,7 +207,7 @@ export function makeWalkerChip(type, female, h = WALKER_H) {
   // facings are idle copies. So stride on the diagonals (real art, no flicker) and let
   // the step-bob carry a cardinal-facing figure. `striding` decides both the frame
   // cycle (here) and whether the walker suppresses its bob (walkers.js reads it).
-  s.striding = () => s._fullCycle || DIAG_DIRS.has(screenDir(s._dx, s._dz));
+  s.striding = () => s._fullCycle || (!HOLD_STAND.has(role) && DIAG_DIRS.has(screenDir(s._dx, s._dz)));
   s.hasWalkCycle = s._fullCycle; // back-compat: battle/other callers still read this
   s.faceWorld = (dx, dz) => { if (dx || dz) { s._dx = dx; s._dz = dz; } };
   s.strike = () => { if (s._lunge <= 0) s._lunge = LUNGE_DUR; }; // no attack frame — jab instead
