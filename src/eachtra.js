@@ -76,34 +76,35 @@ export class Eachtra {
     const dome = new THREE.Mesh(new THREE.SphereGeometry(220, 20, 12), new THREE.MeshBasicMaterial({ map: domeTex, side: THREE.BackSide, fog: false, depthWrite: false }));
     this.scene.add(dome);
 
-    // billboard trees — a dark pine silhouette, scattered into a wood with a ring
-    // of close-packed trunks at the edge so the champion is penned in the clearing.
-    const treeTex = this._canvasTex((x, w, h) => {
-      x.clearRect(0, 0, w, h);
-      x.fillStyle = '#3a2a1c'; x.fillRect(w / 2 - 7, h * 0.62, 14, h * 0.38);            // trunk
-      for (let i = 0; i < 3; i++) {                                                       // three stacked boughs
-        const cy = h * (0.18 + i * 0.2), cw = w * (0.46 - i * 0.1);
-        x.fillStyle = ['#20361f', '#2a4327', '#1b2e1a'][i];
-        x.beginPath(); x.moveTo(w / 2, cy); x.lineTo(w / 2 - cw, cy + h * 0.2); x.lineTo(w / 2 + cw, cy + h * 0.2); x.closePath(); x.fill();
-      }
-    }, 128, 160);
-    const treeMat = new THREE.SpriteMaterial({ map: treeTex, transparent: true, alphaTest: 0.3, fog: true });
-    const addTree = (x, z, s) => {
-      const t = new THREE.Sprite(treeMat); t.center.set(0.5, 0); t.scale.set(3.4 * s, 4.3 * s, 1); t.position.set(x, 0, z);
-      this.scene.add(t); this.trees.push({ x, z, r: 0.7 * s });
+    // billboard trees — painted forest art (assets/wood), base-anchored so each
+    // plants on the ground, scattered into a wood with a wall of trees at the edge.
+    const tl = new THREE.TextureLoader();
+    const place = (name, x, z, worldH, collideR) => {
+      const mat = new THREE.SpriteMaterial({ transparent: true, alphaTest: 0.25, fog: true });
+      const s = new THREE.Sprite(mat); s.center.set(0.5, 0); s.scale.set(worldH * 0.7, worldH, 1); s.position.set(x, 0, z);
+      tl.load(`assets/wood/tree_${name}.png?v=CBUST`, (t) => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; const im = t.image; if (im && im.width) s.scale.set(worldH * (im.width / im.height), worldH, 1); });
+      this.scene.add(s);
+      if (collideR) this.trees.push({ x, z, r: collideR });
     };
     let seed = 90210; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    const pick = (arr) => arr[(rnd() * arr.length) | 0];
+    const CANOPY = ['pine', 'oak', 'birch', 'rowan', 'willow', 'hawthorn', 'deadtree'];
     // the wall of trees — a close-packed double ring, tall, so the wood reads as
     // enclosing and you can't see out past the edge of the world
-    for (let a = 0; a < Math.PI * 2; a += 0.07) {
-      addTree(Math.cos(a) * (PLAY_R + (rnd() - 0.5) * 1.5), Math.sin(a) * (PLAY_R + (rnd() - 0.5) * 1.5), 1.35 + rnd() * 0.5);
-      addTree(Math.cos(a + 0.035) * (PLAY_R + 2.4 + rnd() * 1.5), Math.sin(a + 0.035) * (PLAY_R + 2.4 + rnd() * 1.5), 1.5 + rnd() * 0.5);
+    for (let a = 0; a < Math.PI * 2; a += 0.075) {
+      place(pick(CANOPY), Math.cos(a) * (PLAY_R + (rnd() - 0.5) * 1.5), Math.sin(a) * (PLAY_R + (rnd() - 0.5) * 1.5), 7 + rnd() * 2.5, 0.9);
+      place(pick(CANOPY), Math.cos(a + 0.037) * (PLAY_R + 2.7 + rnd() * 1.5), Math.sin(a + 0.037) * (PLAY_R + 2.7 + rnd() * 1.5), 8 + rnd() * 2.5, 0.9);
     }
-    for (let i = 0; i < 70; i++) {                                                         // the inner wood, with a loose clearing in the middle
-      const a = rnd() * Math.PI * 2, r = 5 + rnd() * (PLAY_R - 6);
+    for (let i = 0; i < 64; i++) { // the inner wood, with a loose clearing kept open in the middle
+      const a = rnd() * Math.PI * 2, r = 6 + rnd() * (PLAY_R - 8);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (x * x + z * z < 36) continue; // keep the heart of the clearing open (room to spawn and move)
-      addTree(x, z, 0.7 + rnd() * 0.7);
+      if (x * x + z * z < 36) continue;
+      const roll = rnd();
+      if (roll < 0.4) place(pick(CANOPY), x, z, 6 + rnd() * 3, 0.9);
+      else if (roll < 0.56) place(pick(['stump', 'log']), x, z, 1.8 + rnd() * 0.8, 1.0);
+      else if (roll < 0.72) place(pick(['boulder', 'rocks']), x, z, 1.4 + rnd() * 1.0, 1.1);
+      else if (roll < 0.9) place(pick(['gorse', 'bramble', 'fern']), x, z, 1.4 + rnd() * 0.7, 0);
+      else place(pick(['toadstools', 'reeds']), x, z, 0.8 + rnd() * 0.4, 0);
     }
   }
 
