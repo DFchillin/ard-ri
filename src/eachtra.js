@@ -67,13 +67,23 @@ export class Eachtra {
     groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping; groundTex.repeat.set(24, 24);
     const ground = new THREE.Mesh(new THREE.CircleGeometry(PLAY_R + 14, 48), new THREE.MeshLambertMaterial({ map: groundTex, emissive: 0x1a2416 }));
     ground.rotation.x = -Math.PI / 2; this.scene.add(ground);
-    // overcast dome
-    const domeTex = this._canvasTex((x, w, h) => {
-      const g = x.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, '#45525a'); g.addColorStop(0.55, '#6a7a78'); g.addColorStop(1, '#93a19a'); // moody above, pale mist at the treeline
-      x.fillStyle = g; x.fillRect(0, 0, w, h);
-    }, 16, 256);
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(220, 20, 12), new THREE.MeshBasicMaterial({ map: domeTex, side: THREE.BackSide, fog: false, depthWrite: false }));
+    // the sky: a brooding overcast skybox — a cold gradient with soft banks of
+    // cloud drifting across the upper air, pale mist settling to the treeline.
+    const skyCv = document.createElement('canvas'); skyCv.width = 1024; skyCv.height = 512;
+    const sx = skyCv.getContext('2d');
+    const sg = sx.createLinearGradient(0, 0, 0, 512);
+    sg.addColorStop(0, '#363f49'); sg.addColorStop(0.42, '#505d66'); sg.addColorStop(0.7, '#7a8884'); sg.addColorStop(1, '#95a39b');
+    sx.fillStyle = sg; sx.fillRect(0, 0, 1024, 512);
+    let ss = 7; const srnd = () => { ss = (ss * 1103515245 + 12345) & 0x7fffffff; return ss / 0x7fffffff; };
+    for (let i = 0; i < 70; i++) {
+      const cx = srnd() * 1024, cy = srnd() * 300, rx = 1024 * (0.04 + srnd() * 0.11), ry = rx * (0.28 + srnd() * 0.22);
+      const tone = 180 + ((srnd() * 45) | 0), a = 0.035 + srnd() * 0.08;
+      const grd = sx.createRadialGradient(cx, cy, 1, cx, cy, rx);
+      grd.addColorStop(0, `rgba(${tone},${tone + 6},${tone},${a})`); grd.addColorStop(1, 'rgba(255,255,255,0)');
+      sx.fillStyle = grd; sx.beginPath(); sx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); sx.fill();
+    }
+    const domeTex = new THREE.CanvasTexture(skyCv); domeTex.colorSpace = THREE.SRGBColorSpace;
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(220, 24, 14), new THREE.MeshBasicMaterial({ map: domeTex, side: THREE.BackSide, fog: false, depthWrite: false }));
     this.scene.add(dome);
 
     // billboard trees — painted forest art (assets/wood), base-anchored so each
@@ -376,7 +386,7 @@ export class Eachtra {
       if (this._keys.has('d') || this._keys.has('arrowright')) ms += 1;
       if (this._keys.has('a') || this._keys.has('arrowleft')) ms -= 1;
       if (this._joy) { mf -= this._joy.z; ms += this._joy.x; }
-      const fwd = this._forward(); TMP2.set(fwd.z, 0, -fwd.x); // right = forward × up
+      const fwd = this._forward(); TMP2.set(-fwd.z, 0, fwd.x); // right = forward × up (so A/D and the stick's x aren't mirrored)
       let vx = fwd.x * mf + TMP2.x * ms, vz = fwd.z * mf + TMP2.z * ms;
       const m = Math.hypot(vx, vz);
       this._moving = m > 0.001;
