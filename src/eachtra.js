@@ -179,13 +179,14 @@ export class Eachtra {
     for (const pk of this.pickups) this.scene.remove(pk.mesh);
     if (this._boss) this.chipGroup.remove(this._boss.chip);
     for (const p of (this._bossProj || [])) this.scene.remove(p.mesh);
-    this.enemies = []; this.spears = []; this.pickups = []; this._bossProj = [];
+    for (const bm of (this._beams || [])) this.scene.remove(bm.mesh);
+    this.enemies = []; this.spears = []; this.pickups = []; this._bossProj = []; this._beams = [];
     this._boss = null; this._bossDone = false; this._wantBoss = !!opts.boss;
     if (this._bossWrap) this._bossWrap.style.display = 'none';
     this._spawnWave(opts.enemies || 5);
     this.hud.style.display = 'block'; this._banner.style.display = 'none';
     this._exitBtn.textContent = '✕ Leave the wood';
-    this._hint.textContent = 'WASD / left-stick to move · drag to look · ⚔ strike · 🗡 throw (walk over a spear to take it up)';
+    this._hint.textContent = 'move · drag to look · ⚔ strike (a beam flies at full health) · 🗡 hurl a dagger (walk over it to take it up)';
     this._bind(); this._setHud();
     this.onResize();
   }
@@ -278,6 +279,16 @@ export class Eachtra {
     this.enemies.push({ chip, hp: t.hp, cd: 0, dead: 0, spd: t.spd, reach: t.reach, dmg: t.dmg });
   }
   _forward() { this.camera.getWorldDirection(TMP); TMP.y = 0; return TMP.normalize(); }
+  _daggerMesh() { // a short thrown blade (points +z, the travel direction)
+    const g = new THREE.Group();
+    const blade = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.42, 6), new THREE.MeshLambertMaterial({ color: 0xcfd6dc }));
+    blade.position.z = 0.2; blade.rotation.x = Math.PI / 2; g.add(blade);
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.035, 0.05), new THREE.MeshLambertMaterial({ color: 0xc9a24a }));
+    g.add(guard);
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.18, 5), new THREE.MeshLambertMaterial({ color: 0x5a3a22 }));
+    grip.rotation.x = Math.PI / 2; grip.position.z = -0.13; g.add(grip);
+    return g;
+  }
   _strike() {
     if (!this.active || this._dead || this._meleeCd > 0) return;
     this._meleeCd = 0.42; this._swing = 0.28;
@@ -294,16 +305,35 @@ export class Eachtra {
       TMP2.subVectors(this._boss.chip.position, this.pos); TMP2.y = 0; const d = TMP2.length();
       if (d <= MELEE_RANGE + 1.8) { TMP2.normalize(); if (f.dot(TMP2) > 1 - MELEE_ARC) this._damageBoss(MELEE_DMG); }
     }
+    if (this.hp >= 100) this._fireBeam(); // whole of heart, whole of blade — a beam flies, as it did for the old heroes
+  }
+  _fireBeam() {
+    const dir = this.camera.getWorldDirection(new THREE.Vector3()).normalize();
+    if (!this._beamTex) this._beamTex = this._canvasTex((x, w, h) => {
+      const g = x.createRadialGradient(w / 2, h / 2, 2, w / 2, h / 2, w / 2);
+      g.addColorStop(0, 'rgba(240,250,255,1)'); g.addColorStop(0.5, 'rgba(150,210,255,0.8)'); g.addColorStop(1, 'rgba(90,160,255,0)');
+      x.fillStyle = g; x.beginPath(); x.ellipse(w / 2, h / 2, w / 2, h / 3.2, 0, 0, Math.PI * 2); x.fill();
+    }, 64, 64);
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._beamTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    s.scale.set(1.1, 0.5, 1); s.position.copy(this.pos); s.position.y = EYE - 0.1; s.position.addScaledVector(dir, 0.6);
+    this.scene.add(s);
+    this._beams.push({ mesh: s, vel: dir.multiplyScalar(34), life: 0.85 });
+  }
+  _updateBeams(dt) {
+    for (let i = this._beams.length - 1; i >= 0; i--) {
+      const bm = this._beams[i]; bm.mesh.position.addScaledVector(bm.vel, dt); bm.life -= dt;
+      let hit = false;
+      for (const e of this.enemies) { if (e.dead) continue; if (bm.mesh.position.distanceToSquared(TMP.copy(e.chip.position).setY(EYE - 0.1)) < 0.8 * 0.8) { this._damage(e, 30); hit = true; break; } }
+      if (!hit && this._boss && this._boss.state === 'active' && bm.mesh.position.distanceToSquared(TMP.copy(this._boss.chip.position).setY(2.2)) < 1.8 * 1.8) { this._damageBoss(30); hit = true; }
+      const r2 = bm.mesh.position.x ** 2 + bm.mesh.position.z ** 2;
+      if (hit || bm.life <= 0 || r2 > (PLAY_R + 2) ** 2) { this.scene.remove(bm.mesh); this._beams.splice(i, 1); }
+    }
   }
   _throw() {
     if (!this.active || this._dead || this.spearN <= 0 || this._throwCd > 0) return;
     this.spearN -= 1; this._throwCd = 0.5; this._setHud();
     const dir = this.camera.getWorldDirection(new THREE.Vector3()).normalize();
-    const g = new THREE.Group();
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.1, 5), new THREE.MeshLambertMaterial({ color: 0x6b4a2a }));
-    shaft.rotation.x = Math.PI / 2; g.add(shaft);
-    const head = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.24, 6), new THREE.MeshLambertMaterial({ color: 0xcfd6dc }));
-    head.position.z = 0.6; head.rotation.x = Math.PI / 2; g.add(head);
+    const g = this._daggerMesh();
     g.position.copy(this.pos); g.position.y = EYE - 0.15;
     this.scene.add(g);
     this.spears.push({ mesh: g, vel: dir.multiplyScalar(26), life: 2.4 });
@@ -378,10 +408,10 @@ export class Eachtra {
       const r2 = s.mesh.position.x ** 2 + s.mesh.position.z ** 2;
       if (hit || s.life <= 0 || s.mesh.position.y < 0.1 || r2 > (PLAY_R + 2) ** 2 || this._collide(s.mesh.position.x, s.mesh.position.z)) {
         this.scene.remove(s.mesh); this.spears.splice(i, 1);
-        if (!hit) { // it lands — stick it upright as a pickup
-          const g = new THREE.Group(); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.0, 5), new THREE.MeshLambertMaterial({ color: 0x6b4a2a }));
-          sh.position.y = 0.5; g.add(sh); const hd = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.22, 6), new THREE.MeshLambertMaterial({ color: 0xcfd6dc })); hd.position.y = 1.0; g.add(hd);
-          g.position.set(Math.max(-PLAY_R + 2, Math.min(PLAY_R - 2, s.mesh.position.x)), 0, Math.max(-PLAY_R + 2, Math.min(PLAY_R - 2, s.mesh.position.z))); g.rotation.z = 0.25;
+        if (!hit) { // it lands — stick it blade-down in the earth as a pickup
+          const g = this._daggerMesh();
+          g.position.set(Math.max(-PLAY_R + 2, Math.min(PLAY_R - 2, s.mesh.position.x)), 0.32, Math.max(-PLAY_R + 2, Math.min(PLAY_R - 2, s.mesh.position.z)));
+          g.rotation.set(-Math.PI / 2 - 0.3, 0, 0.2);
           this.scene.add(g); this.pickups.push({ mesh: g });
         }
       } else { s.mesh.lookAt(TMP.copy(s.mesh.position).add(s.vel)); s.vel.y -= 9 * dt; }
@@ -419,6 +449,7 @@ export class Eachtra {
     this.enemies = this.enemies.filter((e) => !(e.dead && e.dead >= 0.72));
     if (this._boss) this._updateBoss(dt);
     this._updateBossProj(dt);
+    this._updateBeams(dt);
     // the chapter clears once the wave is down AND the giant (if any) is laid low
     const waveClear = !this._dead && alive === 0 && this.enemies.every((e) => e.dead);
     if (waveClear && this._wantBoss && !this._boss && !this._bossDone) this._spawnBoss();
