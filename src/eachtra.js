@@ -147,15 +147,9 @@ export class Eachtra {
     this._bossBar = document.createElement('div'); this._bossBar.style.cssText = 'height:100%;width:100%;background:linear-gradient(90deg,#8a2b6b,#c43a2e)'; bw.appendChild(this._bossBar);
     this._bossWrap.appendChild(bw); h.appendChild(this._bossWrap);
     // first-person sword, swung with a CSS transform
-    const wc = document.createElement('canvas'); wc.width = 180; wc.height = 200;
-    const x = wc.getContext('2d');
-    x.fillStyle = '#6b4a2a'; x.fillRect(150, 150, 16, 50);                 // grip
-    x.fillStyle = '#c9a24a'; x.fillRect(142, 138, 32, 14);                 // guard
-    const bl = x.createLinearGradient(150, 140, 110, 40); bl.addColorStop(0, '#e8edf2'); bl.addColorStop(1, '#9fb0bd');
-    x.fillStyle = bl; x.beginPath(); x.moveTo(150, 140); x.lineTo(166, 140); x.lineTo(150, 30); x.closePath(); x.fill(); // blade
-    this._weap = wc;
-    wc.style.cssText = 'position:absolute;right:6%;bottom:-14px;width:220px;height:244px;pointer-events:none;transform-origin:85% 95%;transition:transform .09s ease-out';
-    h.appendChild(wc);
+    const wimg = document.createElement('img');
+    wimg.style.cssText = 'position:absolute;right:-2%;bottom:-16px;height:52vh;max-height:440px;pointer-events:none;transform-origin:72% 100%;transition:transform .09s ease-out;filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))';
+    this._weap = wimg; this._weapTier = -1; h.appendChild(wimg);
     // top bars
     const bar = document.createElement('div');
     bar.style.cssText = 'position:absolute;left:14px;top:12px;display:flex;flex-direction:column;gap:6px;pointer-events:none;text-shadow:0 1px 3px #000';
@@ -312,7 +306,7 @@ export class Eachtra {
   _strike() {
     if (!this.active || this._dead || this._meleeCd > 0) return;
     this._meleeCd = 0.42; this._swing = 0.28;
-    this._weap.style.transform = 'rotate(-62deg) translate(-26px,30px)';
+    this._weap.style.transform = 'rotate(-34deg) translate(-40px,14px)'; // a downward slash
     setTimeout(() => { this._weap.style.transform = ''; }, 150);
     const f = this._forward().clone();
     for (const e of this.enemies) {
@@ -608,5 +602,12 @@ export class Eachtra {
   _setHud() {
     this._hpBar.style.width = Math.max(0, this.hp) + '%';
     this._spearLbl.textContent = '🗡 × ' + this.spearN;
+    this._setWeaponByHealth();
+  }
+  // the held sword glows by vigour: full aura when hale (beams ready), a faint
+  // charge when wounded, plain steel when near death
+  _setWeaponByHealth() {
+    const tier = this.hp >= BEAM_MULTI ? 5 : this.hp >= BEAM_SINGLE ? 2 : 0;
+    if (tier !== this._weapTier) { this._weapTier = tier; this._weap.src = `assets/weapons/fp_sword${tier}.png?v=CBUST`; }
   }
 }
