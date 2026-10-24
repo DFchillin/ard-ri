@@ -183,6 +183,37 @@ export class Eachtra {
       else if (roll < 0.9) place(pick(['gorse', 'bramble', 'fern']), x, z, 1.4 + rnd() * 0.7, 0);
       else place(pick(['toadstools', 'reeds']), x, z, 0.8 + rnd() * 0.4, 0);
     }
+    this._scatterGroundDecals(rnd);
+  }
+
+  // Soft-edged ground patch: packed earth, fallen leaves, or dark bracken,
+  // painted on a canvas and faded to transparent at the rim so it blends.
+  _patchTex(kind) {
+    return this._canvasTex((x, w, h) => {
+      const pal = kind === 'leaf' ? [[150, 96, 40], [120, 70, 28], [168, 120, 54], [96, 58, 26]]
+        : kind === 'earth' ? [[78, 60, 42], [96, 74, 50], [62, 46, 32], [108, 86, 60]]
+          : [[52, 70, 36], [40, 56, 28], [66, 84, 44], [34, 46, 24]]; // bracken
+      x.fillStyle = `rgb(${pal[0][0]},${pal[0][1]},${pal[0][2]})`; x.fillRect(0, 0, w, h);
+      for (let i = 0; i < 1600; i++) { const c = pal[(Math.random() * pal.length) | 0]; x.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.3 + Math.random() * 0.5})`; const s = 2 + Math.random() * (kind === 'leaf' ? 5 : 3); x.fillRect(Math.random() * w, Math.random() * h, s, s * (kind === 'leaf' ? 0.6 : 1)); }
+      const m = x.createRadialGradient(w / 2, h / 2, w * 0.18, w / 2, h / 2, w * 0.5); // fade the rim out
+      m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.75, 'rgba(0,0,0,0.6)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+      x.globalCompositeOperation = 'destination-in'; x.fillStyle = m; x.fillRect(0, 0, w, h);
+      x.globalCompositeOperation = 'source-over';
+    }, 128, 128);
+  }
+  _scatterGroundDecals(rnd) {
+    const texes = { leaf: this._patchTex('leaf'), earth: this._patchTex('earth'), bracken: this._patchTex('bracken') };
+    const kinds = ['leaf', 'leaf', 'earth', 'bracken']; // leaf litter most common
+    for (let i = 0; i < 64; i++) {
+      const a = rnd() * Math.PI * 2, r = 3 + rnd() * (PLAY_R - 3);
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const kind = kinds[(rnd() * kinds.length) | 0];
+      const sz = 2.0 + rnd() * 3.5;
+      const geo = new THREE.PlaneGeometry(sz, sz); geo.rotateX(-Math.PI / 2);
+      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: texes[kind], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, fog: true }));
+      m.position.set(x, this._heightAt(x, z) + 0.02, z); m.rotation.y = rnd() * Math.PI * 2;
+      this.scene.add(m); this._woodObjs.push(m);
+    }
   }
 
   // The floor is terrain: flat through the heart of the wood, then a grassy
