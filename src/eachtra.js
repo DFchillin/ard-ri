@@ -47,9 +47,13 @@ export class Eachtra {
     this._woodObjs = [];       // ground, sky, trees, cottages — hidden while indoors
     this._houses = [];         // {door:{x,z}, ang, interior index}
     this._inside = null;       // index of the cottage we're standing in, or null
+    this._gibs = [];           // flying/littering death chunks
+    this._gibGeo = new THREE.IcosahedronGeometry(1, 0); // unit chunk, scaled per gib
     this._buildWood();
     this._buildHouses();
     this._buildInteriors();
+    this._buildRain();
+    this._gibGroup = new THREE.Group(); this.scene.add(this._gibGroup); this._woodObjs.push(this._gibGroup);
     this.chipGroup = new THREE.Group(); this.scene.add(this.chipGroup);
 
     this.pos = new THREE.Vector3(0, 0, PLAY_R - 6);
@@ -58,7 +62,50 @@ export class Eachtra {
     this._swing = 0; this._meleeCd = 0; this._throwCd = 0; this._hurtFlash = 0;
     this._keys = new Set(); this._joy = null; this._look = null;
     this._dom();
+    this._buildWeapon();
     this._handlers = {};
+  }
+
+  // ---- the held sword (a camera-child sprite) and its charged-blade smoke ----
+  _buildWeapon() {
+    this.scene.add(this.camera); // children of the camera render only if it's in the scene graph
+    this._swordH = 0.74;
+    const mat = new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false, fog: false });
+    const s = new THREE.Sprite(mat); s.center.set(0.5, 0.5); s.renderOrder = 20;
+    s.scale.set(this._swordH * 0.45, this._swordH, 1);
+    new THREE.TextureLoader().load('assets/weapons/fp_sword0.png?v=CBUST', (t) => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; const im = t.image; if (im && im.width) s.scale.set(this._swordH * (im.width / im.height), this._swordH, 1); });
+    this._swordBasePos = new THREE.Vector3(0.23, -0.30, -0.62);
+    s.position.copy(this._swordBasePos);
+    this.camera.add(s); this._sword = s;
+    // soft blue puff texture for the tip smoke
+    this._smokeTex = this._canvasTex((x, w, h) => { const g = x.createRadialGradient(w / 2, h / 2, 1, w / 2, h / 2, w / 2); g.addColorStop(0, 'rgba(165,210,255,0.95)'); g.addColorStop(0.5, 'rgba(85,150,250,0.4)'); g.addColorStop(1, 'rgba(60,120,240,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); }, 64, 64);
+    this._smokePool = []; this._tipV = new THREE.Vector3(); this._powered = false;
+  }
+  _emitSmoke(tw, pvx, pvz) {
+    let p = this._smokePool.find((q) => q.life <= 0);
+    if (!p) {
+      if (this._smokePool.length > 110) return;
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._smokeTex, transparent: true, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, fog: false }));
+      spr.renderOrder = 26; this.scene.add(spr); p = { spr, life: 0 }; this._smokePool.push(p);
+    }
+    p.spr.visible = true;
+    p.spr.position.set(tw.x + (Math.random() - 0.5) * 0.07, tw.y + (Math.random() - 0.5) * 0.07, tw.z + (Math.random() - 0.5) * 0.07);
+    p.vx = -pvx * 0.45 + (Math.random() - 0.5) * 0.6; // trails back against the champion's travel
+    p.vz = -pvz * 0.45 + (Math.random() - 0.5) * 0.6;
+    p.vy = 0.6 + Math.random() * 1.0;
+    p.life = p.maxLife = 0.4 + Math.random() * 0.35;
+    p.s0 = 0.09 + Math.random() * 0.07;
+  }
+  _updateSmoke(dt) {
+    for (const p of this._smokePool) {
+      if (p.life <= 0) { if (p.spr.visible) p.spr.visible = false; continue; }
+      p.life -= dt;
+      p.spr.position.x += p.vx * dt; p.spr.position.y += p.vy * dt; p.spr.position.z += p.vz * dt;
+      const k = Math.max(0, p.life / p.maxLife);
+      const sc = p.s0 * (2.0 - k * 1.0); p.spr.scale.set(sc, sc, 1); // swells as it dissipates
+      p.spr.material.opacity = k * 0.6;
+      if (p.life <= 0) p.spr.visible = false;
+    }
   }
 
   // ---- world ---------------------------------------------------------------
@@ -147,6 +194,31 @@ export class Eachtra {
     if (zz >= b) return H;
     const t = (zz - a) / (b - a);
     return H * t * t * (3 - 2 * t);
+  }
+
+  // ---- rain (falls while the giant walks) ----------------------------------
+  _buildRain() {
+    const N = 460, R = 22, H = 16; // a column of streaks that follows the champion
+    this._rainN = N; this._rainR = R; this._rainH = H;
+    const pos = new Float32Array(N * 6); this._rainDrop = [];
+    for (let i = 0; i < N; i++) this._rainDrop.push({ x: (Math.random() * 2 - 1) * R, z: (Math.random() * 2 - 1) * R, y: Math.random() * H, len: 0.5 + Math.random() * 0.5, spd: 20 + Math.random() * 10 });
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.LineBasicMaterial({ color: 0xafc0d0, transparent: true, opacity: 0.34, fog: true, depthWrite: false });
+    this._rain = new THREE.LineSegments(geo, mat); this._rain.frustumCulled = false; this._rain.visible = false;
+    this.scene.add(this._rain);
+  }
+  _updateRain(dt) {
+    if (!this._raining || this._inside !== null) { if (this._rain.visible) this._rain.visible = false; return; }
+    this._rain.visible = true;
+    const pos = this._rain.geometry.attributes.position.array, H = this._rainH, slant = 1.1;
+    for (let i = 0; i < this._rainN; i++) {
+      const d = this._rainDrop[i]; d.y -= d.spd * dt;
+      if (d.y < -2) { d.y = H; d.x = (Math.random() * 2 - 1) * this._rainR; d.z = (Math.random() * 2 - 1) * this._rainR; }
+      const wx = this.pos.x + d.x, wz = this.pos.z + d.z, o = i * 6;
+      pos[o] = wx; pos[o + 1] = d.y + d.len; pos[o + 2] = wz;
+      pos[o + 3] = wx + slant * 0.14 * d.len; pos[o + 4] = d.y; pos[o + 5] = wz;
+    }
+    this._rain.geometry.attributes.position.needsUpdate = true;
   }
 
   // ---- cottages ------------------------------------------------------------
@@ -316,22 +388,7 @@ export class Eachtra {
     const bw = document.createElement('div'); bw.style.cssText = 'height:12px;border:2px solid #000a;border-radius:4px;background:#2a0f0f;overflow:hidden';
     this._bossBar = document.createElement('div'); this._bossBar.style.cssText = 'height:100%;width:100%;background:linear-gradient(90deg,#8a2b6b,#c43a2e)'; bw.appendChild(this._bossBar);
     this._bossWrap.appendChild(bw); h.appendChild(this._bossWrap);
-    // charged-blade smoke — blue wisps curling up off the sword at full strength
-    const kf = document.createElement('style');
-    kf.textContent = '@keyframes eachtraSmoke{0%{transform:translateY(8px) scale(.5);opacity:0}22%{opacity:.6}100%{transform:translateY(-110px) scale(1.9);opacity:0}}';
-    document.head.appendChild(kf);
-    this._smoke = document.createElement('div');
-    this._smoke.style.cssText = 'position:absolute;right:20%;bottom:40%;width:130px;height:240px;pointer-events:none;display:none;filter:blur(3px)';
-    for (let i = 0; i < 7; i++) {
-      const w = document.createElement('div');
-      w.style.cssText = `position:absolute;left:${10 + Math.random() * 65}%;bottom:0;width:${20 + Math.random() * 22}px;height:${20 + Math.random() * 22}px;border-radius:50%;background:radial-gradient(circle,rgba(140,195,255,.9),rgba(70,135,245,0));animation:eachtraSmoke ${1.5 + Math.random() * 1.3}s linear ${(Math.random() * 2).toFixed(2)}s infinite`;
-      this._smoke.appendChild(w);
-    }
-    h.appendChild(this._smoke);
-    // first-person sword, swung with a CSS transform — anchored flush to the corner so the arm reads as the champion's own
-    const wimg = document.createElement('img');
-    wimg.style.cssText = 'position:absolute;right:0;bottom:-2%;height:50vh;max-height:440px;pointer-events:none;transform-origin:72% 100%;transition:transform .09s ease-out';
-    this._weap = wimg; this._weapTier = -1; h.appendChild(wimg);
+    // the held sword is a 3D object now (see _buildWeapon), so the blue tip-smoke can live in the world and trail the champion
     // top bars
     const bar = document.createElement('div');
     bar.style.cssText = 'position:absolute;left:14px;top:12px;display:flex;flex-direction:column;gap:6px;pointer-events:none;text-shadow:0 1px 3px #000';
@@ -381,6 +438,9 @@ export class Eachtra {
     this._deathT = 0; this._deathEnded = false; this._shake = 0;
     // leave any cottage and replenish its stores for a fresh run
     this._inside = null; this._enterCd = 0;
+    this._raining = false; if (this._rain) this._rain.visible = false;
+    for (const g of (this._gibs || [])) { this._gibGroup.remove(g.mesh); g.mesh.material.dispose(); } this._gibs = [];
+    for (const p of (this._smokePool || [])) { p.life = 0; if (p.spr) p.spr.visible = false; }
     this.scene.fog = this._woodFog; this.scene.background = this._woodBg;
     if (this._roomLight) this._roomLight.intensity = 0;
     for (const o of this._woodObjs) o.visible = true;
@@ -490,7 +550,7 @@ export class Eachtra {
       if (this._heightAt(px, pz) < 0.8) break;
     }
     const chip = makeWalkerChip(t.art, false, t.h);
-    if (kind === 'fomorian') chip._fullCycle = true; // it carries a real front-facing walk — let it stride
+    if (kind === 'fomorian') { chip._fullCycle = true; chip.faceWorld(0, 1); if (chip.animate) chip.animate(0.02, true); } // prime a walk frame so the unkeyed idle never shows
     chip.position.set(px, this._heightAt(px, pz) + (kind === 'sluagh' ? 1.0 : 0.05), pz);
     this.chipGroup.add(chip);
     const e = { chip, kind, cd: 0, dead: 0, stagger: 0, state: 'drift', t: Math.random() * 3, cast: 0, st: 0, spd: t.spd, reach: t.reach, dmg: t.dmg };
@@ -511,8 +571,7 @@ export class Eachtra {
   _strike() {
     if (!this.active || this._dead || this._meleeCd > 0) return;
     this._meleeCd = 0.42; this._swing = 0.28;
-    this._weap.style.transform = 'rotate(-34deg) translate(-40px,14px)'; // a downward slash
-    setTimeout(() => { this._weap.style.transform = ''; }, 150);
+    this._swingT = 0.2; // drives the 3D blade's downward slash in update()
     const f = this._forward().clone();
     for (const e of this.enemies) {
       if (e.dead) continue;
@@ -565,10 +624,45 @@ export class Eachtra {
     if (e.kind === 'fomorian') { // three solid hits, each staggering it a step back (one hit per stagger window)
       if (e.stagger > 0) return;
       e.hits -= 1; e.stagger = 0.4; this._flashEnemy(e);
-      if (e.hits <= 0) e.dead = 0.001;
+      if (e.hits <= 0) this._kill(e);
     } else {
       e.hp -= amt; this._flashEnemy(e); if (e.chip.strike) e.chip.strike();
-      if (e.hp <= 0) e.dead = 0.001;
+      if (e.hp <= 0) this._kill(e);
+    }
+  }
+  // Doom-style death: the figure bursts apart and litters the ground a while.
+  _kill(e) {
+    if (e.dead) return;
+    e.dead = 0.001;
+    this._spawnGibs(e.chip.position, e.kind);
+    this.chipGroup.remove(e.chip);
+  }
+  _spawnGibs(p, kind) {
+    const n = 12 + (Math.random() * 7 | 0);
+    const col = kind === 'sluagh' ? 0x7b4bb0 : 0x7c1111; // the sluagh spills violet ichor, the brute dark blood
+    const base = (p.y || 0);
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(this._gibGeo, new THREE.MeshLambertMaterial({ color: col }));
+      m.scale.setScalar(0.05 + Math.random() * 0.13);
+      m.position.set(p.x + (Math.random() - 0.5) * 0.4, base + 0.6 + Math.random() * 0.9, p.z + (Math.random() - 0.5) * 0.4);
+      m.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+      const ang = Math.random() * Math.PI * 2, sp = 1.6 + Math.random() * 3.4;
+      this._gibGroup.add(m);
+      this._gibs.push({ mesh: m, vx: Math.cos(ang) * sp, vy: 2.6 + Math.random() * 3.6, vz: Math.sin(ang) * sp, rx: (Math.random() - 0.5) * 12, rz: (Math.random() - 0.5) * 12, life: 5 + Math.random() * 2, rest: false });
+    }
+  }
+  _updateGibs(dt) {
+    for (let i = this._gibs.length - 1; i >= 0; i--) {
+      const g = this._gibs[i]; g.life -= dt;
+      if (!g.rest) {
+        g.vy -= 15 * dt;
+        g.mesh.position.x += g.vx * dt; g.mesh.position.y += g.vy * dt; g.mesh.position.z += g.vz * dt;
+        g.mesh.rotation.x += g.rx * dt; g.mesh.rotation.z += g.rz * dt;
+        const floor = this._heightAt(g.mesh.position.x, g.mesh.position.z) + 0.04;
+        if (g.mesh.position.y <= floor) { g.mesh.position.y = floor; g.rest = true; } // comes to litter the ground
+      }
+      if (g.life < 1.2) { g.mesh.material.transparent = true; g.mesh.material.opacity = Math.max(0, g.life / 1.2); }
+      if (g.life <= 0) { this._gibGroup.remove(g.mesh); g.mesh.material.dispose(); this._gibs.splice(i, 1); }
     }
   }
   _flashEnemy(e) { const c = e.chip.material && e.chip.material.color; if (!c) return; c.setRGB(1, 0.45, 0.45); setTimeout(() => { if (e.chip && e.chip.material) e.chip.material.color.setRGB(1, 1, 1); }, 110); }
@@ -646,7 +740,25 @@ export class Eachtra {
     if (this._shake > 0) { const s = this._shake * 0.4; sx = (Math.random() - 0.5) * s; sz = (Math.random() - 0.5) * s; eyeY += (Math.random() - 0.5) * s; roll += (Math.random() - 0.5) * this._shake * 0.07; }
     this.camera.position.set(this.pos.x + sx, eyeY, this.pos.z + sz);
     this.camera.rotation.set(this.pitch, this.yaw, roll);
-    if (this._weap) this._weap.style.marginBottom = (-Math.abs(Math.sin(this._bobT)) * 10 * bobAmt) + 'px'; // the blade lopes with the stride
+
+    // ---- held sword (a 3D sprite on the camera) + its charged blue tip-smoke ----
+    if (this._sword) {
+      this.camera.updateMatrixWorld();
+      this._swingT = Math.max(0, (this._swingT || 0) - dt);
+      const swing = this._swingT > 0 ? Math.sin((1 - this._swingT / 0.2) * Math.PI) : 0; // 0→1→0 over the slash
+      this._sword.material.rotation = -0.9 * swing;
+      const bp = this._swordBasePos, bobOff = -Math.abs(Math.sin(this._bobT)) * 0.03 * bobAmt;
+      this._sword.position.set(bp.x + 0.03 * swing, bp.y + bobOff - 0.13 * swing, bp.z + 0.05 * swing);
+      const pvx = (this.pos.x - (this._ppx ?? this.pos.x)) / Math.max(dt, 1e-3);
+      const pvz = (this.pos.z - (this._ppz ?? this.pos.z)) / Math.max(dt, 1e-3);
+      this._ppx = this.pos.x; this._ppz = this.pos.z;
+      if (this._powered && !this._dead) { // emit from the blade tip, in world space so it trails the stride
+        this._emitAcc = (this._emitAcc || 0) + dt * 46;
+        this._tipV.set(bp.x - 0.05, bp.y + this._swordH * 0.52, bp.z); this.camera.localToWorld(this._tipV);
+        while (this._emitAcc >= 1) { this._emitAcc -= 1; this._emitSmoke(this._tipV, pvx, pvz); }
+      }
+      this._updateSmoke(dt);
+    }
 
     // ---- spears in flight ----
     for (let i = this.spears.length - 1; i >= 0; i--) {
@@ -677,25 +789,19 @@ export class Eachtra {
       if (pk.mesh.position.distanceToSquared(TMP.set(this.pos.x, pk.mesh.position.y, this.pos.z)) < 1.6 * 1.6) { this.scene.remove(pk.mesh); this.pickups.splice(i, 1); this.spearN += 1; this._setHud(); }
     }
 
+    this._updateRain(dt);
     this._updateHouses(dt);
     if (this._inside !== null) return; // indoors: the wood is paused, the host waits outside
 
     // ---- enemies ----
     let alive = 0;
     for (const e of this.enemies) {
-      if (e.dead) { // dying: keel over at the feet onto the ground, then fade out
-        e.dead += dt; const k = Math.min(1, e.dead / 0.8);
-        if (e.fall === undefined) e.fall = Math.random() < 0.5 ? -1 : 1;
-        e.chip.material.rotation = e.fall * k * k * 1.5; // topples over, pivoting on its feet
-        e.chip.position.y = this._heightAt(e.chip.position.x, e.chip.position.z) + 0.05;
-        e.chip.material.opacity = 1 - Math.max(0, (k - 0.65) / 0.35);
-        if (e.dead >= 0.82) { this.chipGroup.remove(e.chip); }
-        continue;
-      }
+      if (e.dead) continue; // slain — burst into gibs already, entry is swept below
       alive++;
       if (!this._dead) this._updateEnemy(e, dt);
     }
-    this.enemies = this.enemies.filter((e) => !(e.dead && e.dead >= 0.82));
+    this.enemies = this.enemies.filter((e) => !e.dead);
+    this._updateGibs(dt);
     if (this._boss) this._updateBoss(dt);
     this._updateBossProj(dt);
     this._updateEnemyProj(dt);
@@ -725,7 +831,7 @@ export class Eachtra {
         e.chip.position.y = this._heightAt(e.chip.position.x, e.chip.position.z) + 0.05; // tread the slope
         if (e.chip.animate) e.chip.animate(dt, true); // strides, now that the walk cycles
       } else {
-        if (e.chip.animate) e.chip.animate(dt, false);
+        if (e.chip.animate) e.chip.animate(dt, true); // keep striding — its idle frame carries an unkeyed background
         if (e.cd <= 0) { e.cd = 1.3; if (e.chip.strike) e.chip.strike(); this._hurt(e.dmg, e.chip.position); }
       }
       return;
@@ -785,26 +891,28 @@ export class Eachtra {
     this._bossWrap.style.display = 'block'; this._updateBossHud();
     this._hint.textContent = 'A giant of the Fomhóraigh tears itself from the earth — strike and hurl to fell it!';
     this._shake = 0.9; // the ground heaves
+    this._raining = true; // the heavens open as it rises
     // a cold winter sky falls over the wood as the giant rises
     new THREE.TextureLoader().load('assets/sky/sky_geimhreadh.jpg?v=CBUST', (t) => { t.colorSpace = THREE.SRGBColorSpace; if (this._dome) { this._dome.material.map = t; this._dome.material.needsUpdate = true; } });
   }
   _updateBoss(dt) {
     const B = this._boss; if (!B || this._dead) return;
     if (B.state === 'rising') {
-      B.t += dt; const k = Math.min(1, B.t / 1.7); B.chip.position.set(0, -5 + k * 5.05, 0);
-      this._shake = Math.max(this._shake || 0, 0.6); // keep the earth heaving while it emerges
+      B.t += dt; const k = Math.min(1, B.t / 3.4); B.chip.position.set(0, -5 + k * 5.05, 0); // a slow, ponderous emergence
+      this._shake = Math.max(this._shake || 0, 0.55); // keep the earth heaving while it emerges
       if (B.chip.faceWorld) B.chip.faceWorld(this.pos.x, this.pos.z);
+      if (B.chip.animate) B.chip.animate(dt, true); // strides as it tears free — never the unkeyed idle frame
       if (k >= 1) { B.state = 'active'; B.t = 0; } return;
     }
     if (B.state === 'dying') {
       B.t += dt; const k = Math.min(1, B.t / 1.5); B.chip.material.opacity = 1 - k; B.chip.position.y = 0.05 - k * 3.5;
-      if (k >= 1) { this.chipGroup.remove(B.chip); this._boss = null; this._bossDone = true; this._bossWrap.style.display = 'none'; } return;
+      if (k >= 1) { this.chipGroup.remove(B.chip); this._boss = null; this._bossDone = true; this._raining = false; this._bossWrap.style.display = 'none'; } return;
     }
     TMP2.subVectors(this.pos, B.chip.position); TMP2.y = 0; const d = TMP2.length(); TMP2.normalize();
     if (d > 3.3) { B.chip.position.x += TMP2.x * 1.5 * dt; B.chip.position.z += TMP2.z * 1.5 * dt; }
     B.chip.position.y = this._heightAt(B.chip.position.x, B.chip.position.z) + 0.05; // climbs the slope after you
     if (B.chip.faceWorld) B.chip.faceWorld(TMP2.x, TMP2.z);
-    if (B.chip.animate) B.chip.animate(dt, d > 3.3);
+    if (B.chip.animate) B.chip.animate(dt, true); // always striding — its idle frame carries an unkeyed background
     B.mcd = Math.max(0, B.mcd - dt);
     if (d < 3.6 && B.mcd <= 0) { B.mcd = 1.5; if (B.chip.strike) B.chip.strike(); this._hurt(22, B.chip.position); }
     B.cd -= dt; if (B.cd <= 0) { B.cd = 2.1 + Math.random() * 0.9; this._bossLob(); }
@@ -829,7 +937,7 @@ export class Eachtra {
   _damageBoss(amt) {
     const B = this._boss; if (!B || B.state !== 'active') return;
     B.hp -= amt; if (B.chip.strike) B.chip.strike(); this._updateBossHud();
-    if (B.hp <= 0) { B.state = 'dying'; B.t = 0; }
+    if (B.hp <= 0) { B.state = 'dying'; B.t = 0; for (let i = 0; i < 4; i++) this._spawnGibs(TMP.copy(B.chip.position).setY(B.chip.position.y + 1.4 + i * 0.6), 'fomorian'); } // the giant comes apart
   }
   _updateBossHud() { if (this._boss) this._bossBar.style.width = Math.max(0, (this._boss.hp / this._boss.maxHp) * 100) + '%'; }
   _setHud() {
@@ -837,15 +945,9 @@ export class Eachtra {
     this._spearLbl.textContent = '🗡 × ' + this.spearN;
     this._setWeaponByHealth();
   }
-  // the held sword glows by vigour: full aura when hale (beams ready), a faint
-  // charge when wounded, plain steel when near death
+  // One sword sprite throughout; its power reads only in the blue tip-smoke,
+  // which kindles when the champion is hale enough to loose beams.
   _setWeaponByHealth() {
-    const tier = this.hp >= BEAM_MULTI ? 5 : this.hp >= BEAM_SINGLE ? 2 : 0;
-    if (tier === this._weapTier) return;
-    this._weapTier = tier; this._weap.src = `assets/weapons/fp_sword${tier}.png?v=CBUST`;
-    const base = 'drop-shadow(0 3px 8px rgba(0,0,0,.45))'; // a blue aura on the charged blade
-    this._weap.style.filter = tier === 5 ? base + ' drop-shadow(0 0 16px rgba(90,170,255,.95)) drop-shadow(0 0 30px rgba(70,140,255,.6))'
-      : tier === 2 ? base + ' drop-shadow(0 0 9px rgba(90,170,255,.5))' : base;
-    if (this._smoke) this._smoke.style.display = tier === 5 ? 'block' : 'none'; // smoke only when fully charged
+    this._powered = this.hp >= BEAM_MULTI;
   }
 }
