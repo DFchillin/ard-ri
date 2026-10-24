@@ -83,9 +83,9 @@ export class Eachtra {
       grd.addColorStop(0, `rgba(${tone},${tone + 6},${tone},${a})`); grd.addColorStop(1, 'rgba(255,255,255,0)');
       sx.fillStyle = grd; sx.beginPath(); sx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); sx.fill();
     }
-    const domeTex = new THREE.CanvasTexture(skyCv); domeTex.colorSpace = THREE.SRGBColorSpace;
+    const domeTex = new THREE.CanvasTexture(skyCv); domeTex.colorSpace = THREE.SRGBColorSpace; this._woodSkyTex = domeTex;
     const dome = new THREE.Mesh(new THREE.SphereGeometry(220, 24, 14), new THREE.MeshBasicMaterial({ map: domeTex, side: THREE.BackSide, fog: false, depthWrite: false }));
-    this.scene.add(dome);
+    this._dome = dome; this.scene.add(dome);
 
     // billboard trees — painted forest art (assets/wood), base-anchored so each
     // plants on the ground, scattered into a wood with a wall of trees at the edge.
@@ -148,7 +148,7 @@ export class Eachtra {
     this._bossWrap.appendChild(bw); h.appendChild(this._bossWrap);
     // first-person sword, swung with a CSS transform
     const wimg = document.createElement('img');
-    wimg.style.cssText = 'position:absolute;right:-2%;bottom:-16px;height:52vh;max-height:440px;pointer-events:none;transform-origin:72% 100%;transition:transform .09s ease-out;filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))';
+    wimg.style.cssText = 'position:absolute;right:3%;bottom:-6px;height:46vh;max-height:400px;pointer-events:none;transform-origin:70% 100%;transition:transform .09s ease-out';
     this._weap = wimg; this._weapTier = -1; h.appendChild(wimg);
     // top bars
     const bar = document.createElement('div');
@@ -177,6 +177,15 @@ export class Eachtra {
     const ex = document.createElement('button'); ex.textContent = '✕ Leave the wood'; this._exitBtn = ex;
     ex.style.cssText = 'position:absolute;left:50%;top:10px;transform:translateX(-50%);background:#0009;color:#fff;border:1px solid #fff3;border-radius:8px;padding:6px 14px;font-size:14px';
     ex.addEventListener('click', () => this.close()); h.appendChild(ex);
+    // fullscreen toggle (top-right), so the wood can take the whole screen on a phone
+    const fs = document.createElement('button'); fs.textContent = '⛶';
+    fs.style.cssText = 'position:absolute;right:10px;top:10px;width:40px;height:40px;border-radius:8px;border:1px solid #fff3;background:#0008;color:#fff;font-size:19px;touch-action:none';
+    fs.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
+    fs.addEventListener('click', (e) => {
+      e.stopPropagation(); const d = document, el = d.documentElement;
+      try { if (!d.fullscreenElement && !d.webkitFullscreenElement) (el.requestFullscreen || el.webkitRequestFullscreen).call(el); else (d.exitFullscreen || d.webkitExitFullscreen).call(d); } catch (_) {}
+    });
+    h.appendChild(fs);
     document.body.appendChild(h);
   }
 
@@ -187,6 +196,8 @@ export class Eachtra {
     this.active = true;
     this.pos.set(0, 0, 0); this.yaw = 0; this.pitch = 0; // stand in the clear heart of the wood, the host closing from all sides
     this.hp = 100; this.spearN = SPEAR_START; this._dead = false; this._cleared = false;
+    this._deathT = 0; this._deathEnded = false; this._shake = 0;
+    if (this._dome && this._woodSkyTex) { this._dome.material.map = this._woodSkyTex; this._dome.material.needsUpdate = true; } // restore the wood's own sky
     for (const e of this.enemies) this.chipGroup.remove(e.chip);
     for (const s of this.spears) this.scene.remove(s.mesh);
     for (const pk of this.pickups) this.scene.remove(pk.mesh);
@@ -371,7 +382,7 @@ export class Eachtra {
     if (this._dead) return;
     this.hp -= amt; this._hurtFlash = 1; this._setHud();
     if (fromPos) this._damageFrom(fromPos);
-    if (this.hp <= 0) { this.hp = 0; this._dead = true; this._end(false); }
+    if (this.hp <= 0) { this.hp = 0; this._dead = true; this._deathT = 0; this._deathEnded = false; } // the sink plays, then _end(false)
   }
   // flare the screen edge the blow came from — top = ahead, bottom = behind, sides as they lie
   _damageFrom(pos) {
@@ -424,8 +435,17 @@ export class Eachtra {
     this._bobT = (this._bobT || 0) + (this._moving ? dt * 9.5 : 0);
     const bobAmt = (this._bobTarget = (this._bobTarget || 0) + ((this._moving ? 1 : 0) - (this._bobTarget || 0)) * Math.min(1, dt * 6));
     const bob = Math.abs(Math.sin(this._bobT)) * 0.07 * bobAmt;
-    this.camera.position.set(this.pos.x, EYE + bob, this.pos.z);
-    this.camera.rotation.set(this.pitch, this.yaw, 0);
+    let eyeY = EYE + bob, roll = 0;
+    if (this._dead) { // Doom death — the view sinks slowly to the ground and rolls
+      this._deathT += dt; const k = Math.min(1, this._deathT / 1.7);
+      eyeY = EYE - (EYE - 0.34) * (k * k); roll = 0.42 * k;
+      if (this._deathT >= 1.7 && !this._deathEnded) { this._deathEnded = true; this._end(false); }
+    }
+    this._shake = Math.max(0, (this._shake || 0) - dt * 1.6); // decaying screen shake
+    let sx = 0, sz = 0;
+    if (this._shake > 0) { const s = this._shake * 0.4; sx = (Math.random() - 0.5) * s; sz = (Math.random() - 0.5) * s; eyeY += (Math.random() - 0.5) * s; roll += (Math.random() - 0.5) * this._shake * 0.07; }
+    this.camera.position.set(this.pos.x + sx, eyeY, this.pos.z + sz);
+    this.camera.rotation.set(this.pitch, this.yaw, roll);
     if (this._weap) this._weap.style.marginBottom = (-Math.abs(Math.sin(this._bobT)) * 10 * bobAmt) + 'px'; // the blade lopes with the stride
 
     // ---- spears in flight ----
@@ -556,11 +576,15 @@ export class Eachtra {
     this._boss = { chip, hp: 420, maxHp: 420, state: 'rising', t: 0, cd: 2.2, mcd: 0 };
     this._bossWrap.style.display = 'block'; this._updateBossHud();
     this._hint.textContent = 'A giant of the Fomhóraigh tears itself from the earth — strike and hurl to fell it!';
+    this._shake = 0.9; // the ground heaves
+    // a cold winter sky falls over the wood as the giant rises
+    new THREE.TextureLoader().load('assets/sky/sky_geimhreadh.jpg?v=CBUST', (t) => { t.colorSpace = THREE.SRGBColorSpace; if (this._dome) { this._dome.material.map = t; this._dome.material.needsUpdate = true; } });
   }
   _updateBoss(dt) {
     const B = this._boss; if (!B || this._dead) return;
     if (B.state === 'rising') {
       B.t += dt; const k = Math.min(1, B.t / 1.7); B.chip.position.set(0, -5 + k * 5.05, 0);
+      this._shake = Math.max(this._shake || 0, 0.6); // keep the earth heaving while it emerges
       if (B.chip.faceWorld) B.chip.faceWorld(this.pos.x, this.pos.z);
       if (k >= 1) { B.state = 'active'; B.t = 0; } return;
     }
@@ -608,6 +632,10 @@ export class Eachtra {
   // charge when wounded, plain steel when near death
   _setWeaponByHealth() {
     const tier = this.hp >= BEAM_MULTI ? 5 : this.hp >= BEAM_SINGLE ? 2 : 0;
-    if (tier !== this._weapTier) { this._weapTier = tier; this._weap.src = `assets/weapons/fp_sword${tier}.png?v=CBUST`; }
+    if (tier === this._weapTier) return;
+    this._weapTier = tier; this._weap.src = `assets/weapons/fp_sword${tier}.png?v=CBUST`;
+    const base = 'drop-shadow(0 3px 8px rgba(0,0,0,.45))'; // a blue aura on the charged blade
+    this._weap.style.filter = tier === 5 ? base + ' drop-shadow(0 0 16px rgba(90,170,255,.95)) drop-shadow(0 0 30px rgba(70,140,255,.6))'
+      : tier === 2 ? base + ' drop-shadow(0 0 9px rgba(90,170,255,.5))' : base;
   }
 }
