@@ -16,6 +16,7 @@ const SPEAR_START = 30; // a bandolier of throwing daggers
 const MELEE_RANGE = 2.4, MELEE_ARC = 0.6; // reach and half-angle of a sword swing
 const MELEE_DMG = 34, SPEAR_DMG = 55, BEAM_DMG = 30;
 const BEAM_MULTI = 60, BEAM_SINGLE = 20; // ≥60% HP looses a spread of beams, ≥20% a single, below that melee only
+const ROOM_H = 4.0, ROOM_WALL = 3.4; // half-extent and wall height of a cottage interior (built at the origin, shown one at a time)
 // Two kinds of foe, each with its own cunning: the floating sluagh that rises,
 // looses an orb and slips to cover, and the fomhórach brute that strides in and
 // needs three solid hits to fell.
@@ -33,6 +34,7 @@ export class Eachtra {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x7c8d87);
     this.scene.fog = new THREE.Fog(0x8a9a93, 6, 40); // a pale cold mist — the dead haunt its edges
+    this._woodBg = this.scene.background; this._woodFog = this.scene.fog; // restored when leaving a cottage
     this.camera = new THREE.PerspectiveCamera(74, this.aspect, 0.04, 400);
     this.camera.rotation.order = 'YXZ';
     this.scene.add(new THREE.HemisphereLight(0xc3cdc8, 0x44503f, 1.25));
@@ -42,7 +44,12 @@ export class Eachtra {
     this.enemies = [];
     this.spears = [];          // in-flight spears
     this.pickups = [];         // landed spears to retrieve
+    this._woodObjs = [];       // ground, sky, trees, cottages — hidden while indoors
+    this._houses = [];         // {door:{x,z}, ang, interior index}
+    this._inside = null;       // index of the cottage we're standing in, or null
     this._buildWood();
+    this._buildHouses();
+    this._buildInteriors();
     this.chipGroup = new THREE.Group(); this.scene.add(this.chipGroup);
 
     this.pos = new THREE.Vector3(0, 0, PLAY_R - 6);
@@ -79,7 +86,7 @@ export class Eachtra {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.computeVertexNormals();
     const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: groundTex, vertexColors: true, emissive: 0x161f12 }));
-    this.scene.add(ground);
+    this.scene.add(ground); this._woodObjs.push(ground);
     // the sky: a brooding overcast skybox — a cold gradient with soft banks of
     // cloud drifting across the upper air, pale mist settling to the treeline.
     const skyCv = document.createElement('canvas'); skyCv.width = 1024; skyCv.height = 512;
@@ -97,7 +104,7 @@ export class Eachtra {
     }
     const domeTex = new THREE.CanvasTexture(skyCv); domeTex.colorSpace = THREE.SRGBColorSpace; this._woodSkyTex = domeTex;
     const dome = new THREE.Mesh(new THREE.SphereGeometry(220, 24, 14), new THREE.MeshBasicMaterial({ map: domeTex, side: THREE.BackSide, fog: false, depthWrite: false }));
-    this._dome = dome; this.scene.add(dome);
+    this._dome = dome; this.scene.add(dome); this._woodObjs.push(dome);
 
     // billboard trees — painted forest art (assets/wood), base-anchored so each
     // plants on the ground, scattered into a wood with a wall of trees at the edge.
@@ -106,7 +113,7 @@ export class Eachtra {
       const mat = new THREE.SpriteMaterial({ transparent: true, alphaTest: 0.25, fog: true });
       const s = new THREE.Sprite(mat); s.center.set(0.5, 0); s.scale.set(worldH * 0.7, worldH, 1); s.position.set(x, this._heightAt(x, z), z);
       tl.load(`assets/wood/tree_${name}.png?v=CBUST`, (t) => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; const im = t.image; if (im && im.width) s.scale.set(worldH * (im.width / im.height), worldH, 1); });
-      this.scene.add(s);
+      this.scene.add(s); this._woodObjs.push(s);
       if (collideR) this.trees.push({ x, z, r: collideR });
     };
     let seed = 90210; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
@@ -142,6 +149,146 @@ export class Eachtra {
     return H * t * t * (3 - 2 * t);
   }
 
+  // ---- cottages ------------------------------------------------------------
+  // Three dwellings set back in the wood — their painted fronts are billboards,
+  // their doorways step you into a small interior to gather stores. The exterior
+  // body is a solid obstacle; the door is a trigger a pace out toward the clearing.
+  _buildHouses() {
+    const tl = new THREE.TextureLoader();
+    const defs = [
+      { type: 'hut_round', h: 4.6, at: [-14, -5], reward: { hp: 30 } },
+      { type: 'longhouse', h: 5.1, at: [15, -3], reward: { daggers: 8 } },
+      { type: 'forge', h: 4.6, at: [9, 10], reward: { daggers: 6, hp: 16 } },
+    ];
+    defs.forEach((d, i) => {
+      const [x, z] = d.at, gy = this._heightAt(x, z);
+      const fl = Math.hypot(x, z) || 1, ux = -x / fl, uz = -z / fl; // unit vector toward the clearing centre
+      const doorX = x + ux * 1.7, doorZ = z + uz * 1.7;
+      // open a little glade: clear the wood's trees from around and in front of the cottage so it stands plain to see
+      const cx = x + ux * 0.4, cz = z + uz * 0.4; // glade centred a touch toward the approach
+      this._woodObjs = this._woodObjs.filter((o) => {
+        if (o.isSprite && (o.position.x - cx) ** 2 + (o.position.z - cz) ** 2 < 4.0 * 4.0) { this.scene.remove(o); return false; }
+        return true;
+      });
+      this.trees = this.trees.filter((t) => (t.x - cx) ** 2 + (t.z - cz) ** 2 > 4.0 * 4.0);
+      const mat = new THREE.SpriteMaterial({ transparent: true, alphaTest: 0.3, fog: true });
+      const s = new THREE.Sprite(mat); s.center.set(0.5, 0); s.scale.set(d.h, d.h, 1); s.position.set(x, gy, z);
+      tl.load(`assets/village/${d.type}.png?v=CBUST`, (t) => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; const im = t.image; if (im && im.width) s.scale.set(d.h * (im.width / im.height), d.h, 1); });
+      this.scene.add(s); this._woodObjs.push(s);
+      this.trees.push({ x: x - ux * 0.5, z: z - uz * 0.5, r: 1.7 }); // the solid body, behind the door
+      this._houses.push({ door: { x: doorX, z: doorZ }, reward: d.reward, interior: i });
+    });
+  }
+  _buildInteriors() {
+    this._roomLight = new THREE.PointLight(0xffb06a, 0, 13); this.scene.add(this._roomLight);
+    const themes = [
+      { wall: ['#6a5636', '#584527'], floor: '#3c2d1c', plank: false }, // hut: wattle walls, earth floor
+      { wall: ['#5a4a30', '#6d5a3a'], floor: '#5a4328', plank: true },  // longhouse: timber
+      { wall: ['#6b6b70', '#55555b'], floor: '#4a4036', plank: false }, // forge: stone
+    ];
+    this._interiors = themes.map((th) => this._buildRoom(th));
+    this._interiors.forEach((r) => (r.group.visible = false));
+  }
+  _wallTex(c0, c1) {
+    return this._canvasTex((x, w, h) => {
+      x.fillStyle = c0; x.fillRect(0, 0, w, h);
+      for (let i = 0; i < 2400; i++) { const g = (Math.random() * 40 - 20) | 0; x.fillStyle = `rgba(${g < 0 ? 0 : 255},${g < 0 ? 0 : 255},${g < 0 ? 0 : 230},${Math.abs(g) / 180})`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+      x.strokeStyle = c1; x.lineWidth = 2; x.globalAlpha = 0.5;
+      for (let y = 6; y < h; y += 13) { x.beginPath(); x.moveTo(0, y + Math.sin(y) * 2); x.lineTo(w, y); x.stroke(); }
+      x.globalAlpha = 1;
+    }, 128, 128);
+  }
+  _floorTex(c, plank) {
+    return this._canvasTex((x, w, h) => {
+      x.fillStyle = c; x.fillRect(0, 0, w, h);
+      for (let i = 0; i < 2600; i++) { const g = 40 + (Math.random() * 40) | 0; x.fillStyle = `rgba(${g},${g - 6},${g - 16},0.5)`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+      if (plank) { x.strokeStyle = 'rgba(0,0,0,0.4)'; x.lineWidth = 2; for (let px = 0; px < w; px += 22) { x.beginPath(); x.moveTo(px, 0); x.lineTo(px, h); x.stroke(); } }
+    }, 128, 128);
+  }
+  _buildRoom(th) {
+    const g = new THREE.Group(); this.scene.add(g);
+    const R = ROOM_H, WH = ROOM_WALL;
+    const wallTex = this._wallTex(th.wall[0], th.wall[1]); wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping; wallTex.repeat.set(3, 1.3);
+    const floorTex = this._floorTex(th.floor, th.plank); floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(3, 3);
+    const wallMat = new THREE.MeshLambertMaterial({ map: wallTex, fog: true });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(R * 2, R * 2), new THREE.MeshLambertMaterial({ map: floorTex, fog: true }));
+    floor.rotation.x = -Math.PI / 2; g.add(floor);
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(R * 2, R * 2), new THREE.MeshLambertMaterial({ color: 0x1a1109, fog: true }));
+    ceil.rotation.x = Math.PI / 2; ceil.position.y = WH; g.add(ceil);
+    const wall = (w, px, pz, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, WH), wallMat); m.position.set(px, WH / 2, pz); m.rotation.y = ry; g.add(m); };
+    wall(R * 2, 0, -R, 0);          // back
+    wall(R * 2, -R, 0, Math.PI / 2); // left
+    wall(R * 2, R, 0, -Math.PI / 2); // right
+    const side = (R * 2 - 1.8) / 2;  // front wall, split around a doorway gap
+    wall(side, -(0.9 + side / 2), R, Math.PI); wall(side, 0.9 + side / 2, R, Math.PI);
+    // props — a brazier for light, a basket of stores, a spare crate
+    const prop = (name, px, pz, hh) => {
+      const mat = new THREE.SpriteMaterial({ transparent: true, alphaTest: 0.3, fog: true });
+      const s = new THREE.Sprite(mat); s.center.set(0.5, 0); s.scale.set(hh, hh, 1); s.position.set(px, 0, pz);
+      new THREE.TextureLoader().load(`assets/interior/${name}.png?v=CBUST`, (t) => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; const im = t.image; if (im && im.width) s.scale.set(hh * (im.width / im.height), hh, 1); });
+      g.add(s); return s;
+    };
+    prop('brazier', -R + 0.8, -R + 0.8, 2.4);
+    prop('basket', R - 1.1, -R + 1.0, 1.3);
+    // the stores: a basket at the back, haloed so it reads as a prize
+    const supplyPos = { x: 0, z: -R + 1.3 };
+    const mesh = prop('basket', supplyPos.x, supplyPos.z, 1.5);
+    const glowTex = this._canvasTex((x, w, h) => { const gr = x.createRadialGradient(w / 2, h / 2, 1, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,225,150,0.9)'); gr.addColorStop(0.5, 'rgba(255,190,90,0.35)'); gr.addColorStop(1, 'rgba(255,170,60,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, h); }, 64, 64);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    glow.scale.set(1.5, 1.5, 1); glow.position.set(supplyPos.x, 1.0, supplyPos.z + 0.05); g.add(glow);
+    return { group: g, supply: { mesh, glow, pos: supplyPos, reward: null, taken: false } };
+  }
+  _enterHouse(i) {
+    const h = this._houses[i];
+    this._inside = h.interior;
+    this._outPos = { x: this.pos.x, z: this.pos.z, yaw: this.yaw };
+    for (const o of this._woodObjs) o.visible = false;
+    this.chipGroup.visible = false;
+    this._interiors.forEach((r, k) => (r.group.visible = k === h.interior));
+    const r = this._interiors[h.interior]; r.supply.reward = h.reward;
+    this.scene.fog = new THREE.Fog(0x120b06, 3, 17); this.scene.background = new THREE.Color(0x0a0705);
+    this._roomLight.position.set(-ROOM_H + 0.9, 2.0, -ROOM_H + 0.9); this._roomLight.intensity = 2.6;
+    this.pos.set(0, 0, ROOM_H - 0.5); this.yaw = 0; this.pitch = -0.05;
+    this._hint.textContent = 'search the dwelling for stores · walk back out through the doorway to leave';
+  }
+  _exitHouse() {
+    const op = this._outPos || { x: 0, z: 0, yaw: 0 };
+    this._inside = null; this._enterCd = 0.7;
+    for (const o of this._woodObjs) o.visible = true;
+    this.chipGroup.visible = true;
+    this._interiors.forEach((r) => (r.group.visible = false));
+    this.scene.fog = this._woodFog; this.scene.background = this._woodBg; this._roomLight.intensity = 0;
+    this.pos.set(op.x, 0, op.z); this.yaw = op.yaw; this.pitch = 0;
+    this._hint.textContent = 'move · drag to look · ⚔ strike · 🗡 hurl a dagger · duck into a dwelling for stores';
+  }
+  _takeSupply(r) {
+    r.supply.taken = true; r.supply.glow.visible = false; r.supply.mesh.visible = false;
+    const rw = r.supply.reward || {}; const parts = [];
+    if (rw.hp) { this.hp = Math.min(100, this.hp + rw.hp); parts.push(`+${rw.hp} vigour`); this._setWeaponByHealth(); }
+    if (rw.daggers) { this.spearN += rw.daggers; parts.push(`+${rw.daggers} daggers`); }
+    this._setHud();
+    this._hint.textContent = 'You take the stores — ' + parts.join(', ');
+  }
+  _updateHouses(dt) {
+    if (this._enterCd > 0) this._enterCd -= dt;
+    if (this._inside === null) {
+      if (this._dead || this._enterCd > 0 || !this._houses.length) return;
+      for (let i = 0; i < this._houses.length; i++) {
+        const d = this._houses[i].door, dx = this.pos.x - d.x, dz = this.pos.z - d.z;
+        if (dx * dx + dz * dz < 1.3 * 1.3) { this._enterHouse(i); break; }
+      }
+      return;
+    }
+    const r = this._interiors[this._inside];
+    if (r.supply && !r.supply.taken) {
+      this._glowT = (this._glowT || 0) + dt; const pul = 1 + Math.sin(this._glowT * 4) * 0.2;
+      r.supply.glow.scale.set(1.5 * pul, 1.5 * pul, 1);
+      const dx = this.pos.x - r.supply.pos.x, dz = this.pos.z - r.supply.pos.z;
+      if (dx * dx + dz * dz < 1.5 * 1.5) this._takeSupply(r);
+    }
+    if (this.pos.z > ROOM_H - 0.4 && Math.abs(this.pos.x) < 1.0) this._exitHouse(); // stepped out the doorway
+  }
+
   // ---- HUD (built in JS so the slice is self-contained) --------------------
   _dom() {
     const h = document.createElement('div'); h.id = 'eachtra-hud'; this.hud = h;
@@ -169,9 +316,21 @@ export class Eachtra {
     const bw = document.createElement('div'); bw.style.cssText = 'height:12px;border:2px solid #000a;border-radius:4px;background:#2a0f0f;overflow:hidden';
     this._bossBar = document.createElement('div'); this._bossBar.style.cssText = 'height:100%;width:100%;background:linear-gradient(90deg,#8a2b6b,#c43a2e)'; bw.appendChild(this._bossBar);
     this._bossWrap.appendChild(bw); h.appendChild(this._bossWrap);
-    // first-person sword, swung with a CSS transform
+    // charged-blade smoke — blue wisps curling up off the sword at full strength
+    const kf = document.createElement('style');
+    kf.textContent = '@keyframes eachtraSmoke{0%{transform:translateY(8px) scale(.5);opacity:0}22%{opacity:.6}100%{transform:translateY(-110px) scale(1.9);opacity:0}}';
+    document.head.appendChild(kf);
+    this._smoke = document.createElement('div');
+    this._smoke.style.cssText = 'position:absolute;right:20%;bottom:40%;width:130px;height:240px;pointer-events:none;display:none;filter:blur(3px)';
+    for (let i = 0; i < 7; i++) {
+      const w = document.createElement('div');
+      w.style.cssText = `position:absolute;left:${10 + Math.random() * 65}%;bottom:0;width:${20 + Math.random() * 22}px;height:${20 + Math.random() * 22}px;border-radius:50%;background:radial-gradient(circle,rgba(140,195,255,.9),rgba(70,135,245,0));animation:eachtraSmoke ${1.5 + Math.random() * 1.3}s linear ${(Math.random() * 2).toFixed(2)}s infinite`;
+      this._smoke.appendChild(w);
+    }
+    h.appendChild(this._smoke);
+    // first-person sword, swung with a CSS transform — anchored flush to the corner so the arm reads as the champion's own
     const wimg = document.createElement('img');
-    wimg.style.cssText = 'position:absolute;right:3%;bottom:-6px;height:46vh;max-height:400px;pointer-events:none;transform-origin:70% 100%;transition:transform .09s ease-out';
+    wimg.style.cssText = 'position:absolute;right:0;bottom:-2%;height:50vh;max-height:440px;pointer-events:none;transform-origin:72% 100%;transition:transform .09s ease-out';
     this._weap = wimg; this._weapTier = -1; h.appendChild(wimg);
     // top bars
     const bar = document.createElement('div');
@@ -220,6 +379,13 @@ export class Eachtra {
     this.pos.set(0, 0, 0); this.yaw = 0; this.pitch = 0; // stand in the clear heart of the wood, the host closing from all sides
     this.hp = 100; this.spearN = SPEAR_START; this._dead = false; this._cleared = false;
     this._deathT = 0; this._deathEnded = false; this._shake = 0;
+    // leave any cottage and replenish its stores for a fresh run
+    this._inside = null; this._enterCd = 0;
+    this.scene.fog = this._woodFog; this.scene.background = this._woodBg;
+    if (this._roomLight) this._roomLight.intensity = 0;
+    for (const o of this._woodObjs) o.visible = true;
+    if (this.chipGroup) this.chipGroup.visible = true;
+    for (const r of (this._interiors || [])) { r.group.visible = false; r.supply.taken = false; r.supply.mesh.visible = true; r.supply.glow.visible = true; }
     if (this._dome && this._woodSkyTex) { this._dome.material.map = this._woodSkyTex; this._dome.material.needsUpdate = true; } // restore the wood's own sky
     for (const e of this.enemies) this.chipGroup.remove(e.chip);
     for (const s of this.spears) this.scene.remove(s.mesh);
@@ -454,16 +620,21 @@ export class Eachtra {
       if (this._moving) {
         vx = vx / m * MOVE_SPD * dt; vz = vz / m * MOVE_SPD * dt;
         let nx = this.pos.x + vx, nz = this.pos.z + vz;
-        const rr = Math.hypot(nx, nz); if (rr > PLAY_R - 1.5) { const k = (PLAY_R - 1.5) / rr; nx *= k; nz *= k; }
-        if (!this._collide(nx, this.pos.z)) this.pos.x = nx;
-        if (!this._collide(this.pos.x, nz)) this.pos.z = nz;
+        if (this._inside !== null) { // boxed within the cottage walls
+          nx = Math.max(-ROOM_H, Math.min(ROOM_H, nx)); nz = Math.max(-ROOM_H, Math.min(ROOM_H + 0.4, nz));
+          this.pos.x = nx; this.pos.z = nz;
+        } else {
+          const rr = Math.hypot(nx, nz); if (rr > PLAY_R - 1.5) { const k = (PLAY_R - 1.5) / rr; nx *= k; nz *= k; }
+          if (!this._collide(nx, this.pos.z)) this.pos.x = nx;
+          if (!this._collide(this.pos.x, nz)) this.pos.z = nz;
+        }
       }
     } else this._moving = false;
     // Doom-style head-bob: a gentle vertical lope while on the move, eased out at rest.
     this._bobT = (this._bobT || 0) + (this._moving ? dt * 9.5 : 0);
     const bobAmt = (this._bobTarget = (this._bobTarget || 0) + ((this._moving ? 1 : 0) - (this._bobTarget || 0)) * Math.min(1, dt * 6));
     const bob = Math.abs(Math.sin(this._bobT)) * 0.07 * bobAmt;
-    const gh = this._heightAt(this.pos.x, this.pos.z); // the ground underfoot — rises on the prairie
+    const gh = this._inside !== null ? 0 : this._heightAt(this.pos.x, this.pos.z); // the ground underfoot — rises on the prairie, flat indoors
     let eyeY = gh + EYE + bob, roll = 0;
     if (this._dead) { // Doom death — the view sinks slowly to the ground and rolls
       this._deathT += dt; const k = Math.min(1, this._deathT / 1.7);
@@ -506,19 +677,25 @@ export class Eachtra {
       if (pk.mesh.position.distanceToSquared(TMP.set(this.pos.x, pk.mesh.position.y, this.pos.z)) < 1.6 * 1.6) { this.scene.remove(pk.mesh); this.pickups.splice(i, 1); this.spearN += 1; this._setHud(); }
     }
 
+    this._updateHouses(dt);
+    if (this._inside !== null) return; // indoors: the wood is paused, the host waits outside
+
     // ---- enemies ----
     let alive = 0;
     for (const e of this.enemies) {
-      if (e.dead) { // dying: sink and fade, then gone
-        e.dead += dt; const k = Math.min(1, e.dead / 0.7);
-        e.chip.material.opacity = 1 - k; e.chip.position.y = 0.05 - k * 0.5;
-        if (e.dead >= 0.72) { this.chipGroup.remove(e.chip); }
+      if (e.dead) { // dying: keel over at the feet onto the ground, then fade out
+        e.dead += dt; const k = Math.min(1, e.dead / 0.8);
+        if (e.fall === undefined) e.fall = Math.random() < 0.5 ? -1 : 1;
+        e.chip.material.rotation = e.fall * k * k * 1.5; // topples over, pivoting on its feet
+        e.chip.position.y = this._heightAt(e.chip.position.x, e.chip.position.z) + 0.05;
+        e.chip.material.opacity = 1 - Math.max(0, (k - 0.65) / 0.35);
+        if (e.dead >= 0.82) { this.chipGroup.remove(e.chip); }
         continue;
       }
       alive++;
       if (!this._dead) this._updateEnemy(e, dt);
     }
-    this.enemies = this.enemies.filter((e) => !(e.dead && e.dead >= 0.72));
+    this.enemies = this.enemies.filter((e) => !(e.dead && e.dead >= 0.82));
     if (this._boss) this._updateBoss(dt);
     this._updateBossProj(dt);
     this._updateEnemyProj(dt);
@@ -584,20 +761,17 @@ export class Eachtra {
     return best ? { x: best.x, z: best.z } : null;
   }
   _sluaghCast(e) {
-    if (!this._orbTex) this._orbTex = this._canvasTex((x, w, h) => {
-      const g = x.createRadialGradient(w / 2, h / 2, 1, w / 2, h / 2, w / 2);
-      g.addColorStop(0, 'rgba(210,150,255,1)'); g.addColorStop(0.5, 'rgba(130,60,210,0.8)'); g.addColorStop(1, 'rgba(70,20,130,0)');
-      x.fillStyle = g; x.beginPath(); x.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2); x.fill();
-    }, 48, 48);
+    if (!this._orbTex) { this._orbTex = new THREE.TextureLoader().load('assets/fx/orb_purple.png?v=CBUST'); this._orbTex.colorSpace = THREE.SRGBColorSpace; }
     const from = e.chip.position, dir = new THREE.Vector3(this.pos.x - from.x, (EYE - 0.15) - from.y, this.pos.z - from.z).normalize();
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._orbTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-    s.scale.set(0.6, 0.6, 1); s.position.copy(from); this.scene.add(s);
-    this._enemyProj.push({ mesh: s, vel: dir.multiplyScalar(10.5), life: 4 });
+    s.scale.set(0.95, 0.95, 1); s.position.copy(from); s.material.rotation = Math.random() * Math.PI * 2; this.scene.add(s);
+    this._enemyProj.push({ mesh: s, vel: dir.multiplyScalar(10.5), life: 4, spin: Math.random() < 0.5 ? -7 : 7 });
   }
   _updateEnemyProj(dt) {
     for (let i = this._enemyProj.length - 1; i >= 0; i--) {
       const p = this._enemyProj[i]; p.mesh.position.addScaledVector(p.vel, dt); p.life -= dt;
-      p.mesh.material.rotation += dt * 4;
+      p.mesh.material.rotation += dt * (p.spin || 4);
+      const pul = 0.95 + Math.sin(p.life * 18) * 0.12; p.mesh.scale.set(pul, pul, 1); // crackling pulse
       if (!this._dead && p.mesh.position.distanceToSquared(TMP.set(this.pos.x, EYE - 0.15, this.pos.z)) < 0.9 * 0.9) { this._hurt(13, p.mesh.position); this.scene.remove(p.mesh); this._enemyProj.splice(i, 1); }
       else if (p.life <= 0 || p.mesh.position.y < 0.1 || p.mesh.position.x ** 2 + p.mesh.position.z ** 2 > (PLAY_R + 3) ** 2) { this.scene.remove(p.mesh); this._enemyProj.splice(i, 1); }
     }
@@ -672,5 +846,6 @@ export class Eachtra {
     const base = 'drop-shadow(0 3px 8px rgba(0,0,0,.45))'; // a blue aura on the charged blade
     this._weap.style.filter = tier === 5 ? base + ' drop-shadow(0 0 16px rgba(90,170,255,.95)) drop-shadow(0 0 30px rgba(70,140,255,.6))'
       : tier === 2 ? base + ' drop-shadow(0 0 9px rgba(90,170,255,.5))' : base;
+    if (this._smoke) this._smoke.style.display = tier === 5 ? 'block' : 'none'; // smoke only when fully charged
   }
 }
