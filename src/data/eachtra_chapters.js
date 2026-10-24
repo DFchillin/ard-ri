@@ -13,7 +13,7 @@ export const CHAPTERS = [
     outro: 'You cut a path through the dead and stand breathing in the cold. The raven keeps pace, bough to bough.',
   },
   {
-    n: 3, title: 'Guth na Badhbh', titleEn: 'The Voice of the Badhbh', enemies: 4,
+    n: 3, title: 'Guth na Badhbh', titleEn: 'The Voice of the Badhbh', enemies: 4, morrigan: true,
     intro: 'The raven alights, and is a raven no longer. An Mhórrígan — Badhbh, washer at the ford, phantom queen of war — speaks your name as though she has always known it. "Prove the iron in you," she says, "and I will mark you." The host answers her like hounds loosed.',
     outro: '"You will do," says the Badhbh, and lays a cold finger to your brow. The mark will not wash away. You are a champion now, for good or ill.',
   },

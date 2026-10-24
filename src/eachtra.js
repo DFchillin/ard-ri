@@ -392,6 +392,108 @@ export class Eachtra {
     if (this.pos.z > ROOM_H - 0.4 && Math.abs(this.pos.x) < 1.0) this._exitHouse(); // stepped out the doorway
   }
 
+  // ---- dialogue (a Link-style box that freezes the field while it's open) ----
+  _startDialog(nodes, startId, onDone) {
+    this._dlgNodes = nodes; this._dlgDone = onDone || null;
+    this._dlgActive = true; this._parley = true; this._dlg.style.display = 'block';
+    this._dlgGoto(startId);
+  }
+  _dlgGoto(id) {
+    const node = this._dlgNodes[id]; if (!node) return this._endDialog();
+    this._dlgNode = node;
+    this._dlgName.textContent = node.speaker || ''; this._dlgName.style.display = node.speaker ? 'block' : 'none';
+    this._dlgFull = node.text || ''; this._dlgShown = 0; this._dlgTyping = true;
+    this._dlgText.textContent = ''; this._dlgArrow.style.opacity = '0';
+    this._dlgChoices.style.display = 'none'; this._dlgChoices.innerHTML = '';
+  }
+  _updateDialog(dt) {
+    if (!this._dlgActive || !this._dlgTyping) return;
+    this._dlgShown += dt * 45; // letters per second
+    const n = Math.min(this._dlgFull.length, Math.floor(this._dlgShown));
+    this._dlgText.textContent = this._dlgFull.slice(0, n);
+    if (n >= this._dlgFull.length) { this._dlgTyping = false; this._dlgRevealEnd(); }
+  }
+  _dlgRevealEnd() {
+    const node = this._dlgNode;
+    if (node.choices && node.choices.length) {
+      this._dlgChoices.style.display = 'flex'; this._dlgChoices.innerHTML = '';
+      node.choices.forEach((c, i) => {
+        const b = document.createElement('div');
+        b.textContent = '› ' + c.label;
+        b.style.cssText = 'background:#1e2230;border:1px solid #4a5068;border-radius:7px;padding:8px 12px;font-size:15px;color:#e8e2d0;cursor:pointer';
+        b.addEventListener('pointerenter', () => { b.style.background = '#2b3147'; });
+        b.addEventListener('pointerleave', () => { b.style.background = '#1e2230'; });
+        b.addEventListener('click', (e) => { e.stopPropagation(); this._dlgChoose(i); });
+        this._dlgChoices.appendChild(b);
+      });
+    } else { this._dlgArrow.style.opacity = '1'; }
+  }
+  _dlgAdvance() {
+    if (!this._dlgActive) return;
+    if (this._dlgTyping) { this._dlgShown = this._dlgFull.length + 1; return; } // first tap reveals the whole line
+    const node = this._dlgNode;
+    if (node.choices && node.choices.length) return; // a choice must be picked
+    if (node.next) this._dlgGoto(node.next); else this._endDialog();
+  }
+  _dlgChoose(i) {
+    const node = this._dlgNode; if (!node || !node.choices) return;
+    const c = node.choices[i]; if (!c) return;
+    if (c.action) c.action();
+    if (c.next) this._dlgGoto(c.next); else this._endDialog();
+  }
+  _endDialog() {
+    this._dlgActive = false; this._parley = false; this._dlg.style.display = 'none';
+    const cb = this._dlgDone; this._dlgDone = null; if (cb) cb();
+  }
+
+  // ---- An Mhórrígan — the phantom queen who meets the champion in the wood ----
+  _spawnMorrigan() {
+    const chip = makeWalkerChip('druid', true, 1.95); // the hooded Badhbh, staff in hand
+    const x = 0, z = -9; chip.position.set(x, this._heightAt(x, z) + 0.05, z);
+    if (chip.material && chip.material.color) chip.material.color.setRGB(0.6, 0.58, 0.72); // cold, shadowed
+    if (chip.faceWorld) chip.faceWorld(0, 1);
+    this.chipGroup.add(chip);
+    const auraTex = this._canvasTex((cx, w, h) => { const g = cx.createRadialGradient(w / 2, h / 2, 1, w / 2, h / 2, w / 2); g.addColorStop(0, 'rgba(150,60,190,0.5)'); g.addColorStop(0.5, 'rgba(80,25,120,0.28)'); g.addColorStop(1, 'rgba(30,10,50,0)'); cx.fillStyle = g; cx.fillRect(0, 0, w, h); }, 64, 64);
+    const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: auraTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: true }));
+    aura.scale.set(3.0, 3.0, 1); aura.position.set(x, this._heightAt(x, z) + 1.1, z); this.chipGroup.add(aura);
+    this._morrigan = { chip, aura, x, z, t: 0 };
+  }
+  _updateMorrigan(dt) {
+    const m = this._morrigan; if (!m) return;
+    m.t += dt;
+    const baseY = this._heightAt(m.x, m.z) + 0.05;
+    m.chip.position.y = baseY + Math.sin(m.t * 1.5) * 0.08; // she hovers a hand's breadth off the ground
+    m.aura.position.y = m.chip.position.y + 1.05;
+    const pul = 1 + Math.sin(m.t * 3) * 0.12; m.aura.scale.set(3.0 * pul, 3.0 * pul, 1);
+    if (m.chip.faceWorld) m.chip.faceWorld(this.pos.x - m.x, this.pos.z - m.z); // she turns to watch you
+  }
+  _morriganGreet() {
+    const M = 'An Mhórrígan';
+    this._startDialog({
+      start: { speaker: M, text: 'So. The wanderer with the borrowed spear. I have watched you from the branches, little iron.', next: 'q' },
+      q: {
+        speaker: M, text: 'I am Badhbh — washer at the ford, phantom queen of war. Prove the iron in you this night and I will mark you for my own. Will you take up my test?',
+        choices: [
+          { label: 'I will. Loose your host.', next: 'yes' },
+          { label: 'Who are you to command me?', next: 'defy' },
+        ],
+      },
+      defy: { speaker: M, text: 'Ha — teeth, as well as iron. Good. The dead do not fear the meek, but they will learn to fear you.', next: 'yes' },
+      yes: { speaker: M, text: 'Then stand, champion. They come like hounds loosed. Do not fall — I so hate to be disappointed.' },
+    }, 'start', null);
+  }
+  _morriganClose() {
+    const M = 'An Mhórrígan';
+    this._startDialog({
+      start: { speaker: M, text: 'Still breathing. Still standing, in your own blood and theirs. You will do.', next: 'mark' },
+      mark: {
+        speaker: M, text: 'She lays a cold finger to your brow. It burns, then numbs — the mark will not wash away, not in water nor in years.',
+        choices: [{ label: 'Accept the mark of the Badhbh.', action: () => { this.hp = 100; this.spearN += 10; this._setHud(); }, next: 'end' }],
+      },
+      end: { speaker: M, text: 'You are a champion now, for good or ill. Go — the road to Tír na nÓg is longer than you yet know.' },
+    }, 'start', () => this._end(true));
+  }
+
   // ---- HUD (built in JS so the slice is self-contained) --------------------
   _dom() {
     const h = document.createElement('div'); h.id = 'eachtra-hud'; this.hud = h;
@@ -434,6 +536,21 @@ export class Eachtra {
     this._banner = document.createElement('div');
     this._banner.style.cssText = 'position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:30px;font-weight:800;text-align:center;text-shadow:0 2px 8px #000;display:none;width:90%';
     h.appendChild(this._banner);
+    // ---- Link-style dialogue box (bottom of the screen) ----
+    this._dlg = document.createElement('div');
+    this._dlg.style.cssText = 'position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:min(680px,92%);background:linear-gradient(180deg,rgba(14,16,22,0.93),rgba(8,10,14,0.96));border:2px solid #b89a52;border-radius:12px;box-shadow:0 6px 28px rgba(0,0,0,.6);padding:14px 18px 16px;display:none;pointer-events:auto;cursor:pointer';
+    this._dlgName = document.createElement('div');
+    this._dlgName.style.cssText = 'position:absolute;top:-14px;left:16px;background:#b89a52;color:#1a140a;font-weight:800;font-size:13px;letter-spacing:.5px;padding:2px 12px;border-radius:7px;text-shadow:none';
+    this._dlgText = document.createElement('div');
+    this._dlgText.style.cssText = 'font-size:16px;line-height:1.5;color:#f0ead8;min-height:52px;text-shadow:0 1px 2px #000';
+    this._dlgChoices = document.createElement('div');
+    this._dlgChoices.style.cssText = 'display:none;flex-direction:column;gap:7px;margin-top:10px';
+    this._dlgArrow = document.createElement('div');
+    this._dlgArrow.textContent = '▸';
+    this._dlgArrow.style.cssText = 'position:absolute;right:16px;bottom:10px;color:#b89a52;font-size:18px;opacity:0;animation:none';
+    this._dlg.appendChild(this._dlgName); this._dlg.appendChild(this._dlgText); this._dlg.appendChild(this._dlgChoices); this._dlg.appendChild(this._dlgArrow);
+    this._dlg.addEventListener('click', (e) => { e.stopPropagation(); this._dlgAdvance(); });
+    h.appendChild(this._dlg);
     // touch controls: a move stick (left) and two action buttons (right)
     this._stick = document.createElement('div');
     this._stick.style.cssText = 'position:absolute;left:30px;bottom:30px;width:120px;height:120px;border-radius:50%;background:#fff1;border:2px solid #fff3;display:none';
@@ -469,6 +586,10 @@ export class Eachtra {
     this._deathT = 0; this._deathEnded = false; this._shake = 0;
     // leave any cottage and replenish its stores for a fresh run
     this._inside = null; this._enterCd = 0;
+    // clear any parley / phantom queen from a previous run
+    this._parley = false; this._dlgActive = false; if (this._dlg) this._dlg.style.display = 'none';
+    if (this._morrigan) { this.chipGroup.remove(this._morrigan.chip); this.chipGroup.remove(this._morrigan.aura); this._morrigan = null; }
+    this._morriganPhase = null;
     this._raining = false; if (this._rain) this._rain.visible = false;
     for (const g of (this._gibs || [])) { this._gibGroup.remove(g.mesh); g.mesh.material.dispose(); } this._gibs = [];
     for (const p of (this._smokePool || [])) { p.life = 0; if (p.spr) p.spr.visible = false; }
@@ -493,6 +614,7 @@ export class Eachtra {
     this._exitBtn.textContent = '✕ Leave the wood';
     this._hint.textContent = 'move · drag to look · ⚔ strike (a beam flies at full health) · 🗡 hurl a dagger · climb the grassy rise to snipe down into the wood';
     this._bind(); this._setHud();
+    if (opts.morrigan) { this._spawnMorrigan(); this._morriganPhase = 'fight'; this._morriganGreet(); } // she greets, then looses the host
     this.onResize();
   }
   close() {
@@ -600,7 +722,7 @@ export class Eachtra {
     return g;
   }
   _strike() {
-    if (!this.active || this._dead || this._meleeCd > 0) return;
+    if (!this.active || this._dead || this._parley || this._meleeCd > 0) return;
     this._meleeCd = 0.42; this._swing = 0.28;
     this._swingT = 0.2; // drives the 3D blade's downward slash in update()
     const f = this._forward().clone();
@@ -642,7 +764,7 @@ export class Eachtra {
     }
   }
   _throw() {
-    if (!this.active || this._dead || this.spearN <= 0 || this._throwCd > 0) return;
+    if (!this.active || this._dead || this._parley || this.spearN <= 0 || this._throwCd > 0) return;
     this.spearN -= 1; this._throwCd = 0.5; this._setHud();
     const dir = this.camera.getWorldDirection(new THREE.Vector3()).normalize();
     const g = this._daggerMesh();
@@ -730,8 +852,9 @@ export class Eachtra {
     this._meleeCd = Math.max(0, this._meleeCd - dt); this._throwCd = Math.max(0, this._throwCd - dt);
     if (this._hurtFlash > 0) { this._hurtFlash = Math.max(0, this._hurtFlash - dt * 2.2); this._vig.style.boxShadow = `inset 0 0 160px 40px rgba(140,10,10,${0.5 * this._hurtFlash})`; }
 
+    this._updateDialog(dt); this._updateMorrigan(dt);
     // ---- movement ----
-    if (!this._dead) {
+    if (!this._dead && !this._parley) {
       let mf = 0, ms = 0;
       if (this._keys.has('w') || this._keys.has('arrowup')) mf += 1;
       if (this._keys.has('s') || this._keys.has('arrowdown')) mf -= 1;
@@ -824,6 +947,9 @@ export class Eachtra {
     this._updateHouses(dt);
     if (this._inside !== null) return; // indoors: the wood is paused, the host waits outside
 
+    this._updateGibs(dt);
+    if (this._parley) return; // a parley holds the field — the host waits
+
     // ---- enemies ----
     let alive = 0;
     for (const e of this.enemies) {
@@ -832,7 +958,6 @@ export class Eachtra {
       if (!this._dead) this._updateEnemy(e, dt);
     }
     this.enemies = this.enemies.filter((e) => !e.dead);
-    this._updateGibs(dt);
     if (this._boss) this._updateBoss(dt);
     this._updateBossProj(dt);
     this._updateEnemyProj(dt);
@@ -840,7 +965,8 @@ export class Eachtra {
     // the chapter clears once the wave is down AND the giant (if any) is laid low
     const waveClear = !this._dead && alive === 0 && this.enemies.every((e) => e.dead);
     if (waveClear && this._wantBoss && !this._boss && !this._bossDone) this._spawnBoss();
-    else if (waveClear && (!this._wantBoss || this._bossDone) && !this._cleared) this._end(true);
+    else if (waveClear && this._morrigan && this._morriganPhase === 'fight') { this._morriganPhase = 'closing'; this._morriganClose(); }
+    else if (waveClear && (!this._wantBoss || this._bossDone) && !this._cleared && !this._morrigan) this._end(true);
   }
   // ---- enemy brains ----
   _updateEnemy(e, dt) {
