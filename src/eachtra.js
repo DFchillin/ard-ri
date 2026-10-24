@@ -66,8 +66,20 @@ export class Eachtra {
       for (let i = 0; i < 1100; i++) { const g = 48 + (Math.random() * 46) | 0; x.fillStyle = `rgb(${g - 10},${g + 16},${g - 8})`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
     }, 256, 256);
     groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping; groundTex.repeat.set(24, 24);
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(PLAY_R + 14, 48), new THREE.MeshLambertMaterial({ map: groundTex, emissive: 0x1a2416 }));
-    ground.rotation.x = -Math.PI / 2; this.scene.add(ground);
+    // the floor is terrain now: a grassy prairie shelf rises along the far (−z) side,
+    // a vantage to climb and snipe down into the wooded hollow.
+    const S = (PLAY_R + 14) * 2, geo = new THREE.PlaneGeometry(S, S, 72, 72); geo.rotateX(-Math.PI / 2);
+    const vp = geo.attributes.position, col = new Float32Array(vp.count * 3);
+    for (let i = 0; i < vp.count; i++) {
+      const hy = this._heightAt(vp.getX(i), vp.getZ(i)); vp.setY(i, hy);
+      // the shelf greens into open prairie grass as it climbs; the hollow stays dark mossy wood-floor
+      const g = Math.min(1, hy / 4.6), n = 0.88 + Math.random() * 0.24;
+      col[i * 3] = (0.42 + g * 0.26) * n; col[i * 3 + 1] = (0.46 + g * 0.30) * n; col[i * 3 + 2] = (0.30 + g * 0.08) * n;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: groundTex, vertexColors: true, emissive: 0x161f12 }));
+    this.scene.add(ground);
     // the sky: a brooding overcast skybox — a cold gradient with soft banks of
     // cloud drifting across the upper air, pale mist settling to the treeline.
     const skyCv = document.createElement('canvas'); skyCv.width = 1024; skyCv.height = 512;
@@ -92,7 +104,7 @@ export class Eachtra {
     const tl = new THREE.TextureLoader();
     const place = (name, x, z, worldH, collideR) => {
       const mat = new THREE.SpriteMaterial({ transparent: true, alphaTest: 0.25, fog: true });
-      const s = new THREE.Sprite(mat); s.center.set(0.5, 0); s.scale.set(worldH * 0.7, worldH, 1); s.position.set(x, 0, z);
+      const s = new THREE.Sprite(mat); s.center.set(0.5, 0); s.scale.set(worldH * 0.7, worldH, 1); s.position.set(x, this._heightAt(x, z), z);
       tl.load(`assets/wood/tree_${name}.png?v=CBUST`, (t) => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; const im = t.image; if (im && im.width) s.scale.set(worldH * (im.width / im.height), worldH, 1); });
       this.scene.add(s);
       if (collideR) this.trees.push({ x, z, r: collideR });
@@ -117,6 +129,17 @@ export class Eachtra {
       else if (roll < 0.9) place(pick(['gorse', 'bramble', 'fern']), x, z, 1.4 + rnd() * 0.7, 0);
       else place(pick(['toadstools', 'reeds']), x, z, 0.8 + rnd() * 0.4, 0);
     }
+  }
+
+  // The floor is terrain: flat through the heart of the wood, then a grassy
+  // prairie shelf swelling up along the far (−z) edge — a vantage to climb and
+  // snipe down into the hollow where the host gathers.
+  _heightAt(x, z) {
+    const a = 8, b = 17, H = 4.6, zz = -z;
+    if (zz <= a) return 0;
+    if (zz >= b) return H;
+    const t = (zz - a) / (b - a);
+    return H * t * t * (3 - 2 * t);
   }
 
   // ---- HUD (built in JS so the slice is self-contained) --------------------
@@ -211,7 +234,7 @@ export class Eachtra {
     this._spawnWave(opts.enemies || 5);
     this.hud.style.display = 'block'; this._banner.style.display = 'none';
     this._exitBtn.textContent = '✕ Leave the wood';
-    this._hint.textContent = 'move · drag to look · ⚔ strike (a beam flies at full health) · 🗡 hurl a dagger (walk over it to take it up)';
+    this._hint.textContent = 'move · drag to look · ⚔ strike (a beam flies at full health) · 🗡 hurl a dagger · climb the grassy rise to snipe down into the wood';
     this._bind(); this._setHud();
     this.onResize();
   }
@@ -294,10 +317,15 @@ export class Eachtra {
   }
   _spawnEnemy(kind) {
     const t = ENEMY_TYPES[kind];
-    const a = Math.random() * Math.PI * 2, r = 11 + Math.random() * (PLAY_R - 15);
+    let a, r, px, pz; // keep the host down in the wooded hollow, not up on the prairie shelf
+    for (let tries = 0; tries < 12; tries++) {
+      a = Math.random() * Math.PI * 2; r = 11 + Math.random() * (PLAY_R - 15);
+      px = Math.cos(a) * r; pz = Math.sin(a) * r;
+      if (this._heightAt(px, pz) < 0.8) break;
+    }
     const chip = makeWalkerChip(t.art, false, t.h);
     if (kind === 'fomorian') chip._fullCycle = true; // it carries a real front-facing walk — let it stride
-    chip.position.set(Math.cos(a) * r, kind === 'sluagh' ? 1.0 : 0.05, Math.sin(a) * r);
+    chip.position.set(px, this._heightAt(px, pz) + (kind === 'sluagh' ? 1.0 : 0.05), pz);
     this.chipGroup.add(chip);
     const e = { chip, kind, cd: 0, dead: 0, stagger: 0, state: 'drift', t: Math.random() * 3, cast: 0, st: 0, spd: t.spd, reach: t.reach, dmg: t.dmg };
     if (kind === 'fomorian') e.hits = t.hits; else e.hp = t.hp;
@@ -435,10 +463,11 @@ export class Eachtra {
     this._bobT = (this._bobT || 0) + (this._moving ? dt * 9.5 : 0);
     const bobAmt = (this._bobTarget = (this._bobTarget || 0) + ((this._moving ? 1 : 0) - (this._bobTarget || 0)) * Math.min(1, dt * 6));
     const bob = Math.abs(Math.sin(this._bobT)) * 0.07 * bobAmt;
-    let eyeY = EYE + bob, roll = 0;
+    const gh = this._heightAt(this.pos.x, this.pos.z); // the ground underfoot — rises on the prairie
+    let eyeY = gh + EYE + bob, roll = 0;
     if (this._dead) { // Doom death — the view sinks slowly to the ground and rolls
       this._deathT += dt; const k = Math.min(1, this._deathT / 1.7);
-      eyeY = EYE - (EYE - 0.34) * (k * k); roll = 0.42 * k;
+      eyeY = gh + EYE - (EYE - 0.34) * (k * k); roll = 0.42 * k;
       if (this._deathT >= 1.7 && !this._deathEnded) { this._deathEnded = true; this._end(false); }
     }
     this._shake = Math.max(0, (this._shake || 0) - dt * 1.6); // decaying screen shake
@@ -459,11 +488,13 @@ export class Eachtra {
       }
       if (!hit && this._boss && this._boss.state === 'active' && s.mesh.position.distanceToSquared(TMP.copy(this._boss.chip.position).setY(2.2)) < 1.7 * 1.7) { this._damageBoss(SPEAR_DMG); hit = true; }
       const r2 = s.mesh.position.x ** 2 + s.mesh.position.z ** 2;
-      if (hit || s.life <= 0 || s.mesh.position.y < 0.1 || r2 > (PLAY_R + 2) ** 2 || this._collide(s.mesh.position.x, s.mesh.position.z)) {
+      const grd = this._heightAt(s.mesh.position.x, s.mesh.position.z);
+      if (hit || s.life <= 0 || s.mesh.position.y < grd + 0.1 || r2 > (PLAY_R + 2) ** 2 || this._collide(s.mesh.position.x, s.mesh.position.z)) {
         this.scene.remove(s.mesh); this.spears.splice(i, 1);
         if (!hit) { // it lands — stick it blade-down in the earth as a pickup
           const g = this._daggerMesh();
-          g.position.set(Math.max(-PLAY_R + 2, Math.min(PLAY_R - 2, s.mesh.position.x)), 0.32, Math.max(-PLAY_R + 2, Math.min(PLAY_R - 2, s.mesh.position.z)));
+          const gx = Math.max(-PLAY_R + 2, Math.min(PLAY_R - 2, s.mesh.position.x)), gz = Math.max(-PLAY_R + 2, Math.min(PLAY_R - 2, s.mesh.position.z));
+          g.position.set(gx, this._heightAt(gx, gz) + 0.32, gz);
           g.rotation.set(-Math.PI / 2 - 0.3, 0, 0.2);
           this.scene.add(g); this.pickups.push({ mesh: g });
         }
@@ -472,7 +503,7 @@ export class Eachtra {
     // retrieve landed spears
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       const pk = this.pickups[i];
-      if (pk.mesh.position.distanceToSquared(TMP.set(this.pos.x, 0, this.pos.z)) < 1.6 * 1.6) { this.scene.remove(pk.mesh); this.pickups.splice(i, 1); this.spearN += 1; this._setHud(); }
+      if (pk.mesh.position.distanceToSquared(TMP.set(this.pos.x, pk.mesh.position.y, this.pos.z)) < 1.6 * 1.6) { this.scene.remove(pk.mesh); this.pickups.splice(i, 1); this.spearN += 1; this._setHud(); }
     }
 
     // ---- enemies ----
@@ -505,6 +536,7 @@ export class Eachtra {
       e.stagger -= dt;
       const bx = e.chip.position.x - toP.x * 2.6 * dt, bz = e.chip.position.z - toP.z * 2.6 * dt;
       if (!this._collide(bx, bz)) { e.chip.position.x = bx; e.chip.position.z = bz; }
+      e.chip.position.y = this._heightAt(e.chip.position.x, e.chip.position.z) + 0.05;
       if (e.chip.faceWorld) e.chip.faceWorld(toP.x, toP.z);
       return;
     }
@@ -513,6 +545,7 @@ export class Eachtra {
       if (d > e.reach) {
         const nx = e.chip.position.x + toP.x * e.spd * dt, nz = e.chip.position.z + toP.z * e.spd * dt;
         if (!this._collide(nx, nz)) { e.chip.position.x = nx; e.chip.position.z = nz; }
+        e.chip.position.y = this._heightAt(e.chip.position.x, e.chip.position.z) + 0.05; // tread the slope
         if (e.chip.animate) e.chip.animate(dt, true); // strides, now that the walk cycles
       } else {
         if (e.chip.animate) e.chip.animate(dt, false);
@@ -527,18 +560,19 @@ export class Eachtra {
   _updateSluagh(e, dt, d, toP) {
     if (e.chip.faceWorld) e.chip.faceWorld(toP.x, toP.z);
     const bob = Math.sin(e.t * 2.2) * 0.2;
+    const gh = this._heightAt(e.chip.position.x, e.chip.position.z); // floats a set height over whatever lies below
     if (e.state === 'drift') {
-      e.chip.position.y = 1.0 + bob;
+      e.chip.position.y = gh + 1.0 + bob;
       const err = d - 11, dir = err > 0 ? 1 : -1, step = Math.min(Math.abs(err), 1.2) * 1.5 * dt * dir;
       const nx = e.chip.position.x + toP.x * step, nz = e.chip.position.z + toP.z * step;
       if (!this._collide(nx, nz)) { e.chip.position.x = nx; e.chip.position.z = nz; }
       e.cast += dt;
       if (e.cast > 2.6 + Math.random() * 1.5) { e.cast = 0; e.state = 'rise'; e.st = 0; }
     } else if (e.state === 'rise') {
-      e.st += dt; e.chip.position.y = 1.0 + e.st * 2.1 + bob * 0.4;
+      e.st += dt; e.chip.position.y = gh + 1.0 + e.st * 2.1 + bob * 0.4;
       if (e.st > 0.7) { this._sluaghCast(e); e.state = 'cover'; e.st = 0; e.cover = this._coverPoint(); }
     } else if (e.state === 'cover') {
-      e.st += dt; e.chip.position.y = 1.0 + Math.max(0, 1.5 - e.st * 2.2) + bob;
+      e.st += dt; e.chip.position.y = gh + 1.0 + Math.max(0, 1.5 - e.st * 2.2) + bob;
       const cp = e.cover;
       if (cp) { const cx = cp.x - e.chip.position.x, cz = cp.z - e.chip.position.z, cl = Math.hypot(cx, cz) || 1; const nx = e.chip.position.x + cx / cl * 2.2 * dt, nz = e.chip.position.z + cz / cl * 2.2 * dt; if (!this._collide(nx, nz)) { e.chip.position.x = nx; e.chip.position.z = nz; } }
       if (e.st > 2.0) { e.state = 'drift'; e.t = 0; }
@@ -594,6 +628,7 @@ export class Eachtra {
     }
     TMP2.subVectors(this.pos, B.chip.position); TMP2.y = 0; const d = TMP2.length(); TMP2.normalize();
     if (d > 3.3) { B.chip.position.x += TMP2.x * 1.5 * dt; B.chip.position.z += TMP2.z * 1.5 * dt; }
+    B.chip.position.y = this._heightAt(B.chip.position.x, B.chip.position.z) + 0.05; // climbs the slope after you
     if (B.chip.faceWorld) B.chip.faceWorld(TMP2.x, TMP2.z);
     if (B.chip.animate) B.chip.animate(dt, d > 3.3);
     B.mcd = Math.max(0, B.mcd - dt);
