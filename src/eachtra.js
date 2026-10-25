@@ -23,6 +23,7 @@ const ROOM_H = 4.0, ROOM_WALL = 3.4; // half-extent and wall height of a cottage
 const ENEMY_TYPES = {
   sluagh:   { art: 'sluagh',   hp: 22,  h: 1.35 }, // frail floating caster
   fomorian: { art: 'fomorian', hits: 3, spd: 1.25, reach: 2.0, dmg: 18, h: 1.95 }, // brute — three hits to fell
+  redcoat:  { art: 'man_at_arms', hits: 2, spd: 1.9, reach: 1.6, dmg: 14, h: 1.05 }, // an imperial man-at-arms, charging the strand
 };
 const TMP = new THREE.Vector3(), TMP2 = new THREE.Vector3();
 
@@ -53,6 +54,7 @@ export class Eachtra {
     this._buildHouses();
     this._buildInteriors();
     this._buildRain();
+    this._buildBeach();
     this._gibGroup = new THREE.Group(); this.scene.add(this._gibGroup); this._woodObjs.push(this._gibGroup);
     this.chipGroup = new THREE.Group(); this.scene.add(this.chipGroup);
 
@@ -220,11 +222,46 @@ export class Eachtra {
   // prairie shelf swelling up along the far (−z) edge — a vantage to climb and
   // snipe down into the hollow where the host gathers.
   _heightAt(x, z) {
+    if (this._beach) return 0; // the strand of Tír na nÓg is flat
     const a = 8, b = 17, H = 4.6, zz = -z;
     if (zz <= a) return 0;
     if (zz >= b) return H;
     const t = (zz - a) / (b - a);
     return H * t * t * (3 - 2 * t);
+  }
+
+  // ---- the strand of Tír na nÓg (a separate scene, shown for the landing) ----
+  _buildBeach() {
+    const g = new THREE.Group(); g.visible = false; this.scene.add(g); this._beachGroup = g;
+    // pale golden sand
+    const sandTex = this._canvasTex((x, w, h) => {
+      x.fillStyle = '#d8c38a'; x.fillRect(0, 0, w, h);
+      for (let i = 0; i < 1400; i++) { const t = 170 + (Math.random() * 60) | 0; x.fillStyle = `rgba(${t},${t - 14},${t - 50},${0.25 + Math.random() * 0.4})`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+    }, 256, 256);
+    sandTex.wrapS = sandTex.wrapT = THREE.RepeatWrapping; sandTex.repeat.set(20, 20);
+    const sand = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshLambertMaterial({ map: sandTex, emissive: 0x2a2614 }));
+    sand.rotation.x = -Math.PI / 2; sand.position.set(0, 0, 10); g.add(sand);
+    // the sea, behind the landing (−z), a shade lower with a bright shimmer
+    const seaTex = this._canvasTex((x, w, h) => {
+      const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#2b7fae'); gr.addColorStop(1, '#4fb5c9'); x.fillStyle = gr; x.fillRect(0, 0, w, h);
+      x.strokeStyle = 'rgba(255,255,255,0.3)'; x.lineWidth = 2; for (let i = 0; i < 40; i++) { x.beginPath(); const yy = Math.random() * h; x.moveTo(0, yy); x.bezierCurveTo(w / 3, yy - 6, 2 * w / 3, yy + 6, w, yy); x.stroke(); }
+    }, 256, 256);
+    seaTex.wrapS = seaTex.wrapT = THREE.RepeatWrapping; seaTex.repeat.set(14, 14);
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(200, 120), new THREE.MeshBasicMaterial({ map: seaTex, fog: true }));
+    sea.rotation.x = -Math.PI / 2; sea.position.set(0, -0.12, -72); g.add(sea); this._sea = sea;
+    // a foam line at the water's edge
+    const foam = new THREE.Mesh(new THREE.PlaneGeometry(200, 3.5), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, fog: true }));
+    foam.rotation.x = -Math.PI / 2; foam.position.set(0, 0.02, -12); g.add(foam);
+    // the bright Otherworld sky — eternal summer
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(220, 24, 14), new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false, depthWrite: false, color: 0xbfe0ec }));
+    new THREE.TextureLoader().load('assets/sky/sky_samhradh.jpg?v=CBUST', (t) => { t.colorSpace = THREE.SRGBColorSpace; dome.material.map = t; dome.material.color.setHex(0xffffff); dome.material.needsUpdate = true; });
+    g.add(dome);
+    // a scatter of pale dune-grass and standing stones to break the strand
+    const tl = new THREE.TextureLoader();
+    const place = (name, x, z, worldH) => { const mat = new THREE.SpriteMaterial({ transparent: true, alphaTest: 0.25, fog: true }); const s = new THREE.Sprite(mat); s.center.set(0.5, 0); s.scale.set(worldH * 0.8, worldH, 1); s.position.set(x, 0, z); tl.load(`assets/wood/tree_${name}.png?v=CBUST`, (t) => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; const im = t.image; if (im && im.width) s.scale.set(worldH * (im.width / im.height), worldH, 1); }); g.add(s); };
+    let seed = 1337; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    for (let i = 0; i < 22; i++) { const x = (rnd() - 0.5) * 48, z = 6 + rnd() * 26; place(rnd() < 0.5 ? 'reeds' : 'gorse', x, z, 1.2 + rnd() * 0.8); }
+    for (let i = 0; i < 6; i++) { place(rnd() < 0.5 ? 'boulder' : 'rocks', (rnd() - 0.5) * 44, 14 + rnd() * 16, 1.6 + rnd() * 1.2); }
   }
 
   // ---- rain (falls while the giant walks) ----------------------------------
@@ -373,6 +410,7 @@ export class Eachtra {
     this._hint.textContent = 'You take the stores — ' + parts.join(', ');
   }
   _updateHouses(dt) {
+    if (this._beach) return; // no cottages on the strand of Tír na nÓg
     if (this._enterCd > 0) this._enterCd -= dt;
     if (this._inside === null) {
       if (this._dead || this._enterCd > 0 || !this._houses.length) return;
@@ -635,7 +673,9 @@ export class Eachtra {
     this._onExit = opts.onExit || (() => {});
     this._result = 'quit';
     this.active = true;
-    this.pos.set(0, 0, 0); this.yaw = 0; this.pitch = 0; // stand in the clear heart of the wood, the host closing from all sides
+    this._beach = !!opts.beach;
+    if (this._beach) { this.pos.set(0, 0, -9); this.yaw = Math.PI; this.pitch = 0; } // wade ashore at the water's edge, facing up the strand (+z, inland)
+    else { this.pos.set(0, 0, 0); this.yaw = 0; this.pitch = 0; } // stand in the clear heart of the wood, the host closing from all sides
     this.hp = 100; this.spearN = SPEAR_START; this._dead = false; this._cleared = false;
     this._deathT = 0; this._deathEnded = false; this._shake = 0;
     // leave any cottage and replenish its stores for a fresh run
@@ -649,10 +689,13 @@ export class Eachtra {
     for (const p of (this._smokePool || [])) { p.life = 0; if (p.spr) p.spr.visible = false; }
     this.scene.fog = this._woodFog; this.scene.background = this._woodBg;
     if (this._roomLight) this._roomLight.intensity = 0;
-    for (const o of this._woodObjs) o.visible = true;
+    for (const o of this._woodObjs) o.visible = !this._beach; // the wood gives way to the strand
+    if (this._gibGroup) this._gibGroup.visible = true; // gibs litter whichever ground we're on
+    if (this._beachGroup) this._beachGroup.visible = this._beach;
+    if (this._beach) { this.scene.fog = new THREE.Fog(0xcfe7ec, 20, 110); this.scene.background = new THREE.Color(0xbfe0ec); } // bright sea haze
     if (this.chipGroup) this.chipGroup.visible = true;
     for (const r of (this._interiors || [])) { r.group.visible = false; r.supply.taken = false; r.supply.mesh.visible = true; r.supply.glow.visible = true; }
-    if (this._dome && this._woodSkyTex) { this._dome.material.map = this._woodSkyTex; this._dome.material.color.setRGB(1, 1, 1); this._dome.material.needsUpdate = true; } // restore the wood's own sky
+    if (!this._beach && this._dome && this._woodSkyTex) { this._dome.material.map = this._woodSkyTex; this._dome.material.color.setRGB(1, 1, 1); this._dome.material.needsUpdate = true; } // restore the wood's own sky
     for (const e of this.enemies) this.chipGroup.remove(e.chip);
     for (const s of this.spears) this.scene.remove(s.mesh);
     for (const pk of this.pickups) this.scene.remove(pk.mesh);
@@ -670,8 +713,10 @@ export class Eachtra {
     this._clearMsg = null;
     this._spawnWave(this._gauntlet ? this._gauntlet.waves[0] : (opts.enemies || 5));
     this.hud.style.display = 'block'; this._banner.style.display = 'none';
-    this._exitBtn.textContent = '✕ Leave the wood';
-    this._hint.textContent = 'move · drag to look · ⚔ strike (a beam flies at full health) · 🗡 hurl a dagger · climb the grassy rise to snipe down into the wood';
+    this._exitBtn.textContent = this._beach ? '✕ Back to the sea' : '✕ Leave the wood';
+    this._hint.textContent = this._beach
+      ? 'You wade ashore on Tír na nÓg — hold the strand · ⚔ strike · 🗡 hurl a dagger · a beam flies at full health'
+      : 'move · drag to look · ⚔ strike (a beam flies at full health) · 🗡 hurl a dagger · climb the grassy rise to snipe down into the wood';
     this._bind(); this._setHud();
     if (opts.morrigan) { this._spawnMorrigan(); this._morriganPhase = 'fight'; this._morriganGreet(); } // she greets, then looses the host
     this.onResize();
@@ -751,22 +796,24 @@ export class Eachtra {
 
   // ---- combat --------------------------------------------------------------
   _spawnWave(n) {
-    for (let i = 0; i < n; i++) this._spawnEnemy(Math.random() < 0.45 ? 'fomorian' : 'sluagh');
+    for (let i = 0; i < n; i++) {
+      if (this._beach) this._spawnEnemy(Math.random() < 0.6 ? 'redcoat' : 'fomorian'); // a charge of men-at-arms and brutes up the strand
+      else this._spawnEnemy(Math.random() < 0.45 ? 'fomorian' : 'sluagh');
+    }
   }
   _spawnEnemy(kind) {
     const t = ENEMY_TYPES[kind];
-    let a, r, px, pz; // keep the host down in the wooded hollow, not up on the prairie shelf
-    for (let tries = 0; tries < 12; tries++) {
-      a = Math.random() * Math.PI * 2; r = 11 + Math.random() * (PLAY_R - 15);
-      px = Math.cos(a) * r; pz = Math.sin(a) * r;
-      if (this._heightAt(px, pz) < 0.8) break;
+    let px, pz;
+    if (this._beach) { px = (Math.random() * 2 - 1) * 17; pz = 10 + Math.random() * 14; } // massing inland, up the strand
+    else {
+      for (let tries = 0; tries < 12; tries++) { const a = Math.random() * Math.PI * 2, r = 11 + Math.random() * (PLAY_R - 15); px = Math.cos(a) * r; pz = Math.sin(a) * r; if (this._heightAt(px, pz) < 0.8) break; }
     }
     const chip = makeWalkerChip(t.art, false, t.h);
-    if (kind === 'fomorian') { chip._fullCycle = true; chip.faceWorld(0, 1); if (chip.animate) chip.animate(0.02, true); } // prime a walk frame so the unkeyed idle never shows
+    if (kind !== 'sluagh') { chip._fullCycle = true; chip.faceWorld(0, 1); if (chip.animate) chip.animate(0.02, true); } // prime a walk frame so the unkeyed idle never shows
     chip.position.set(px, this._heightAt(px, pz) + (kind === 'sluagh' ? 1.0 : 0.05), pz);
     this.chipGroup.add(chip);
     const e = { chip, kind, cd: 0, dead: 0, stagger: 0, state: 'drift', t: Math.random() * 3, cast: 0, st: 0, spd: t.spd, reach: t.reach, dmg: t.dmg };
-    if (kind === 'fomorian') e.hits = t.hits; else e.hp = t.hp;
+    if (kind === 'sluagh') e.hp = t.hp; else e.hits = t.hits;
     this.enemies.push(e);
   }
   _forward() { this.camera.getWorldDirection(TMP); TMP.y = 0; return TMP.normalize(); }
@@ -837,7 +884,7 @@ export class Eachtra {
   }
   _damage(e, amt) {
     if (e.dead) return;
-    if (e.kind === 'fomorian') { // three solid hits, each staggering it a step back (one hit per stagger window)
+    if (e.kind !== 'sluagh') { // brutes & men-at-arms take solid hits, each staggering them a step back (one hit per stagger window)
       if (e.stagger > 0) return;
       e.hits -= 1; e.stagger = 0.4; this._flashEnemy(e);
       if (e.hits <= 0) this._kill(e);
@@ -933,6 +980,7 @@ export class Eachtra {
 
   // ---- step ----------------------------------------------------------------
   _collide(nx, nz) {
+    if (this._beach) return false; // the open strand — no wood to skirt
     for (const t of this.trees) { const dx = nx - t.x, dz = nz - t.z, rr = t.r + 0.4; if (dx * dx + dz * dz < rr * rr) return true; }
     return false;
   }
@@ -1078,12 +1126,12 @@ export class Eachtra {
       if (e.chip.faceWorld) e.chip.faceWorld(toP.x, toP.z);
       return;
     }
-    if (e.kind === 'fomorian') {
+    if (e.kind !== 'sluagh') { // brutes & men-at-arms stride in and strike
       if (e.chip.faceWorld) e.chip.faceWorld(toP.x, toP.z);
       if (d > e.reach) {
         const nx = e.chip.position.x + toP.x * e.spd * dt, nz = e.chip.position.z + toP.z * e.spd * dt;
         if (!this._collide(nx, nz)) { e.chip.position.x = nx; e.chip.position.z = nz; }
-        e.chip.position.y = this._heightAt(e.chip.position.x, e.chip.position.z) + 0.05; // tread the slope
+        e.chip.position.y = this._heightAt(e.chip.position.x, e.chip.position.z) + 0.05; // tread the ground
         if (e.chip.animate) e.chip.animate(dt, true); // strides, now that the walk cycles
       } else {
         if (e.chip.animate) e.chip.animate(dt, true); // keep striding — its idle frame carries an unkeyed background

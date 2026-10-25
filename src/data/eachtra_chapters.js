@@ -18,9 +18,9 @@ export const CHAPTERS = [
     outro: '"You will do," says the Badhbh, and lays a cold finger to your brow. The mark will not wash away. You are a champion now, for good or ill.',
   },
   {
-    n: 4, title: 'Slua na hOíche', titleEn: 'The Host of the Night', enemies: 5,
-    intro: 'They come in full now — the whole night-host, wailing, wheeling, hungry. The Badhbh watches from the dark and does not help. This is the test she promised: stand, or be carried off with the rest.',
-    outro: 'The wood falls silent for the first time in an age. You are still standing. The silence, somehow, is worse than the keening.',
+    n: 4, title: 'Trá Thír na nÓg', titleEn: 'The Strand of Tír na nÓg', beach: true, enemies: 6,
+    intro: 'The Badhbh\'s mark carries you west over the ninth wave, to the strand of Tír na nÓg — the Land of the Young, where no one grows old. But its shore is not undefended. As your curragh grounds on the bright sand, a warband of imperial men-at-arms and Fomhórach brutes pours down the strand to throw you back into the sea. Hold the beach, and win your footing in the Otherworld.',
+    outro: 'The last of the shore-guard falls, and the strand lies quiet under an endless summer sky. You stand on Tír na nÓg — but the Land of the Young keeps its own, and the way back runs deeper still.',
   },
   {
     n: 5, title: 'Ceann an tSlua', titleEn: 'The Head of the Host', enemies: 6,
