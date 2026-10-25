@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeWalkerChip } from './render/chips.js?v=CBUST';
+import { makeWalkerChip, makeWarriorChip } from './render/chips.js?v=CBUST';
 import { setCamera } from './render/assets.js?v=CBUST';
 
 // Eachtra — the Adventure. A vertical slice of the hero's-journey mode: a custom
@@ -401,6 +401,7 @@ export class Eachtra {
   _dlgGoto(id) {
     const node = this._dlgNodes[id]; if (!node) return this._endDialog();
     this._dlgNode = node;
+    if (node.onShow) node.onShow();
     this._dlgName.textContent = node.speaker || ''; this._dlgName.style.display = node.speaker ? 'block' : 'none';
     this._dlgFull = node.text || ''; this._dlgShown = 0; this._dlgTyping = true;
     this._dlgText.textContent = ''; this._dlgArrow.style.opacity = '0';
@@ -456,7 +457,7 @@ export class Eachtra {
     const auraTex = this._canvasTex((cx, w, h) => { const g = cx.createRadialGradient(w / 2, h / 2, 1, w / 2, h / 2, w / 2); g.addColorStop(0, 'rgba(150,60,190,0.5)'); g.addColorStop(0.5, 'rgba(80,25,120,0.28)'); g.addColorStop(1, 'rgba(30,10,50,0)'); cx.fillStyle = g; cx.fillRect(0, 0, w, h); }, 64, 64);
     const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: auraTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: true }));
     aura.scale.set(3.0, 3.0, 1); aura.position.set(x, this._heightAt(x, z) + 1.1, z); this.chipGroup.add(aura);
-    this._morrigan = { chip, aura, x, z, t: 0 };
+    this._morrigan = { chip, aura, x, z, t: 0, auraBase: 2.6, revealed: false };
   }
   _updateMorrigan(dt) {
     const m = this._morrigan; if (!m) return;
@@ -464,15 +465,38 @@ export class Eachtra {
     const baseY = this._heightAt(m.x, m.z) + 0.05;
     m.chip.position.y = baseY + Math.sin(m.t * 1.5) * 0.08; // she hovers a hand's breadth off the ground
     m.aura.position.y = m.chip.position.y + 1.05;
-    const pul = 1 + Math.sin(m.t * 3) * 0.12; m.aura.scale.set(3.0 * pul, 3.0 * pul, 1);
+    const pul = 1 + Math.sin(m.t * 3) * 0.12; m.aura.scale.set(m.auraBase * pul, m.auraBase * pul, 1);
     if (m.chip.faceWorld) m.chip.faceWorld(this.pos.x - m.x, this.pos.z - m.z); // she turns to watch you
+    if (m.chip.animate) m.chip.animate(dt, false);
+  }
+  _lockGazeTo(tx, ty, tz, dt) {
+    const ex = this.pos.x, ez = this.pos.z, ey = this._heightAt(ex, ez) + EYE;
+    const dx = tx - ex, dz = tz - ez, horiz = Math.hypot(dx, dz) || 1e-3;
+    const wantYaw = Math.atan2(-dx, -dz), wantPitch = Math.atan2(ty - ey, horiz);
+    let dyaw = wantYaw - this.yaw; while (dyaw > Math.PI) dyaw -= Math.PI * 2; while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+    const k = Math.min(1, dt * 5);
+    this.yaw += dyaw * k; this.pitch += (wantPitch - this.pitch) * k;
+  }
+  _revealMorrigan() {
+    const m = this._morrigan; if (!m || m.revealed) return; m.revealed = true;
+    this.chipGroup.remove(m.chip); // the hooded traveller unfolds into the raven-winged queen
+    const chip = makeWarriorChip('morrigan', 2.4);
+    chip.position.set(m.x, this._heightAt(m.x, m.z) + 0.05, m.z);
+    if (chip.faceWorld) chip.faceWorld(0, 1);
+    this.chipGroup.add(chip); m.chip = chip; m.auraBase = 4.3;
+    // the sky darkens, a cold fog gathers, the rain comes on in earnest
+    new THREE.TextureLoader().load('assets/sky/sky_geimhreadh.jpg?v=CBUST', (t) => { t.colorSpace = THREE.SRGBColorSpace; if (this._dome) { this._dome.material.map = t; this._dome.material.color.setRGB(0.5, 0.52, 0.6); this._dome.material.needsUpdate = true; } });
+    this.scene.fog = new THREE.Fog(0x0c1016, 4, 28); this.scene.background = new THREE.Color(0x10141b);
+    this._raining = true; if (this._rain) this._rain.material.opacity = 0.5;
+    this._shake = 0.5;
   }
   _morriganGreet() {
     const M = 'An Mhórrígan';
     this._startDialog({
       start: { speaker: M, text: 'So. The wanderer with the borrowed spear. I have watched you from the branches, little iron.', next: 'q' },
       q: {
-        speaker: M, text: 'I am Badhbh — washer at the ford, phantom queen of war. Prove the iron in you this night and I will mark you for my own. Will you take up my test?',
+        speaker: M, onShow: () => this._revealMorrigan(), // the hood falls away — the Badhbh stands revealed as the sky turns
+        text: 'I am Badhbh — washer at the ford, phantom queen of war. Prove the iron in you this night and I will mark you for my own. Will you take up my test?',
         choices: [
           { label: 'I will. Loose your host.', next: 'yes' },
           { label: 'Who are you to command me?', next: 'defy' },
@@ -590,7 +614,7 @@ export class Eachtra {
     this._parley = false; this._dlgActive = false; if (this._dlg) this._dlg.style.display = 'none';
     if (this._morrigan) { this.chipGroup.remove(this._morrigan.chip); this.chipGroup.remove(this._morrigan.aura); this._morrigan = null; }
     this._morriganPhase = null;
-    this._raining = false; if (this._rain) this._rain.visible = false;
+    this._raining = false; if (this._rain) { this._rain.visible = false; this._rain.material.opacity = 0.34; }
     for (const g of (this._gibs || [])) { this._gibGroup.remove(g.mesh); g.mesh.material.dispose(); } this._gibs = [];
     for (const p of (this._smokePool || [])) { p.life = 0; if (p.spr) p.spr.visible = false; }
     this.scene.fog = this._woodFog; this.scene.background = this._woodBg;
@@ -598,7 +622,7 @@ export class Eachtra {
     for (const o of this._woodObjs) o.visible = true;
     if (this.chipGroup) this.chipGroup.visible = true;
     for (const r of (this._interiors || [])) { r.group.visible = false; r.supply.taken = false; r.supply.mesh.visible = true; r.supply.glow.visible = true; }
-    if (this._dome && this._woodSkyTex) { this._dome.material.map = this._woodSkyTex; this._dome.material.needsUpdate = true; } // restore the wood's own sky
+    if (this._dome && this._woodSkyTex) { this._dome.material.map = this._woodSkyTex; this._dome.material.color.setRGB(1, 1, 1); this._dome.material.needsUpdate = true; } // restore the wood's own sky
     for (const e of this.enemies) this.chipGroup.remove(e.chip);
     for (const s of this.spears) this.scene.remove(s.mesh);
     for (const pk of this.pickups) this.scene.remove(pk.mesh);
@@ -679,7 +703,7 @@ export class Eachtra {
       this._nub.style.left = (35 + dx) + 'px'; this._nub.style.top = (35 + dy) + 'px';
       this._joy.x = dx / cap; this._joy.z = dy / cap;
     }
-    if (this._look && e.pointerId === this._look.id) {
+    if (this._look && e.pointerId === this._look.id && !this._parley) { // the parley holds the gaze on her
       this.yaw -= (e.clientX - this._look.x) * LOOK_SENS;
       this.pitch = Math.max(-1.1, Math.min(1.1, this.pitch - (e.clientY - this._look.y) * LOOK_SENS));
       this._look.x = e.clientX; this._look.y = e.clientY;
@@ -743,19 +767,17 @@ export class Eachtra {
   _fireBeam(spread = 0) {
     const dir = this.camera.getWorldDirection(new THREE.Vector3()).normalize();
     if (spread) { const c = Math.cos(spread), s = Math.sin(spread); const x = dir.x * c + dir.z * s, z = -dir.x * s + dir.z * c; dir.x = x; dir.z = z; dir.normalize(); }
-    if (!this._beamTex) this._beamTex = this._canvasTex((x, w, h) => {
-      const g = x.createRadialGradient(w / 2, h / 2, 2, w / 2, h / 2, w / 2);
-      g.addColorStop(0, 'rgba(240,250,255,1)'); g.addColorStop(0.5, 'rgba(150,210,255,0.8)'); g.addColorStop(1, 'rgba(90,160,255,0)');
-      x.fillStyle = g; x.beginPath(); x.ellipse(w / 2, h / 2, w / 2, h / 3.2, 0, 0, Math.PI * 2); x.fill();
-    }, 64, 64);
+    if (!this._beamTex) { this._beamTex = new THREE.TextureLoader().load('assets/fx/orb_blue.png?v=CBUST'); this._beamTex.colorSpace = THREE.SRGBColorSpace; }
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._beamTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-    s.scale.set(1.1, 0.5, 1); s.position.copy(this.pos); s.position.y = EYE - 0.1; s.position.addScaledVector(dir, 0.6);
+    s.scale.set(1.0, 1.0, 1); s.material.rotation = Math.random() * Math.PI * 2; s.position.copy(this.pos); s.position.y = EYE - 0.1; s.position.addScaledVector(dir, 0.6);
     this.scene.add(s);
-    this._beams.push({ mesh: s, vel: dir.multiplyScalar(34), life: 0.85 });
+    this._beams.push({ mesh: s, vel: dir.multiplyScalar(34), life: 0.85, spin: Math.random() < 0.5 ? -9 : 9 });
   }
   _updateBeams(dt) {
     for (let i = this._beams.length - 1; i >= 0; i--) {
       const bm = this._beams[i]; bm.mesh.position.addScaledVector(bm.vel, dt); bm.life -= dt;
+      bm.mesh.material.rotation += dt * (bm.spin || 9);
+      const pul = 0.95 + Math.sin(bm.life * 26) * 0.14; bm.mesh.scale.set(pul, pul, 1); // crackling bolt
       let hit = false;
       for (const e of this.enemies) { if (e.dead) continue; if (bm.mesh.position.distanceToSquared(TMP.copy(e.chip.position).setY(EYE - 0.1)) < 0.8 * 0.8) { this._damage(e, 30); hit = true; break; } }
       if (!hit && this._boss && this._boss.state === 'active' && bm.mesh.position.distanceToSquared(TMP.copy(this._boss.chip.position).setY(2.2)) < 1.8 * 1.8) { this._damageBoss(30); hit = true; }
@@ -878,6 +900,7 @@ export class Eachtra {
         }
       }
     } else this._moving = false;
+    if (this._parley && this._morrigan) this._lockGazeTo(this._morrigan.x, this._heightAt(this._morrigan.x, this._morrigan.z) + 1.4, this._morrigan.z, dt);
     // Doom-style head-bob: a gentle vertical lope while on the move, eased out at rest.
     this._bobT = (this._bobT || 0) + (this._moving ? dt * 9.5 : 0);
     const bobAmt = (this._bobTarget = (this._bobTarget || 0) + ((this._moving ? 1 : 0) - (this._bobTarget || 0)) * Math.min(1, dt * 6));
