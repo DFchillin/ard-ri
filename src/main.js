@@ -1396,7 +1396,29 @@ function advanceDay() {
       ui.showFestival({ name: 'Raiders at the Gate', emoji: '🔥', sub: `${campaign.rival ? `The war-band of ${campaign.rival.name}, risen in ${campaign.rival.region}, falls upon your ráth` : 'The war-band you provoked falls upon your ráth'}, ${leaderName()}. Muster the folk and hold the field.`, onDone: () => enterBattle('defend') });
     }
   }
+  maybeThiefEvent(); // a raider may slip into the ráth to lift a cow
   if (started) saveSettlement(); // persist the standing ráth (herd growth, economy) each day
+}
+const THIEF_CHANCE = 0.06, THIEF_COW = 5; // per-day odds and the heads a thief drives off
+function maybeThiefEvent() {
+  if (battle.active || hurling.active || sparring.active || eachtra.active || manhunt.active) return;
+  if (document.getElementById('thief-event')) return; // one at a time
+  if (!hasGiant() || (game.cattle || 0) < 10) return; // only once a giant guards the ráth and there is a herd to raid
+  if (Math.random() < THIEF_CHANCE) showThiefEvent();
+}
+function showThiefEvent() {
+  if (document.getElementById('thief-event')) return;
+  const el = document.createElement('div'); el.id = 'thief-event';
+  el.style.cssText = 'position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(4,6,8,.55);backdrop-filter:blur(2px)';
+  const card = document.createElement('div');
+  card.style.cssText = 'max-width:440px;width:88%;background:linear-gradient(180deg,rgba(20,16,12,.97),rgba(10,8,6,.98));border:2px solid #b8524a;border-radius:14px;box-shadow:0 10px 40px #000a;padding:22px;color:#f0ead8;text-align:center;font-family:inherit';
+  card.innerHTML = '<div style="font-size:30px">⚔️🐄</div><div style="font-size:19px;font-weight:800;color:#e4a23a;margin:8px 0 6px">A raider in the ráth!</div><div style="font-size:14px;line-height:1.5;opacity:.92">An imperial man-at-arms has slipped into your streets and is driving off one of your cattle. Will you loose the giant on him, or let the beast go?</div>';
+  const btns = document.createElement('div'); btns.style.cssText = 'display:flex;flex-direction:column;gap:9px;margin-top:16px';
+  const close = () => el.remove();
+  const mk = (label, sub, onClick, accent) => { const b = document.createElement('button'); b.innerHTML = `<div style="font-weight:700">${label}</div><div style="font-size:12px;opacity:.82;font-weight:400">${sub}</div>`; b.style.cssText = `padding:11px 14px;border-radius:9px;border:1px solid ${accent || '#4a5068'};background:${accent ? '#3a1f1c' : '#1e2230'};color:#f0ead8;cursor:pointer;text-align:center;font-family:inherit`; b.addEventListener('click', onClick); btns.appendChild(b); };
+  mk('🗿 Unleash Deasún Fathaigh', 'Hunt him down through the ráth', () => { close(); startManhunt(); }, '#b8524a');
+  mk('🐄 Let the cow go', `Absorb the loss — −${THIEF_COW} cattle`, () => { close(); game.cattle = Math.max(0, game.cattle - THIEF_COW); pushStats(); if (started) saveSettlement(); flashNotice(`🐄 You let the raider go — he drives off ${THIEF_COW} head, and the giant stays idle.`); });
+  card.appendChild(btns); el.appendChild(card); document.body.appendChild(el);
 }
 
 function triggerAdvisor() {
@@ -2242,7 +2264,7 @@ window.addEventListener('resize', () => {
 });
 
 window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, hurling, sparring, eachtra, manhunt, startManhunt, hero, openSparring, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
-  _dbg: { foundColony, collectColonyTribute, replenishWarband, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
+  _dbg: { foundColony, collectColonyTribute, replenishWarband, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml, showThiefEvent, hasGiant,
     layRow: (key, sx, sz, ex, ez) => { const before = game.buildings.length; tool = key; showBuildRow({ x: sx, z: sz }, { x: ex, z: ez }); const shown = pendingBuildRow ? pendingBuildRow.length : 0; confirmBuild(); return { shown, placed: game.buildings.length - before }; } },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
     const w = map.tileToWorld(tx, tz);
