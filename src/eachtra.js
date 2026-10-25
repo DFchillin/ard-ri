@@ -360,6 +360,39 @@ export class Eachtra {
       if ((this.pos.x - hx) ** 2 + (this.pos.z - hz) ** 2 < 4.5 * 4.5) this._startCouncil();
     }
     if (this._boss && this._boss.kind === 'god') this._updateGod(dt);
+    if (this._mapOpen) this._drawMap();
+  }
+  _toggleMap() { this._mapOpen = !this._mapOpen; this._mapCanvas.style.display = this._mapOpen ? 'block' : 'none'; if (this._mapOpen) this._drawMap(); }
+  _drawMap() {
+    const cv = this._mapCanvas, W = cv.clientWidth || 600, H = cv.clientHeight || 400;
+    if (cv.width !== W) cv.width = W; if (cv.height !== H) cv.height = H;
+    const x = cv.getContext('2d'); x.clearRect(0, 0, W, H);
+    const cols = this._dcols, rows = this._drows, g = this._dgrid;
+    const pad = 20, s = Math.min((W - pad * 2) / cols, (H - pad * 2) / rows);
+    const ox = (W - cols * s) / 2, oz = (H - rows * s) / 2;
+    const ex = (c) => ox + (c + 0.5) * s, ez = (r) => oz + (r + 0.5) * s; // entity → screen (cell-centred)
+    // wireframe: draw a line on each floor-cell edge that borders a wall
+    x.strokeStyle = '#34f85e'; x.lineWidth = 1.5; x.beginPath();
+    const wall = (c, r) => r < 0 || c < 0 || r >= rows || c >= cols || g[r][c] !== 0;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (g[r][c] !== 0) continue;
+      const px = ox + c * s, pz = oz + r * s;
+      if (wall(c - 1, r)) { x.moveTo(px, pz); x.lineTo(px, pz + s); }
+      if (wall(c + 1, r)) { x.moveTo(px + s, pz); x.lineTo(px + s, pz + s); }
+      if (wall(c, r - 1)) { x.moveTo(px, pz); x.lineTo(px + s, pz); }
+      if (wall(c, r + 1)) { x.moveTo(px, pz + s); x.lineTo(px + s, pz + s); }
+    }
+    x.stroke();
+    if (!this._dGateOpen) { x.strokeStyle = '#ff8a3a'; x.lineWidth = 2.5; x.strokeRect(ox + this._dGate.c * s + 1, oz + this._dGate.r * s + 1, s - 2, s - 2); } // the gate
+    x.fillStyle = '#e4c76a'; x.beginPath(); x.arc(ex(this._dHall.c), ez(this._dHall.r), s * 0.3, 0, Math.PI * 2); x.fill(); // the gods' hall
+    const toC = (wx) => wx / DCELL + (cols - 1) / 2, toR = (wz) => wz / DCELL;
+    x.fillStyle = '#f55';
+    for (const e of this.enemies) { if (e.dead) continue; x.beginPath(); x.arc(ex(toC(e.chip.position.x)), ez(toR(e.chip.position.z)), 3, 0, Math.PI * 2); x.fill(); }
+    // the champion, an arrow pointing where he looks
+    const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
+    x.save(); x.translate(ex(toC(this.pos.x)), ez(toR(this.pos.z))); x.rotate(Math.atan2(fz, fx));
+    x.fillStyle = '#fff'; x.beginPath(); x.moveTo(9, 0); x.lineTo(-6, -6); x.lineTo(-6, 6); x.closePath(); x.fill(); x.restore();
+    x.fillStyle = '#9f9'; x.font = '12px monospace'; x.fillText('TÍR NA MARBH — automap  ·  M to close', 12, 18);
   }
   _startCouncil() {
     this._godPhase = 'council';
@@ -820,6 +853,15 @@ export class Eachtra {
       try { if (!d.fullscreenElement && !d.webkitFullscreenElement) (el.requestFullscreen || el.webkitRequestFullscreen).call(el); else (d.exitFullscreen || d.webkitExitFullscreen).call(d); } catch (_) {}
     });
     h.appendChild(fs);
+    // Doom-style automap: a wireframe of the maze, toggled with M or the 🗺 button
+    this._mapCanvas = document.createElement('canvas');
+    this._mapCanvas.style.cssText = 'position:absolute;inset:0;margin:auto;width:86%;height:82%;max-width:720px;background:rgba(2,6,3,0.82);border:1px solid #2f6;border-radius:8px;display:none;pointer-events:none';
+    h.appendChild(this._mapCanvas);
+    this._mapBtn = document.createElement('button'); this._mapBtn.textContent = '🗺';
+    this._mapBtn.style.cssText = 'position:absolute;right:58px;top:10px;width:40px;height:40px;border-radius:8px;border:1px solid #fff3;background:#0008;color:#fff;font-size:18px;touch-action:none;display:none';
+    this._mapBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this._mapBtn.addEventListener('click', (e) => { e.stopPropagation(); this._toggleMap(); });
+    h.appendChild(this._mapBtn);
     document.body.appendChild(h);
   }
 
@@ -873,6 +915,8 @@ export class Eachtra {
     this._clearMsg = null;
     this._spawnWave(this._gauntlet ? this._gauntlet.waves[0] : (opts.enemies || 5));
     this.hud.style.display = 'block'; this._banner.style.display = 'none';
+    if (this._mapBtn) this._mapBtn.style.display = this._dungeon ? 'block' : 'none';
+    this._mapOpen = false; if (this._mapCanvas) this._mapCanvas.style.display = 'none';
     this._exitBtn.textContent = this._dungeon ? '✕ Flee the dark' : this._beach ? '✕ Back to the sea' : '✕ Leave the wood';
     this._hint.textContent = this._dungeon
       ? 'The halls of the dead — hunt down the war-dead through the maze, then seek the gate to the gods\' hall'
@@ -900,7 +944,7 @@ export class Eachtra {
   // ---- input ---------------------------------------------------------------
   _bind() {
     const H = this._handlers;
-    H.kd = (e) => { const k = e.key.toLowerCase(); this._keys.add(k); if (k === ' ') { this._strike(); e.preventDefault(); } if (k === 'f') this._throw(); if (k === 'escape') this.close(); };
+    H.kd = (e) => { const k = e.key.toLowerCase(); this._keys.add(k); if (k === ' ') { this._strike(); e.preventDefault(); } if (k === 'f') this._throw(); if ((k === 'm' || k === 'tab') && this._dungeon) { this._toggleMap(); e.preventDefault(); } if (k === 'escape') this.close(); };
     H.ku = (e) => this._keys.delete(e.key.toLowerCase());
     H.pd = (e) => this._pointerDown(e);
     H.pm = (e) => this._pointerMove(e);
