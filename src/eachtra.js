@@ -26,6 +26,24 @@ const ENEMY_TYPES = {
   redcoat:  { art: 'man_at_arms', hits: 2, spd: 1.9, reach: 1.6, dmg: 14, h: 1.05 }, // an imperial man-at-arms, charging the strand
 };
 const TMP = new THREE.Vector3(), TMP2 = new THREE.Vector3();
+const DCELL = 3.3; // world size of a dungeon maze cell
+
+// Recursive-backtracker maze on a cell grid (odd dims). 1 = wall, 0 = floor.
+// Fully connected by construction, so a path always runs entrance → hall.
+function genMaze(W, H, rnd) {
+  const g = Array.from({ length: H }, () => new Array(W).fill(1));
+  const stack = [[1, 1]]; g[1][1] = 0;
+  const dirs = [[0, -2], [0, 2], [-2, 0], [2, 0]];
+  while (stack.length) {
+    const [cx, cy] = stack[stack.length - 1];
+    const opts = [];
+    for (const [dx, dy] of dirs) { const nx = cx + dx, ny = cy + dy; if (nx > 0 && ny > 0 && nx < W - 1 && ny < H - 1 && g[ny][nx] === 1) opts.push([nx, ny, dx, dy]); }
+    if (!opts.length) { stack.pop(); continue; }
+    const [nx, ny, dx, dy] = opts[(rnd() * opts.length) | 0];
+    g[cy + dy / 2][cx + dx / 2] = 0; g[ny][nx] = 0; stack.push([nx, ny]);
+  }
+  return g;
+}
 
 export class Eachtra {
   constructor({ onClose } = {}) {
@@ -55,6 +73,7 @@ export class Eachtra {
     this._buildInteriors();
     this._buildRain();
     this._buildBeach();
+    this._buildDungeon();
     this._gibGroup = new THREE.Group(); this.scene.add(this._gibGroup); this._woodObjs.push(this._gibGroup);
     this.chipGroup = new THREE.Group(); this.scene.add(this.chipGroup);
 
@@ -222,7 +241,7 @@ export class Eachtra {
   // prairie shelf swelling up along the far (−z) edge — a vantage to climb and
   // snipe down into the hollow where the host gathers.
   _heightAt(x, z) {
-    if (this._beach) return 0; // the strand of Tír na nÓg is flat
+    if (this._beach || this._dungeon) return 0; // the strand and the underworld halls are flat
     const a = 8, b = 17, H = 4.6, zz = -z;
     if (zz <= a) return 0;
     if (zz >= b) return H;
@@ -262,6 +281,139 @@ export class Eachtra {
     let seed = 1337; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
     for (let i = 0; i < 22; i++) { const x = (rnd() - 0.5) * 48, z = 6 + rnd() * 26; place(rnd() < 0.5 ? 'reeds' : 'gorse', x, z, 1.2 + rnd() * 0.8); }
     for (let i = 0; i < 6; i++) { place(rnd() < 0.5 ? 'boulder' : 'rocks', (rnd() - 0.5) * 44, 14 + rnd() * 16, 1.6 + rnd() * 1.2); }
+  }
+
+  // ---- the Underworld: a navigable maze of the war-dead, ending in the gods' hall ----
+  _dCellX(col) { return (col - (this._dcols - 1) / 2) * DCELL; }
+  _dCellZ(row) { return row * DCELL; }
+  _buildDungeon() {
+    const g = new THREE.Group(); g.visible = false; this.scene.add(g); this._dungeonGroup = g;
+    const W = 15, H = 23; this._dcols = W; this._drows = H;
+    let seed = 0xA17E; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    const grid = genMaze(W, H, rnd);
+    const carve = (c0, r0, c1, r1) => { for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (r > 0 && c > 0 && r < H - 1 && c < W - 1) grid[r][c] = 0; };
+    carve(2, 2, 5, 5);     // first chamber
+    carve(5, 9, 9, 13);    // the open arena
+    carve(3, 15, 11, 17);  // the pre-hall muster
+    for (let c = 1; c < W - 1; c++) grid[18][c] = 1; // wall the hall off
+    grid[18][7] = 2;       // ...but for one gate
+    carve(2, 19, 12, 21);  // the gods' hall
+    grid[1][1] = 0;
+    this._dgrid = grid;
+    this._dChambers = [{ c: 3, r: 3 }, { c: 7, r: 11 }, { c: 7, r: 16 }]; // where the dead muster
+    this._dGate = { c: 7, r: 18 };
+    this._dHall = { c: 7, r: 20 };
+    this._dEntry = { c: 1, r: 1 };
+    // textures
+    const floorTex = this._canvasTex((x, w, h) => { x.fillStyle = '#2a2622'; x.fillRect(0, 0, w, h); for (let i = 0; i < 1800; i++) { const t = 28 + (Math.random() * 34) | 0; x.fillStyle = `rgba(${t},${t - 4},${t - 8},0.6)`; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); } }, 256, 256);
+    floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(W, H);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * DCELL, H * DCELL), new THREE.MeshLambertMaterial({ map: floorTex, emissive: 0x0c0a08 }));
+    floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, (H - 1) / 2 * DCELL); g.add(floor);
+    // walls — dark stone boxes per wall cell
+    const wallTex = this._canvasTex((x, w, h) => { x.fillStyle = '#3a3630'; x.fillRect(0, 0, w, h); for (let i = 0; i < 900; i++) { const t = 36 + (Math.random() * 40) | 0; x.fillStyle = `rgba(${t},${t - 4},${t - 10},0.5)`; x.fillRect(Math.random() * w, Math.random() * h, 3, 3); } x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = 2; for (let y = 8; y < h; y += 16) { x.beginPath(); x.moveTo(0, y); x.lineTo(w, y); x.stroke(); } }, 64, 64);
+    const WH = 4.2, wallGeo = new THREE.BoxGeometry(DCELL, WH, DCELL);
+    const wallMat = new THREE.MeshLambertMaterial({ map: wallTex, emissive: 0x070605 });
+    const gateMat = new THREE.MeshLambertMaterial({ color: 0x5a1414, emissive: 0x2a0606 });
+    this._dWalls = []; this._dGateMeshes = [];
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      if (grid[r][c] === 0) continue;
+      const m = new THREE.Mesh(wallGeo, grid[r][c] === 2 ? gateMat : wallMat);
+      m.position.set(this._dCellX(c), WH / 2, this._dCellZ(r)); g.add(m);
+      if (grid[r][c] === 2) this._dGateMeshes.push(m);
+    }
+    // a brazier at each chamber for light + atmosphere
+    this._dungeonLight = new THREE.PointLight(0xff7a3a, 0, 22); this.scene.add(this._dungeonLight);
+    const brazierTex = () => this._canvasTex((x, w, h) => { const gr = x.createRadialGradient(w / 2, h / 2, 1, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,180,90,0.9)'); gr.addColorStop(0.5, 'rgba(230,110,40,0.4)'); gr.addColorStop(1, 'rgba(120,40,10,0)'); x.fillStyle = gr; x.fillRect(0, 0, w, h); }, 48, 48);
+    const bt = brazierTex();
+    for (const ch of this._dChambers.concat([this._dHall])) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: bt, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); s.scale.set(3, 3, 1); s.position.set(this._dCellX(ch.c), 1.6, this._dCellZ(ch.r)); g.add(s); }
+    // a brooding black-red storm dome overhead (roofless halls)
+    const skyCv = document.createElement('canvas'); skyCv.width = 512; skyCv.height = 256; const sx = skyCv.getContext('2d');
+    const sg = sx.createLinearGradient(0, 0, 0, 256); sg.addColorStop(0, '#0a0608'); sg.addColorStop(0.6, '#1a0c10'); sg.addColorStop(1, '#2a1014'); sx.fillStyle = sg; sx.fillRect(0, 0, 512, 256);
+    const domeTex = new THREE.CanvasTexture(skyCv); domeTex.colorSpace = THREE.SRGBColorSpace;
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(240, 20, 12), new THREE.MeshBasicMaterial({ map: domeTex, side: THREE.BackSide, fog: false, depthWrite: false })); g.add(dome);
+  }
+  _dungeonReset() {
+    this._dGateOpen = false; this._godPhase = null; this._lightningCd = 2.5; this._lightningFlash = 0;
+    for (const m of (this._dGateMeshes || [])) m.visible = true;
+    if (this._dgrid) this._dgrid[this._dGate.r][this._dGate.c] = 2;
+    for (const c of (this._council || [])) this.chipGroup.remove(c);
+    this._council = null;
+    if (this._flash) this._flash.style.opacity = '0';
+  }
+  _openGate() {
+    this._dGateOpen = true;
+    for (const m of this._dGateMeshes) m.visible = false;
+    this._dgrid[this._dGate.r][this._dGate.c] = 0;
+    this._flashBanner('The dead are stilled');
+    this._hint.textContent = 'The gate yawns wide — descend into the hall of the gods and claim your fate.';
+  }
+  _updateDungeon(dt) {
+    if (this._dungeonLight) this._dungeonLight.position.set(this.pos.x, 3.2, this.pos.z); // light rides with the champion
+    // lightning: a flash, a crack of thunder, a shudder
+    this._lightningCd -= dt;
+    if (this._lightningCd <= 0 && !this._dead) { this._lightningCd = 3.5 + Math.random() * 5; this._lightningFlash = 0.16; this._shake = Math.max(this._shake || 0, 0.45); }
+    if (this._lightningFlash > 0) { this._lightningFlash -= dt; if (this._flash) this._flash.style.opacity = String(Math.max(0, this._lightningFlash * 3.2)); }
+    else if (this._flash && this._flash.style.opacity !== '0') this._flash.style.opacity = '0';
+    // reaching the open hall convenes the gods (once)
+    if (this._dGateOpen && !this._godPhase && !this._dead) {
+      const hx = this._dCellX(this._dHall.c), hz = this._dCellZ(this._dHall.r) - 3.3;
+      if ((this.pos.x - hx) ** 2 + (this.pos.z - hz) ** 2 < 4.5 * 4.5) this._startCouncil();
+    }
+    if (this._boss && this._boss.kind === 'god') this._updateGod(dt);
+  }
+  _startCouncil() {
+    this._godPhase = 'council';
+    const names = ['nuada', 'lugh', 'brigid', 'dagda'];
+    this._council = [];
+    const hz = this._dCellZ(this._dHall.r) + 3;
+    names.forEach((nm, i) => { const chip = makeWarriorChip(nm, 2.2); chip.position.set(this._dCellX(this._dHall.c) + (i - 1.5) * 3.0, 0.05, hz); if (chip.faceWorld) chip.faceWorld(0, -1); if (chip.animate) chip.animate(0.02, false); this.chipGroup.add(chip); this._council.push(chip); });
+    const D = 'Donn', Dg = 'An Dagda';
+    this._startDialog({
+      start: { speaker: D, text: 'So. A soul that will not lie still. I am Donn, lord of this house — every soul of Ériu comes to me in the end. Why do you batter at the halls of the dead, little champion?', next: 'q' },
+      q: {
+        speaker: Dg, text: 'He fell from the white horse, Donn, and three hundred years took him in a breath. He asks for what was stolen — his time, his soul, his name among the living.',
+        choices: [{ label: 'I claim my soul. Give it back.', next: 'test' }, { label: 'I will take it, if you will not give it.', next: 'test2' }],
+      },
+      test2: { speaker: D, text: 'Ha! Teeth to the last — the old blood runs true.', next: 'test' },
+      test: { speaker: Dg, text: 'A soul is not given, champion. It is won. Prove the hero in you against a god, here in the house of the dead. Best me, and carry your soul back into the sun. Fail, and you are Donn\'s forever.' },
+    }, 'start', () => this._spawnGod());
+  }
+  _spawnGod() {
+    for (const c of (this._council || [])) this.chipGroup.remove(c); this._council = null;
+    const chip = makeWarriorChip('dagda', 4.2); chip._fullCycle = true;
+    chip.position.set(this._dCellX(this._dHall.c), 0.05, this._dCellZ(this._dHall.r) + 1); if (chip.faceWorld) chip.faceWorld(0, -1);
+    this.chipGroup.add(chip);
+    this._boss = { chip, hp: 520, maxHp: 520, state: 'active', kind: 'god', cd: 1.6, mcd: 0, t: 0 };
+    this._godPhase = 'fight';
+    if (this._bossWrap.firstChild) this._bossWrap.firstChild.textContent = 'An Dagda · the Good God';
+    this._bossWrap.style.display = 'block'; this._updateBossHud();
+    this._flashBanner('An Dagda rises against you'); this._shake = 0.9;
+    this._hint.textContent = 'Best the Dagda and win back your soul — ⚔ strike · 🗡 hurl · a beam flies at full health';
+  }
+  _updateGod(dt) {
+    const B = this._boss; if (!B || this._dead) return;
+    if (B.state === 'dying') { B.t += dt; const k = Math.min(1, B.t / 1.6); B.chip.material.opacity = 1 - k; if (k >= 1) { this.chipGroup.remove(B.chip); this._boss = null; this._bossWrap.style.display = 'none'; this._winSoul(); } return; }
+    B.t += dt;
+    TMP2.subVectors(this.pos, B.chip.position); TMP2.y = 0; const d = TMP2.length(); TMP2.normalize();
+    if (d > 3.0) { const nx = B.chip.position.x + TMP2.x * 2.0 * dt, nz = B.chip.position.z + TMP2.z * 2.0 * dt; if (!this._collide(nx, nz)) { B.chip.position.x = nx; B.chip.position.z = nz; } }
+    if (B.chip.faceWorld) B.chip.faceWorld(TMP2.x, TMP2.z);
+    if (B.chip.animate) B.chip.animate(dt, d > 3.0);
+    B.mcd = Math.max(0, B.mcd - dt);
+    if (d < 3.4 && B.mcd <= 0) { B.mcd = 1.3; if (B.chip.strike) B.chip.strike(); this._hurt(18, B.chip.position); }
+    B.cd -= dt; if (B.cd <= 0) { B.cd = 1.7 + Math.random() * 1.2; this._godBolt(); }
+  }
+  _godBolt() {
+    if (!this._orbTex) { this._orbTex = new THREE.TextureLoader().load('assets/fx/orb_purple.png?v=CBUST'); this._orbTex.colorSpace = THREE.SRGBColorSpace; }
+    const from = TMP.copy(this._boss.chip.position).setY(2.4);
+    const dir = new THREE.Vector3(this.pos.x - from.x, (this._eyeY() - 0.15) - from.y, this.pos.z - from.z).normalize();
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._orbTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    s.scale.set(1.3, 1.3, 1); s.position.copy(from); this.scene.add(s);
+    this._enemyProj.push({ mesh: s, vel: dir.multiplyScalar(14), life: 4, spin: 8 });
+  }
+  _winSoul() {
+    this._bossDone = true;
+    this._clearMsg = '<div style="color:#e4c76a">Your soul is won</div><div style="font-size:15px;opacity:.9;margin-top:9px">An Dagda yields, and the cauldron of rebirth gives back what death took. The halls of the dead fall silent, and you rise through the dark toward a living dawn — a hero of Ériu, your name beyond the reach of years. Tap ✕ to return.</div>';
+    this._end(true);
   }
 
   // ---- rain (falls while the giant walks) ----------------------------------
@@ -594,6 +746,9 @@ export class Eachtra {
     this._vig = document.createElement('div');
     this._vig.style.cssText = 'position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 160px 40px rgba(140,10,10,0);transition:box-shadow .12s';
     h.appendChild(this._vig);
+    this._flash = document.createElement('div'); // lightning
+    this._flash.style.cssText = 'position:absolute;inset:0;pointer-events:none;background:#dfe6ff;opacity:0';
+    h.appendChild(this._flash);
     // damage-direction flares — a red glow on the edge the blow came from
     const edge = (css) => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;pointer-events:none;opacity:0;transition:opacity .1s;' + css; h.appendChild(d); return d; };
     const red = 'rgba(210,25,25,0.75)';
@@ -673,8 +828,9 @@ export class Eachtra {
     this._onExit = opts.onExit || (() => {});
     this._result = 'quit';
     this.active = true;
-    this._beach = !!opts.beach;
-    if (this._beach) { this.pos.set(0, 0, -9); this.yaw = Math.PI; this.pitch = 0; } // wade ashore at the water's edge, facing up the strand (+z, inland)
+    this._beach = !!opts.beach; this._dungeon = !!opts.dungeon;
+    if (this._dungeon) { this.pos.set(this._dCellX(this._dEntry.c), 0, this._dCellZ(this._dEntry.r)); this.yaw = Math.PI; this.pitch = 0; } // at the maze mouth, facing in (+z)
+    else if (this._beach) { this.pos.set(0, 0, -9); this.yaw = Math.PI; this.pitch = 0; } // wade ashore at the water's edge, facing up the strand (+z, inland)
     else { this.pos.set(0, 0, 0); this.yaw = 0; this.pitch = 0; } // stand in the clear heart of the wood, the host closing from all sides
     this.hp = 100; this.spearN = SPEAR_START; this._dead = false; this._cleared = false;
     this._deathT = 0; this._deathEnded = false; this._shake = 0;
@@ -689,10 +845,14 @@ export class Eachtra {
     for (const p of (this._smokePool || [])) { p.life = 0; if (p.spr) p.spr.visible = false; }
     this.scene.fog = this._woodFog; this.scene.background = this._woodBg;
     if (this._roomLight) this._roomLight.intensity = 0;
-    for (const o of this._woodObjs) o.visible = !this._beach; // the wood gives way to the strand
+    const otherScene = this._beach || this._dungeon;
+    for (const o of this._woodObjs) o.visible = !otherScene; // the wood gives way to the strand or the halls of the dead
     if (this._gibGroup) this._gibGroup.visible = true; // gibs litter whichever ground we're on
     if (this._beachGroup) this._beachGroup.visible = this._beach;
+    if (this._dungeonGroup) this._dungeonGroup.visible = this._dungeon;
+    if (this._dungeonLight) this._dungeonLight.intensity = this._dungeon ? 2.6 : 0;
     if (this._beach) { this.scene.fog = new THREE.Fog(0xcfe7ec, 20, 110); this.scene.background = new THREE.Color(0xbfe0ec); } // bright sea haze
+    if (this._dungeon) { this.scene.fog = new THREE.Fog(0x120a0c, 4, 30); this.scene.background = new THREE.Color(0x0a0608); this._raining = true; this._dungeonReset(); } // close, lightless halls under storm
     if (this.chipGroup) this.chipGroup.visible = true;
     for (const r of (this._interiors || [])) { r.group.visible = false; r.supply.taken = false; r.supply.mesh.visible = true; r.supply.glow.visible = true; }
     if (!this._beach && this._dome && this._woodSkyTex) { this._dome.material.map = this._woodSkyTex; this._dome.material.color.setRGB(1, 1, 1); this._dome.material.needsUpdate = true; } // restore the wood's own sky
@@ -713,10 +873,12 @@ export class Eachtra {
     this._clearMsg = null;
     this._spawnWave(this._gauntlet ? this._gauntlet.waves[0] : (opts.enemies || 5));
     this.hud.style.display = 'block'; this._banner.style.display = 'none';
-    this._exitBtn.textContent = this._beach ? '✕ Back to the sea' : '✕ Leave the wood';
-    this._hint.textContent = this._beach
-      ? 'You wade ashore on Tír na nÓg — hold the strand · ⚔ strike · 🗡 hurl a dagger · a beam flies at full health'
-      : 'move · drag to look · ⚔ strike (a beam flies at full health) · 🗡 hurl a dagger · climb the grassy rise to snipe down into the wood';
+    this._exitBtn.textContent = this._dungeon ? '✕ Flee the dark' : this._beach ? '✕ Back to the sea' : '✕ Leave the wood';
+    this._hint.textContent = this._dungeon
+      ? 'The halls of the dead — hunt down the war-dead through the maze, then seek the gate to the gods\' hall'
+      : this._beach
+        ? 'You wade ashore on Tír na nÓg — hold the strand · ⚔ strike · 🗡 hurl a dagger · a beam flies at full health'
+        : 'move · drag to look · ⚔ strike (a beam flies at full health) · 🗡 hurl a dagger · climb the grassy rise to snipe down into the wood';
     this._bind(); this._setHud();
     if (opts.morrigan) { this._spawnMorrigan(); this._morriganPhase = 'fight'; this._morriganGreet(); } // she greets, then looses the host
     this.onResize();
@@ -796,15 +958,24 @@ export class Eachtra {
 
   // ---- combat --------------------------------------------------------------
   _spawnWave(n) {
+    if (this._dungeon) { // the war-dead muster in the maze chambers
+      for (let i = 0; i < n; i++) {
+        const ch = this._dChambers[i % this._dChambers.length];
+        const kind = Math.random() < 0.4 ? 'sluagh' : (Math.random() < 0.6 ? 'fomorian' : 'redcoat');
+        this._spawnEnemy(kind, { x: this._dCellX(ch.c) + (Math.random() - 0.5) * DCELL * 1.4, z: this._dCellZ(ch.r) + (Math.random() - 0.5) * DCELL * 1.4 });
+      }
+      return;
+    }
     for (let i = 0; i < n; i++) {
       if (this._beach) this._spawnEnemy(Math.random() < 0.6 ? 'redcoat' : 'fomorian'); // a charge of men-at-arms and brutes up the strand
       else this._spawnEnemy(Math.random() < 0.45 ? 'fomorian' : 'sluagh');
     }
   }
-  _spawnEnemy(kind) {
+  _spawnEnemy(kind, at) {
     const t = ENEMY_TYPES[kind];
     let px, pz;
-    if (this._beach) { px = (Math.random() * 2 - 1) * 17; pz = 10 + Math.random() * 14; } // massing inland, up the strand
+    if (at) { px = at.x; pz = at.z; } // a fixed muster point (dungeon chambers)
+    else if (this._beach) { px = (Math.random() * 2 - 1) * 17; pz = 10 + Math.random() * 14; } // massing inland, up the strand
     else {
       for (let tries = 0; tries < 12; tries++) { const a = Math.random() * Math.PI * 2, r = 11 + Math.random() * (PLAY_R - 15); px = Math.cos(a) * r; pz = Math.sin(a) * r; if (this._heightAt(px, pz) < 0.8) break; }
     }
@@ -980,9 +1151,15 @@ export class Eachtra {
 
   // ---- step ----------------------------------------------------------------
   _collide(nx, nz) {
+    if (this._dungeon) return this._collideDungeon(nx, nz);
     if (this._beach) return false; // the open strand — no wood to skirt
     for (const t of this.trees) { const dx = nx - t.x, dz = nz - t.z, rr = t.r + 0.4; if (dx * dx + dz * dz < rr * rr) return true; }
     return false;
+  }
+  _collideDungeon(nx, nz) {
+    const col = Math.round(nx / DCELL + (this._dcols - 1) / 2), row = Math.round(nz / DCELL);
+    if (row < 0 || col < 0 || row >= this._drows || col >= this._dcols) return true;
+    return this._dgrid[row][col] !== 0; // walls (1) and the closed gate (2) block
   }
   update(dt) {
     if (!this.active) return;
@@ -1009,6 +1186,9 @@ export class Eachtra {
         if (this._inside !== null) { // boxed within the cottage walls
           nx = Math.max(-ROOM_H, Math.min(ROOM_H, nx)); nz = Math.max(-ROOM_H, Math.min(ROOM_H + 0.4, nz));
           this.pos.x = nx; this.pos.z = nz;
+        } else if (this._dungeon) { // the maze walls, no radial bound
+          if (!this._collide(nx, this.pos.z)) this.pos.x = nx;
+          if (!this._collide(this.pos.x, nz)) this.pos.z = nz;
         } else {
           const rr = Math.hypot(nx, nz); if (rr > PLAY_R - 1.5) { const k = (PLAY_R - 1.5) / rr; nx *= k; nz *= k; }
           if (!this._collide(nx, this.pos.z)) this.pos.x = nx;
@@ -1084,6 +1264,7 @@ export class Eachtra {
     }
 
     this._updateRain(dt);
+    if (this._dungeon) this._updateDungeon(dt);
     this._updateHouses(dt);
     if (this._inside !== null) return; // indoors: the wood is paused, the host waits outside
 
@@ -1098,7 +1279,7 @@ export class Eachtra {
       if (!this._dead) this._updateEnemy(e, dt);
     }
     this.enemies = this.enemies.filter((e) => !e.dead);
-    if (this._boss) this._updateBoss(dt);
+    if (this._boss && this._boss.kind !== 'god') this._updateBoss(dt); // the god is driven by _updateGod
     this._updateBossProj(dt);
     this._updateEnemyProj(dt);
     this._updateBeams(dt);
@@ -1112,7 +1293,8 @@ export class Eachtra {
       if (g.wi < g.waves.length) { this._spawnWave(g.waves[g.wi]); this._flashBanner(`Wave ${g.wi + 1} of ${g.waves.length}`); }
       else { g.done = true; this._spawnHoard(); }
     }
-    else if (waveClear && (!this._wantBoss || this._bossDone) && !this._cleared && !this._morrigan && !this._gauntlet) this._end(true);
+    else if (waveClear && this._dungeon && !this._dGateOpen) this._openGate(); // the maze is cleared — the gods' hall opens
+    else if (waveClear && (!this._wantBoss || this._bossDone) && !this._cleared && !this._morrigan && !this._gauntlet && !this._dungeon) this._end(true);
   }
   // ---- enemy brains ----
   _updateEnemy(e, dt) {

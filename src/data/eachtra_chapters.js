@@ -23,8 +23,8 @@ export const CHAPTERS = [
     outro: 'The last of the shore-guard falls, and the strand lies quiet under an endless summer sky. You stand on Tír na nÓg — but the Land of the Young keeps its own, and the way back runs deeper still.',
   },
   {
-    n: 5, title: 'Ceann an tSlua', titleEn: 'The Head of the Host', enemies: 6,
-    intro: 'One last ride. The oldest of the dead gathers what is left of the host for a final sweep — and you stand between them and the living world. The Badhbh’s mark burns on your brow. End this, and your name will outlast you.',
-    outro: 'The last of the host unravels into mist and is gone. A thin grey dawn finds the wood empty — and you alive within it. The ráth will sing of this. You are a hero of Ériu.',
+    n: 5, title: 'Tír na Marbh', titleEn: 'The Land of the Dead', dungeon: true, enemies: 9,
+    intro: 'You rode back from Tír na nÓg on a white horse, warned never to touch the soil of Ériu. But you stooped to help a man, the girth broke, and you fell — and three hundred years fell on you in a breath. Aged, withered, you met Pádraig at the roadside and died there in the dust. You refuse it. Down you go, into Tír na Marbh where the old wars are fought forever, maze upon maze of the war-dead — and at the heart of it, the gods themselves keep your soul. Cut your way to their hall, beat a god in the house of the dead, and win back your soul and the years that were taken.',
+    outro: 'The Dagda yields, the cauldron gives back what death stole, and you rise through the storm-dark into a living dawn. You are no longer an old man dead in the dust of a changed Ériu — you are a hero, whole and young, your name set beyond the reach of years. The Eachtra is run.',
   },
 ];
