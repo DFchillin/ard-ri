@@ -449,8 +449,12 @@ export class Eachtra {
 
   // ---- An Mhórrígan — the phantom queen who meets the champion in the wood ----
   _spawnMorrigan() {
+    const x = 0, z = -7; // she stands in the open, a little way across the clearing
+    // clear a glade so no tree hides her — pull the wood back from where she'll stand
+    this._woodObjs = this._woodObjs.filter((o) => { if (o.isSprite && (o.position.x - x) ** 2 + (o.position.z - z) ** 2 < 5.5 * 5.5) { this.scene.remove(o); return false; } return true; });
+    this.trees = this.trees.filter((t) => (t.x - x) ** 2 + (t.z - z) ** 2 > 5.5 * 5.5);
     const chip = makeWalkerChip('druid', true, 1.95); // the hooded Badhbh, staff in hand
-    const x = 0, z = -9; chip.position.set(x, this._heightAt(x, z) + 0.05, z);
+    chip.position.set(x, this._heightAt(x, z) + 0.05, z);
     if (chip.material && chip.material.color) chip.material.color.setRGB(0.6, 0.58, 0.72); // cold, shadowed
     if (chip.faceWorld) chip.faceWorld(0, 1);
     this.chipGroup.add(chip);
@@ -735,6 +739,7 @@ export class Eachtra {
     this.enemies.push(e);
   }
   _forward() { this.camera.getWorldDirection(TMP); TMP.y = 0; return TMP.normalize(); }
+  _eyeY() { return (this._inside !== null ? 0 : this._heightAt(this.pos.x, this.pos.z)) + EYE; } // the champion's real eye height — rides the prairie
   _daggerMesh() { // a short thrown blade (points +z, the travel direction)
     const g = new THREE.Group();
     const blade = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.42, 6), new THREE.MeshLambertMaterial({ color: 0xcfd6dc }));
@@ -769,7 +774,7 @@ export class Eachtra {
     if (spread) { const c = Math.cos(spread), s = Math.sin(spread); const x = dir.x * c + dir.z * s, z = -dir.x * s + dir.z * c; dir.x = x; dir.z = z; dir.normalize(); }
     if (!this._beamTex) { this._beamTex = new THREE.TextureLoader().load('assets/fx/orb_blue.png?v=CBUST'); this._beamTex.colorSpace = THREE.SRGBColorSpace; }
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._beamTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-    s.scale.set(1.0, 1.0, 1); s.material.rotation = Math.random() * Math.PI * 2; s.position.copy(this.pos); s.position.y = EYE - 0.1; s.position.addScaledVector(dir, 0.6);
+    s.scale.set(1.0, 1.0, 1); s.material.rotation = Math.random() * Math.PI * 2; s.position.copy(this.pos); s.position.y = this._eyeY() - 0.1; s.position.addScaledVector(dir, 0.6);
     this.scene.add(s);
     this._beams.push({ mesh: s, vel: dir.multiplyScalar(34), life: 0.85, spin: Math.random() < 0.5 ? -9 : 9 });
   }
@@ -779,8 +784,8 @@ export class Eachtra {
       bm.mesh.material.rotation += dt * (bm.spin || 9);
       const pul = 0.95 + Math.sin(bm.life * 26) * 0.14; bm.mesh.scale.set(pul, pul, 1); // crackling bolt
       let hit = false;
-      for (const e of this.enemies) { if (e.dead) continue; if (bm.mesh.position.distanceToSquared(TMP.copy(e.chip.position).setY(EYE - 0.1)) < 0.8 * 0.8) { this._damage(e, 30); hit = true; break; } }
-      if (!hit && this._boss && this._boss.state === 'active' && bm.mesh.position.distanceToSquared(TMP.copy(this._boss.chip.position).setY(2.2)) < 1.8 * 1.8) { this._damageBoss(30); hit = true; }
+      for (const e of this.enemies) { if (e.dead) continue; if (bm.mesh.position.distanceToSquared(TMP.copy(e.chip.position).setY(e.chip.position.y + 0.9)) < 0.9 * 0.9) { this._damage(e, 30); hit = true; break; } }
+      if (!hit && this._boss && this._boss.state === 'active' && bm.mesh.position.distanceToSquared(TMP.copy(this._boss.chip.position).setY(this._boss.chip.position.y + 2.0)) < 1.9 * 1.9) { this._damageBoss(30); hit = true; }
       const r2 = bm.mesh.position.x ** 2 + bm.mesh.position.z ** 2;
       if (hit || bm.life <= 0 || r2 > (PLAY_R + 2) ** 2) { this.scene.remove(bm.mesh); this._beams.splice(i, 1); }
     }
@@ -790,7 +795,7 @@ export class Eachtra {
     this.spearN -= 1; this._throwCd = 0.5; this._setHud();
     const dir = this.camera.getWorldDirection(new THREE.Vector3()).normalize();
     const g = this._daggerMesh();
-    g.position.copy(this.pos); g.position.y = EYE - 0.15;
+    g.position.copy(this.pos); g.position.y = this._eyeY() - 0.15;
     this.scene.add(g);
     this.spears.push({ mesh: g, vel: dir.multiplyScalar(26), life: 2.4 });
   }
@@ -944,9 +949,9 @@ export class Eachtra {
       let hit = false;
       for (const e of this.enemies) {
         if (e.dead) continue;
-        if (s.mesh.position.distanceToSquared(TMP.copy(e.chip.position).setY(EYE - 0.15)) < 0.7 * 0.7) { this._damage(e, SPEAR_DMG); hit = true; break; }
+        if (s.mesh.position.distanceToSquared(TMP.copy(e.chip.position).setY(e.chip.position.y + 0.9)) < 0.8 * 0.8) { this._damage(e, SPEAR_DMG); hit = true; break; }
       }
-      if (!hit && this._boss && this._boss.state === 'active' && s.mesh.position.distanceToSquared(TMP.copy(this._boss.chip.position).setY(2.2)) < 1.7 * 1.7) { this._damageBoss(SPEAR_DMG); hit = true; }
+      if (!hit && this._boss && this._boss.state === 'active' && s.mesh.position.distanceToSquared(TMP.copy(this._boss.chip.position).setY(this._boss.chip.position.y + 2.0)) < 1.8 * 1.8) { this._damageBoss(SPEAR_DMG); hit = true; }
       const r2 = s.mesh.position.x ** 2 + s.mesh.position.z ** 2;
       const grd = this._heightAt(s.mesh.position.x, s.mesh.position.z);
       if (hit || s.life <= 0 || s.mesh.position.y < grd + 0.1 || r2 > (PLAY_R + 2) ** 2 || this._collide(s.mesh.position.x, s.mesh.position.z)) {
@@ -1048,7 +1053,7 @@ export class Eachtra {
   }
   _sluaghCast(e) {
     if (!this._orbTex) { this._orbTex = new THREE.TextureLoader().load('assets/fx/orb_purple.png?v=CBUST'); this._orbTex.colorSpace = THREE.SRGBColorSpace; }
-    const from = e.chip.position, dir = new THREE.Vector3(this.pos.x - from.x, (EYE - 0.15) - from.y, this.pos.z - from.z).normalize();
+    const from = e.chip.position, dir = new THREE.Vector3(this.pos.x - from.x, (this._eyeY() - 0.15) - from.y, this.pos.z - from.z).normalize();
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._orbTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
     s.scale.set(0.95, 0.95, 1); s.position.copy(from); s.material.rotation = Math.random() * Math.PI * 2; this.scene.add(s);
     this._enemyProj.push({ mesh: s, vel: dir.multiplyScalar(10.5), life: 4, spin: Math.random() < 0.5 ? -7 : 7 });
@@ -1058,7 +1063,7 @@ export class Eachtra {
       const p = this._enemyProj[i]; p.mesh.position.addScaledVector(p.vel, dt); p.life -= dt;
       p.mesh.material.rotation += dt * (p.spin || 4);
       const pul = 0.95 + Math.sin(p.life * 18) * 0.12; p.mesh.scale.set(pul, pul, 1); // crackling pulse
-      if (!this._dead && p.mesh.position.distanceToSquared(TMP.set(this.pos.x, EYE - 0.15, this.pos.z)) < 0.9 * 0.9) { this._hurt(13, p.mesh.position); this.scene.remove(p.mesh); this._enemyProj.splice(i, 1); }
+      if (!this._dead && p.mesh.position.distanceToSquared(TMP.set(this.pos.x, this._eyeY() - 0.15, this.pos.z)) < 0.9 * 0.9) { this._hurt(13, p.mesh.position); this.scene.remove(p.mesh); this._enemyProj.splice(i, 1); }
       else if (p.life <= 0 || p.mesh.position.y < 0.1 || p.mesh.position.x ** 2 + p.mesh.position.z ** 2 > (PLAY_R + 3) ** 2) { this.scene.remove(p.mesh); this._enemyProj.splice(i, 1); }
     }
   }
@@ -1099,7 +1104,7 @@ export class Eachtra {
   }
   _bossLob() {
     const from = TMP.copy(this._boss.chip.position); from.y = 3.2;
-    const tx = this.pos.x, tz = this.pos.z, ty = EYE - 0.2;
+    const tx = this.pos.x, tz = this.pos.z, ty = this._eyeY() - 0.2;
     const flat = Math.hypot(tx - from.x, tz - from.z), g = 16, t = Math.max(0.55, flat / 11);
     const vx = (tx - from.x) / t, vz = (tz - from.z) / t, vy = (ty - from.y) / t + 0.5 * g * t;
     const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), new THREE.MeshLambertMaterial({ color: 0x6b6256 }));
@@ -1110,7 +1115,7 @@ export class Eachtra {
     for (let i = this._bossProj.length - 1; i >= 0; i--) {
       const p = this._bossProj[i]; p.vel.y -= p.g * dt; p.mesh.position.addScaledVector(p.vel, dt); p.life -= dt;
       p.mesh.rotation.x += dt * 6; p.mesh.rotation.y += dt * 4;
-      if (!this._dead && p.mesh.position.distanceToSquared(TMP.set(this.pos.x, EYE - 0.2, this.pos.z)) < 1.05 * 1.05) { this._hurt(16, p.mesh.position); this.scene.remove(p.mesh); this._bossProj.splice(i, 1); }
+      if (!this._dead && p.mesh.position.distanceToSquared(TMP.set(this.pos.x, this._eyeY() - 0.2, this.pos.z)) < 1.05 * 1.05) { this._hurt(16, p.mesh.position); this.scene.remove(p.mesh); this._bossProj.splice(i, 1); }
       else if (p.mesh.position.y < 0.15 || p.life <= 0) { this.scene.remove(p.mesh); this._bossProj.splice(i, 1); }
     }
   }

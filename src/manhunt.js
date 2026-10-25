@@ -7,7 +7,7 @@ import { entryRoadTile, roadPath } from './sim/roads.js?v=CBUST';
 // road out. Catch him before he leaves the map. Mind your daggers: a towns-
 // person cut down in the crossfire is a wound to the ráth's own commerce.
 
-const EYE = 1.6, MOVE_SPD = 5.2;
+const EYE = 2.9, MOVE_SPD = 6.2; // the hero looms over the ráth — a guardian giant, Big-Daddy tall
 const LOOK_SENS = 0.0026;
 const MELEE_RANGE = 2.2, MELEE_ARC = 0.6, MELEE_DMG = 40, DAGGER_DMG = 55;
 const BANDIT_SPD = 3.4, BANDIT_HP = 120;
@@ -33,7 +33,7 @@ export class Manhunt {
   // ---- hero's sword (a camera-child sprite) --------------------------------
   _buildWeapon() {
     this.scene.add(this.camera);
-    this._swordH = 0.74;
+    this._swordH = 0.86; // a giant's blade
     const mat = new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false, fog: false });
     const s = new THREE.Sprite(mat); s.center.set(0.5, 0.5); s.renderOrder = 20;
     s.scale.set(this._swordH * 0.45, this._swordH, 1);
@@ -218,9 +218,9 @@ export class Manhunt {
   _throw() {
     if (!this.active || this._over || this.daggerN <= 0 || this._throwCd > 0) return;
     this._throwCd = 0.3; this.daggerN -= 1; this._setHud();
-    const g = this._daggerMesh(); const dir = this._forward().clone();
-    g.position.copy(this.pos); g.position.y = EYE - 0.1; g.position.addScaledVector(dir, 0.6);
-    const vel = dir.multiplyScalar(26); vel.y = 1.0;
+    const g = this._daggerMesh(); const dir = this.camera.getWorldDirection(new THREE.Vector3()).normalize(); // aim where you look — down at the small folk
+    g.position.copy(this.pos); g.position.y = EYE - 0.2; g.position.addScaledVector(dir, 0.7);
+    const vel = dir.multiplyScalar(28);
     this.scene.add(g); this.daggers.push({ mesh: g, vel, life: 2.2 });
   }
   _woundBandit(amt) {
@@ -281,11 +281,11 @@ export class Manhunt {
       const d = this.daggers[i]; d.life -= dt; d.mesh.position.addScaledVector(d.vel, dt); d.vel.y -= 9 * dt; d.mesh.rotation.x += dt * 22;
       let hit = false;
       const b = this._bandit;
-      if (b && !b.dead && d.mesh.position.distanceToSquared(TMP.copy(b.chip.position).setY(0.9)) < 0.7 * 0.7) { this._woundBandit(DAGGER_DMG); hit = true; }
+      if (b && !b.dead && d.mesh.position.distanceToSquared(TMP.copy(b.chip.position).setY(b.chip.position.y + 0.5)) < 0.8 * 0.8) { this._woundBandit(DAGGER_DMG); hit = true; }
       if (!hit) { // a stray blade among the townsfolk
         for (const w of this.game.walkers) {
           if (!w || w.done || !w.sprite || w.tag === 'stroll') continue;
-          if (d.mesh.position.distanceToSquared(TMP.copy(w.sprite.position).setY(0.8)) < 0.6 * 0.6) { this._killBystander(w); hit = true; break; }
+          if (d.mesh.position.distanceToSquared(TMP.copy(w.sprite.position).setY(w.sprite.position.y + 0.5)) < 0.7 * 0.7) { this._killBystander(w); hit = true; break; }
         }
       }
       if (hit || d.life <= 0 || d.mesh.position.y < 0.1) {
