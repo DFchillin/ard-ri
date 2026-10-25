@@ -1157,9 +1157,14 @@ export class Eachtra {
     return false;
   }
   _collideDungeon(nx, nz) {
-    const col = Math.round(nx / DCELL + (this._dcols - 1) / 2), row = Math.round(nz / DCELL);
-    if (row < 0 || col < 0 || row >= this._drows || col >= this._dcols) return true;
-    return this._dgrid[row][col] !== 0; // walls (1) and the closed gate (2) block
+    // treat the walker as a disc, not a point, so you stop short of the stone instead of clipping into it
+    const r = 0.6, off = (this._dcols - 1) / 2;
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      const col = Math.round((nx + dx * r) / DCELL + off), row = Math.round((nz + dz * r) / DCELL);
+      if (row < 0 || col < 0 || row >= this._drows || col >= this._dcols) return true;
+      if (this._dgrid[row][col] !== 0) return true; // walls (1) and the closed gate (2) block
+    }
+    return false;
   }
   update(dt) {
     if (!this.active) return;
