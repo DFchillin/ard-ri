@@ -12,6 +12,7 @@ import { Battle } from './battle/battle.js?v=CBUST';
 import { Hurling } from './hurling.js?v=CBUST';
 import { Sparring } from './sparring.js?v=CBUST';
 import { Eachtra } from './eachtra.js?v=CBUST';
+import { Manhunt } from './manhunt.js?v=CBUST';
 import { CHAPTERS } from './data/eachtra_chapters.js?v=CBUST';
 import { ISLAND, KINGDOMS, NEIGHBOURS, kingdomById, OVERSEAS, overseasById } from './data/kingdoms.js?v=CBUST';
 import { CODEX } from './data/codex.js?v=CBUST';
@@ -432,8 +433,8 @@ let missionDone = false;
 const ui = new UI({
   onTool: (kind) => { cancelPending(); tool = kind; if (!(tool === 'road' || BUILDINGS[tool])) preview.visible = false; game.showInspectDots(kind === 'inspect'); },
   onSpeed: (s) => { sim.speed = s; savedSpeed = null; },
-  onRotate: (d) => { if (sparring.active || eachtra.active) return; if (hurling.active) { rotateIsoCamera(hurling.camera, d); return; } if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
-  onZoom: (f) => { if (sparring.active || eachtra.active) return; if (hurling.active) { hurling.zoom(f); return; } if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
+  onRotate: (d) => { if (sparring.active || eachtra.active || manhunt.active) return; if (hurling.active) { rotateIsoCamera(hurling.camera, d); return; } if (battle.active) { battle.rotate(d); return; } ui.setCompass(rotateIsoCamera(camera, d)); },
+  onZoom: (f) => { if (sparring.active || eachtra.active || manhunt.active) return; if (hurling.active) { hurling.zoom(f); return; } if (battle.active) { battle.zoom(f); return; } zoomIsoCamera(camera, f, aspect); },
   onInspectClose: () => { _inspectDwelling = null; resumeGame(); },
   onFestivalContinue: () => { if (battleWon) { battleWon = false; battle.exit(); } else resumeGame(); },
   onStartMission: (n) => startMission(n),
@@ -769,6 +770,12 @@ function openSparring() {
 }
 // --- Eachtra: the hero's-journey mode — a named champion through chapters of story ---
 const eachtra = new Eachtra();
+const manhunt = new Manhunt({ scene, game, map });
+function startManhunt() {
+  if (walk.active) walk.exit();
+  document.getElementById('ui-overlay').style.display = 'none'; // hide the settlement chrome for the hunt
+  manhunt.enter({ onExit: () => { document.getElementById('ui-overlay').style.display = ''; pushStats(); } });
+}
 const HERO_KEY = 'ardri_hero';
 function loadHero() { try { const h = JSON.parse(localStorage.getItem(HERO_KEY) || '{}'); return { name: h.name || null, chapter: h.chapter || 1 }; } catch (e) { return { name: null, chapter: 1 }; } }
 function saveHero() { try { localStorage.setItem(HERO_KEY, JSON.stringify(hero.save)); } catch (e) {} }
@@ -858,6 +865,7 @@ const hero = {
 };
 document.getElementById('hero-open')?.addEventListener('click', () => hero.openHub(true));
 document.getElementById('eachtra-btn')?.addEventListener('click', () => hero.openHub(false));
+document.getElementById('manhunt-btn')?.addEventListener('click', () => startManhunt());
 
 const SPAR_CHANCE = 1 / 3; // one in three each season a champion comes calling
 function maybeSparChallenge() {
@@ -2086,7 +2094,7 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture?.(e.pointerId);
-  if (sparring.active || eachtra.active) return;
+  if (sparring.active || eachtra.active || manhunt.active) return;
   if (hurling.active) { hurling.pointerDown(e); return; }
   if (battle.active) { battle.pointerDown(e); return; }
   if (walk.active) { inspectAt(e); return; } // on a stroll, a tap just looks at who/what you pass
@@ -2114,7 +2122,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
-  if (sparring.active || eachtra.active) return;
+  if (sparring.active || eachtra.active || manhunt.active) return;
   if (hurling.active) { hurling.pointerMove(e); return; }
   if (battle.active) { battle.pointerMove(e); return; }
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2143,7 +2151,7 @@ canvas.addEventListener('pointermove', (e) => {
 
 function endPointer(e) {
   canvas.releasePointerCapture?.(e.pointerId);
-  if (sparring.active || eachtra.active) return;
+  if (sparring.active || eachtra.active || manhunt.active) return;
   if (hurling.active) { hurling.pointerUp(e); return; }
   if (battle.active) { battle.pointerUp(e); return; }
   pointers.delete(e.pointerId);
@@ -2169,7 +2177,7 @@ canvas.addEventListener('pointerleave', () => { if (!pendingBuild) preview.visib
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  if (sparring.active || eachtra.active) return;
+  if (sparring.active || eachtra.active || manhunt.active) return;
   if (hurling.active) { hurling.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   if (battle.active) { battle.zoom(e.deltaY > 0 ? 1.1 : 0.9); return; }
   zoomIsoCamera(camera, e.deltaY > 0 ? 1.1 : 0.9, aspect);
@@ -2229,7 +2237,7 @@ window.addEventListener('resize', () => {
   sparring.resize(aspect);
 });
 
-window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, hurling, sparring, eachtra, hero, openSparring, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
+window.ardri = { game, map, view, sim, cal, camera, walk, walkCam, battle, hurling, sparring, eachtra, manhunt, startManhunt, hero, openSparring, ui, openKingdomMap, openTrade, campaign, saveSettlement, setCattle,
   _dbg: { foundColony, collectColonyTribute, replenishWarband, isColony, showNarrative, completeLevel, loadLevel, levelById, advanceLevel, applyUnlock, refreshCampaignButton, buildingHtml,
     layRow: (key, sx, sz, ex, ez) => { const before = game.buildings.length; tool = key; showBuildRow({ x: sx, z: sz }, { x: ex, z: ez }); const shown = pendingBuildRow ? pendingBuildRow.length : 0; confirmBuild(); return { shown, placed: game.buildings.length - before }; } },
   screenOf(tx, tz) { // tile → screen pixels, for headless probes
@@ -2279,6 +2287,12 @@ function frame() {
   if (hurling.active) { setCamera(hurling.renderCam()); hurling.update(dt); hurling.render(renderer); return; }
   if (sparring.active) { setCamera(sparring.renderCam()); sparring.update(dt); sparring.render(renderer); return; }
   if (eachtra.active) { setCamera(eachtra.renderCam()); eachtra.update(dt); eachtra.render(renderer); return; }
+  if (manhunt.active) { // the hero walks the living ráth — keep it moving under the first-person eye
+    const live = titleScreenEl.classList.contains('hidden');
+    game.update(live ? dt * sim.speed : 0); game.updateFx(dt);
+    setCamera(manhunt.camera); manhunt.update(dt);
+    billboardBuildings(manhunt.camera, true); manhunt.render(renderer); return;
+  }
   const cam = walk.active ? walkCam : camera;
   setCamera(cam);
   updateWalkBtn();
