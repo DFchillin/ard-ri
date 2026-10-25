@@ -8,9 +8,9 @@ export const CHAPTERS = [
     outro: 'The giant is felled, the host laid to rest. High in the branches a single raven watches, unblinking — and does not fly.',
   },
   {
-    n: 2, title: 'Coill na Marbh', titleEn: 'The Wood of the Dead', enemies: 4,
-    intro: 'Deeper now, where the mist never lifts and the trees remember older names. The host is thicker here, drawn to the warmth of the living. Somewhere ahead, the keening gathers into something almost like words.',
-    outro: 'You cut a path through the dead and stand breathing in the cold. The raven keeps pace, bough to bough.',
+    n: 2, title: 'Coill na Marbh', titleEn: 'The Wood of the Dead', gauntlet: true, waves: [4, 5, 6], gold: 70,
+    intro: 'Deeper now, where the mist never lifts and the trees remember older names. The host comes on in waves, thicker with each, and there is no pause between them. But the dead of this wood were buried with their gold — cut through the whole host and the hoard is yours to carry home.',
+    outro: 'You cut a path through the dead, the hoard heavy at your belt, and stand breathing in the cold. The raven keeps pace, bough to bough.',
   },
   {
     n: 3, title: 'Guth na Badhbh', titleEn: 'The Voice of the Badhbh', enemies: 4, morrigan: true,

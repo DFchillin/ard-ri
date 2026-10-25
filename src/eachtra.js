@@ -663,7 +663,12 @@ export class Eachtra {
     this.enemies = []; this.spears = []; this.pickups = []; this._bossProj = []; this._beams = []; this._enemyProj = [];
     this._boss = null; this._bossDone = false; this._wantBoss = !!opts.boss;
     if (this._bossWrap) this._bossWrap.style.display = 'none';
-    this._spawnWave(opts.enemies || 5);
+    // a gauntlet runs several waves back to back, then leaves a hoard of gold
+    this._gauntlet = opts.gauntlet ? { waves: opts.waves || [4, 5, 6], wi: 0, gold: opts.gold || 60, done: false } : null;
+    this._onReward = opts.onReward || null;
+    if (this._hoard) { this.scene.remove(this._hoard.mesh); this.scene.remove(this._hoard.glow); this._hoard = null; }
+    this._clearMsg = null;
+    this._spawnWave(this._gauntlet ? this._gauntlet.waves[0] : (opts.enemies || 5));
     this.hud.style.display = 'block'; this._banner.style.display = 'none';
     this._exitBtn.textContent = '✕ Leave the wood';
     this._hint.textContent = 'move · drag to look · ⚔ strike (a beam flies at full health) · 🗡 hurl a dagger · climb the grassy rise to snipe down into the wood';
@@ -895,8 +900,35 @@ export class Eachtra {
     if (this._exitBtn) this._exitBtn.textContent = 'Continue ▸';
     this._banner.style.display = 'block';
     this._banner.innerHTML = won
-      ? '<div style="color:#e4c76a">The wood is cleared</div><div style="font-size:15px;opacity:.85;margin-top:8px">The sluagh are laid to rest. Tap ✕ to return to the ráth.</div>'
+      ? (this._clearMsg || '<div style="color:#e4c76a">The wood is cleared</div><div style="font-size:15px;opacity:.85;margin-top:8px">The sluagh are laid to rest. Tap ✕ to return to the ráth.</div>')
       : (this._fallMsg || '<div style="color:#d9534f">You have fallen</div><div style="font-size:15px;opacity:.85;margin-top:8px">The dead close over you. Tap ✕ to return.</div>');
+  }
+  _flashBanner(text) {
+    this._banner.innerHTML = `<div style="color:#e4c76a">${text}</div>`;
+    this._banner.style.display = 'block'; clearTimeout(this._bannerT);
+    this._bannerT = setTimeout(() => { if (!this._cleared && !this._dead) this._banner.style.display = 'none'; }, 1400);
+  }
+  _spawnHoard() {
+    const goldTex = this._canvasTex((x, w, h) => { const g = x.createRadialGradient(w / 2, h / 2, 1, w / 2, h / 2, w / 2); g.addColorStop(0, 'rgba(255,240,150,1)'); g.addColorStop(0.5, 'rgba(230,180,50,0.7)'); g.addColorStop(1, 'rgba(180,130,30,0)'); x.fillStyle = g; x.beginPath(); x.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2); x.fill(); }, 64, 64);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: goldTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    glow.scale.set(2.6, 2.6, 1); glow.position.set(0, 0.8, 0); this.scene.add(glow);
+    const pile = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 0), new THREE.MeshLambertMaterial({ color: 0xd9b23a, emissive: 0x3a2c08 }));
+    pile.position.set(0, 0.45, 0); this.scene.add(pile);
+    this._hoard = { mesh: pile, glow, pos: { x: 0, z: 0 }, taken: false, t: 0 };
+    this._hint.textContent = 'The gauntlet is run — a hoard of gold glitters in the clearing. Walk over it to carry it home to the ráth.';
+  }
+  _updateHoard(dt) {
+    const h = this._hoard; h.t += dt;
+    const pul = 1 + Math.sin(h.t * 4) * 0.18; h.glow.scale.set(2.6 * pul, 2.6 * pul, 1);
+    h.mesh.rotation.y += dt * 1.6; h.mesh.position.y = 0.45 + Math.sin(h.t * 2) * 0.06;
+    const dx = this.pos.x - h.pos.x, dz = this.pos.z - h.pos.z;
+    if (dx * dx + dz * dz < 1.9 * 1.9) {
+      h.taken = true; this.scene.remove(h.glow); this.scene.remove(h.mesh);
+      const gold = this._gauntlet ? this._gauntlet.gold : 60;
+      if (this._onReward) this._onReward(gold);
+      this._clearMsg = `<div style="color:#e4c76a">The gauntlet is run</div><div style="font-size:15px;opacity:.9;margin-top:8px">You carry off a hoard of ${gold} silver — it rides home to swell the ráth's coffers. Tap ✕ to return.</div>`;
+      this._end(true);
+    }
   }
 
   // ---- step ----------------------------------------------------------------
@@ -1023,10 +1055,16 @@ export class Eachtra {
     this._updateEnemyProj(dt);
     this._updateBeams(dt);
     // the chapter clears once the wave is down AND the giant (if any) is laid low
+    if (this._hoard && !this._hoard.taken) this._updateHoard(dt); // the gold waits to be claimed
     const waveClear = !this._dead && alive === 0 && this.enemies.every((e) => e.dead);
     if (waveClear && this._wantBoss && !this._boss && !this._bossDone) this._spawnBoss();
     else if (waveClear && this._morrigan && this._morriganPhase === 'fight') { this._morriganPhase = 'closing'; this._morriganClose(); }
-    else if (waveClear && (!this._wantBoss || this._bossDone) && !this._cleared && !this._morrigan) this._end(true);
+    else if (waveClear && this._gauntlet && !this._gauntlet.done) { // next wave, or the hoard at the end
+      const g = this._gauntlet; g.wi += 1;
+      if (g.wi < g.waves.length) { this._spawnWave(g.waves[g.wi]); this._flashBanner(`Wave ${g.wi + 1} of ${g.waves.length}`); }
+      else { g.done = true; this._spawnHoard(); }
+    }
+    else if (waveClear && (!this._wantBoss || this._bossDone) && !this._cleared && !this._morrigan && !this._gauntlet) this._end(true);
   }
   // ---- enemy brains ----
   _updateEnemy(e, dt) {
