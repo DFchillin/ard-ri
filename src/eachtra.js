@@ -467,11 +467,37 @@ export class Eachtra {
     const m = this._morrigan; if (!m) return;
     m.t += dt;
     const baseY = this._heightAt(m.x, m.z) + 0.05;
+    if (m.chip.faceWorld) m.chip.faceWorld(this.pos.x - m.x, this.pos.z - m.z);
+    if (m.chip.animate) m.chip.animate(dt, false);
+    if (m.wrath) { // ── EASTER EGG: raise a hand against a god and she answers ──
+      m.wrath += dt;
+      this._shake = Math.max(this._shake || 0, 0.9); // the earth heaves
+      m.chip.position.y = baseY + Math.min(m.wrath, 1.0) * 3.2; // she rises from the earth, towering
+      m.auraBase = Math.min(6.5, m.auraBase + dt * 8);
+      m.aura.position.y = m.chip.position.y + 1.3; const p2 = 1 + Math.sin(m.t * 10) * 0.2; m.aura.scale.set(m.auraBase * p2, m.auraBase * p2, 1);
+      if (m.wrath > 0.85 && !m.struck) { m.struck = true; this._morriganBeam(); }
+      if (m.wrath > 1.35 && !this._dead) { this.hp = 0; this._dead = true; this._deathT = 0; this._deathEnded = false; this._parley = false; }
+      return;
+    }
     m.chip.position.y = baseY + Math.sin(m.t * 1.5) * 0.08; // she hovers a hand's breadth off the ground
     m.aura.position.y = m.chip.position.y + 1.05;
     const pul = 1 + Math.sin(m.t * 3) * 0.12; m.aura.scale.set(m.auraBase * pul, m.auraBase * pul, 1);
-    if (m.chip.faceWorld) m.chip.faceWorld(this.pos.x - m.x, this.pos.z - m.z); // she turns to watch you
-    if (m.chip.animate) m.chip.animate(dt, false);
+  }
+  _morriganWrath() {
+    const m = this._morrigan; if (!m || m.wrath || this._dead) return;
+    m.wrath = 0.001; m.struck = false; this._shake = 1.3; this._parley = true; // frozen in place to witness the goddess rise
+    this._fallMsg = '<div style="color:#c07af0">You have fallen</div><div style="font-size:15px;opacity:.9;margin-top:9px">You are no match for An Mhórrígan. She is a goddess of war and the washer at the ford; you are a mortal with a borrowed spear. Did you truly think iron could touch her?</div>';
+    this._hint.textContent = '';
+  }
+  _morriganBeam() {
+    const m = this._morrigan; if (!m) return;
+    if (!this._orbTex) { this._orbTex = new THREE.TextureLoader().load('assets/fx/orb_purple.png?v=CBUST'); this._orbTex.colorSpace = THREE.SRGBColorSpace; }
+    const from = TMP.copy(m.chip.position).setY(m.chip.position.y + 1.4);
+    const to = new THREE.Vector3(this.pos.x, this._eyeY() - 0.1, this.pos.z);
+    const dir = to.clone().sub(from).normalize();
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._orbTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    s.scale.set(2.4, 2.4, 1); s.position.copy(from); this.scene.add(s);
+    this._enemyProj.push({ mesh: s, vel: dir.multiplyScalar(22), life: 1.2, spin: 10, wrath: true });
   }
   _lockGazeTo(tx, ty, tz, dt) {
     const ex = this.pos.x, ez = this.pos.z, ey = this._heightAt(ex, ez) + EYE;
@@ -617,7 +643,7 @@ export class Eachtra {
     // clear any parley / phantom queen from a previous run
     this._parley = false; this._dlgActive = false; if (this._dlg) this._dlg.style.display = 'none';
     if (this._morrigan) { this.chipGroup.remove(this._morrigan.chip); this.chipGroup.remove(this._morrigan.aura); this._morrigan = null; }
-    this._morriganPhase = null;
+    this._morriganPhase = null; this._fallMsg = null;
     this._raining = false; if (this._rain) { this._rain.visible = false; this._rain.material.opacity = 0.34; }
     for (const g of (this._gibs || [])) { this._gibGroup.remove(g.mesh); g.mesh.material.dispose(); } this._gibs = [];
     for (const p of (this._smokePool || [])) { p.life = 0; if (p.spr) p.spr.visible = false; }
@@ -765,6 +791,10 @@ export class Eachtra {
       TMP2.subVectors(this._boss.chip.position, this.pos); TMP2.y = 0; const d = TMP2.length();
       if (d <= MELEE_RANGE + 1.8) { TMP2.normalize(); if (f.dot(TMP2) > 1 - MELEE_ARC) this._damageBoss(MELEE_DMG); }
     }
+    if (this._morrigan && !this._morrigan.wrath) { // raise a blade against the goddess and she answers
+      TMP2.subVectors(this._morrigan.chip.position, this.pos); TMP2.y = 0; const d = TMP2.length();
+      if (d <= MELEE_RANGE + 0.6) { TMP2.normalize(); if (f.dot(TMP2) > 1 - MELEE_ARC) this._morriganWrath(); }
+    }
     // the blade's reach by vigour: hale → a spread of beams, wounded → one, near death → steel alone
     if (this.hp >= BEAM_MULTI) { this._fireBeam(-0.16); this._fireBeam(0); this._fireBeam(0.16); }
     else if (this.hp >= BEAM_SINGLE) this._fireBeam(0);
@@ -786,6 +816,7 @@ export class Eachtra {
       let hit = false;
       for (const e of this.enemies) { if (e.dead) continue; if (bm.mesh.position.distanceToSquared(TMP.copy(e.chip.position).setY(e.chip.position.y + 0.9)) < 0.9 * 0.9) { this._damage(e, 30); hit = true; break; } }
       if (!hit && this._boss && this._boss.state === 'active' && bm.mesh.position.distanceToSquared(TMP.copy(this._boss.chip.position).setY(this._boss.chip.position.y + 2.0)) < 1.9 * 1.9) { this._damageBoss(30); hit = true; }
+      if (!hit && this._morrigan && !this._morrigan.wrath && bm.mesh.position.distanceToSquared(TMP.copy(this._morrigan.chip.position).setY(this._morrigan.chip.position.y + 0.9)) < 1.1 * 1.1) { this._morriganWrath(); hit = true; }
       const r2 = bm.mesh.position.x ** 2 + bm.mesh.position.z ** 2;
       if (hit || bm.life <= 0 || r2 > (PLAY_R + 2) ** 2) { this.scene.remove(bm.mesh); this._beams.splice(i, 1); }
     }
@@ -865,7 +896,7 @@ export class Eachtra {
     this._banner.style.display = 'block';
     this._banner.innerHTML = won
       ? '<div style="color:#e4c76a">The wood is cleared</div><div style="font-size:15px;opacity:.85;margin-top:8px">The sluagh are laid to rest. Tap ✕ to return to the ráth.</div>'
-      : '<div style="color:#d9534f">You have fallen</div><div style="font-size:15px;opacity:.85;margin-top:8px">The dead close over you. Tap ✕ to return.</div>';
+      : (this._fallMsg || '<div style="color:#d9534f">You have fallen</div><div style="font-size:15px;opacity:.85;margin-top:8px">The dead close over you. Tap ✕ to return.</div>');
   }
 
   // ---- step ----------------------------------------------------------------
@@ -952,6 +983,7 @@ export class Eachtra {
         if (s.mesh.position.distanceToSquared(TMP.copy(e.chip.position).setY(e.chip.position.y + 0.9)) < 0.8 * 0.8) { this._damage(e, SPEAR_DMG); hit = true; break; }
       }
       if (!hit && this._boss && this._boss.state === 'active' && s.mesh.position.distanceToSquared(TMP.copy(this._boss.chip.position).setY(this._boss.chip.position.y + 2.0)) < 1.8 * 1.8) { this._damageBoss(SPEAR_DMG); hit = true; }
+      if (!hit && this._morrigan && !this._morrigan.wrath && s.mesh.position.distanceToSquared(TMP.copy(this._morrigan.chip.position).setY(this._morrigan.chip.position.y + 0.9)) < 1.0 * 1.0) { this._morriganWrath(); hit = true; }
       const r2 = s.mesh.position.x ** 2 + s.mesh.position.z ** 2;
       const grd = this._heightAt(s.mesh.position.x, s.mesh.position.z);
       if (hit || s.life <= 0 || s.mesh.position.y < grd + 0.1 || r2 > (PLAY_R + 2) ** 2 || this._collide(s.mesh.position.x, s.mesh.position.z)) {

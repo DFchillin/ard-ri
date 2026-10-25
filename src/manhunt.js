@@ -7,7 +7,7 @@ import { entryRoadTile, roadPath } from './sim/roads.js?v=CBUST';
 // road out. Catch him before he leaves the map. Mind your daggers: a towns-
 // person cut down in the crossfire is a wound to the ráth's own commerce.
 
-const EYE = 2.9, MOVE_SPD = 6.2; // the hero looms over the ráth — a guardian giant, Big-Daddy tall
+const EYE = 1.6, MOVE_SPD = 5.2; // Deasún Fathaigh already looms over the little folk at a man's height
 const LOOK_SENS = 0.0026;
 const MELEE_RANGE = 2.2, MELEE_ARC = 0.6, MELEE_DMG = 40, DAGGER_DMG = 55;
 const BANDIT_SPD = 3.4, BANDIT_HP = 120;
@@ -33,7 +33,7 @@ export class Manhunt {
   // ---- hero's sword (a camera-child sprite) --------------------------------
   _buildWeapon() {
     this.scene.add(this.camera);
-    this._swordH = 0.86; // a giant's blade
+    this._swordH = 0.78; // the giant's blade
     const mat = new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false, fog: false });
     const s = new THREE.Sprite(mat); s.center.set(0.5, 0.5); s.renderOrder = 20;
     s.scale.set(this._swordH * 0.45, this._swordH, 1);
@@ -100,11 +100,16 @@ export class Manhunt {
     // stand the hero at the heart of the ráth
     const m = this.map, c = m.tileToWorld((m.size / 2) | 0, (m.size / 2) | 0);
     this.pos.set(c.x, 0, c.z); this.yaw = 0; this.pitch = 0;
+    this._shake = 0.9; this._stepCount = 0; this._lastPhase = 0; // the earth shudders as the giant takes the field
     this._spawnBandit();
-    this.hud.style.display = 'block'; this._banner.style.display = 'none';
+    this.hud.style.display = 'block';
     this._mission.textContent = 'An imperial soldier is plundering the ráth — run him down before he reaches the road out!';
     this._hint.textContent = 'move · drag to look · ⚔ strike · 🗡 hurl a dagger · mind the townsfolk';
     this._exitBtn.style.display = this._isTouch() ? 'none' : 'block';
+    // name the defender — Deasún Fathaigh, the faceless giant kept to guard the ráth
+    this._banner.innerHTML = '<div style="color:#cdb36a">Deasún Fathaigh</div><div style="font-size:14px;opacity:.85;margin-top:6px">the ráth\'s giant takes the field — the ground trembles at his tread</div>';
+    this._banner.style.display = 'block';
+    setTimeout(() => { if (this.active && !this._over) this._banner.style.display = 'none'; }, 2900);
     this._bind(); this._setHud(); this.onResize();
   }
   exit(result = 'off') {
@@ -267,8 +272,14 @@ export class Manhunt {
     this._bobT = (this._bobT || 0) + (this._moving ? dt * 9 : 0);
     const bobAmt = (this._bobTarget = (this._bobTarget || 0) + ((this._moving ? 1 : 0) - (this._bobTarget || 0)) * Math.min(1, dt * 6));
     const bob = Math.abs(Math.sin(this._bobT)) * 0.06 * bobAmt;
-    this.camera.position.set(this.pos.x, EYE + bob, this.pos.z);
-    this.camera.rotation.set(this.pitch, this.yaw, 0);
+    // the ground trembles under the giant's first few strides
+    const phase = Math.floor(this._bobT / Math.PI);
+    if (this._moving && phase !== this._lastPhase) { this._lastPhase = phase; this._stepCount = (this._stepCount || 0) + 1; if (this._stepCount <= 4) this._shake = Math.max(this._shake || 0, 0.6); }
+    this._shake = Math.max(0, (this._shake || 0) - dt * 1.8);
+    let sx = 0, sy = 0, roll = 0;
+    if (this._shake > 0) { const s = this._shake * 0.34; sx = (Math.random() - 0.5) * s; sy = (Math.random() - 0.5) * s; roll = (Math.random() - 0.5) * this._shake * 0.05; }
+    this.camera.position.set(this.pos.x + sx, EYE + bob + sy, this.pos.z);
+    this.camera.rotation.set(this.pitch, this.yaw, roll);
     this.camera.updateMatrixWorld();
     if (this._sword) { this._swingT = Math.max(0, (this._swingT || 0) - dt); const sw = this._swingT > 0 ? Math.sin((1 - this._swingT / 0.2) * Math.PI) : 0; this._sword.material.rotation = -0.9 * sw; const bp = this._swordBasePos; this._sword.position.set(bp.x + 0.03 * sw, bp.y - Math.abs(Math.sin(this._bobT)) * 0.03 * bobAmt - 0.13 * sw, bp.z + 0.05 * sw); }
 

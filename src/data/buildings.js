@@ -41,6 +41,8 @@ export const BUILDINGS = {
     desc: 'Your own ráth and the seat of your rule. Cattle — the true measure of a king — graze the open pasture around it and multiply. Wealth to send in tribute or trade for what Ériu cannot make, and the prize a raider drives off.' },
   somhairlin_house: { label: 'Somhairlín’s House', sprite: 'roundhouse', art: 'longhouse', states: 4, icon: '🔨', footprint: [2, 2], cost: 24, role: 'builder_house', unique: true, folk: 1,
     desc: 'Teach Shomhairlín — the home of Somhairlín the builder. From here she walks out to raise the great works of the ráth: the leader’s seat, the gallán and every house of culture. Nothing momentous is finished until her hammer falls — and there is only one of her, so the great works wait their turn. (The everyday huts, fields and stores go up without her.)' },
+  giants_dwelling: { label: 'Giant’s Dwelling', sprite: 'roundhouse', art: 'roundhouse', states: 4, drawW: 4.3, icon: '🗿', footprint: [3, 3], cost: 48, role: 'defense', unique: true, upkeep: 4, unlockLevel: 2,
+    desc: 'A great tall round house raised for Deasún Fathaigh — the faceless giant kept to guard the ráth. House him here and pay his daily wage, and when a raider is loose you may loose the giant to run them down. Without his dwelling you can only stand by as your cattle are driven off.' },
 };
 
 // The great works Somhairlín must raise with her own hammer — placed as an
@@ -58,6 +60,7 @@ export const CATEGORIES = [
   { id: 'farming', icon: '🌾', label: 'Farming', items: ['field', 'orchard', 'granary', 'sciobolmor'] },
   { id: 'services', icon: '🏛️', label: 'Services', items: ['market', 'aonach', 'well', 'altar'] },
   { id: 'culture', icon: '🎶', label: 'Culture', items: ['feast_hall', 'hurling_field', 'nemeton', 'gallan', 'hosting_hall', 'wrestling_ring', 'brehon_court', 'healer_well', 'monument'] },
+  { id: 'defence', icon: '🛡️', label: 'Defence', items: ['giants_dwelling'] },
 ];
 
 export const ROAD_ITEM = { key: 'road', label: 'Road', icon: '🛣️', cost: 0,

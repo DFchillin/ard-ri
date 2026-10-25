@@ -358,7 +358,10 @@ function updateWalkBtn() {
   const hasRoads = !!(game.map && game.map.tiles && game.map.tiles.some((t) => t && t.road));
   if (peg) peg.classList.toggle('hidden', !(inSettlement && !walk.active && hasRoads));
   if (ex) ex.classList.toggle('hidden', !walk.active);
+  const mh = document.getElementById('manhunt-btn'); // only with the giant housed can you loose him
+  if (mh) mh.classList.toggle('hidden', !(inSettlement && !walk.active && hasGiant()));
 }
+function hasGiant() { return !!(game.buildings && game.buildings.some((b) => b.key === 'giants_dwelling' && !b.building)); }
 document.getElementById('walk-btn')?.addEventListener('click', () => walk.enter());
 document.getElementById('walk-exit')?.addEventListener('click', () => walk.exit());
 document.getElementById('walk-name')?.addEventListener('click', () => walk.cycle());
@@ -772,6 +775,7 @@ function openSparring() {
 const eachtra = new Eachtra();
 const manhunt = new Manhunt({ scene, game, map });
 function startManhunt() {
+  if (!hasGiant()) { flashNotice('🗿 You must raise the Giant’s Dwelling and house Deasún Fathaigh before you can loose him on a raider.'); return; }
   if (walk.active) walk.exit();
   document.getElementById('ui-overlay').style.display = 'none'; // hide the settlement chrome for the hunt
   manhunt.enter({ onExit: () => { document.getElementById('ui-overlay').style.display = ''; pushStats(); } });
