@@ -102,7 +102,7 @@ export class Manhunt {
     this.pos.set(c.x, 0, c.z); this.yaw = 0; this.pitch = 0;
     this._spawnBandit();
     this.hud.style.display = 'block'; this._banner.style.display = 'none';
-    this._mission.textContent = 'A thief is loose in the ráth — run him down before he reaches the road out!';
+    this._mission.textContent = 'An imperial soldier is plundering the ráth — run him down before he reaches the road out!';
     this._hint.textContent = 'move · drag to look · ⚔ strike · 🗡 hurl a dagger · mind the townsfolk';
     this._exitBtn.style.display = this._isTouch() ? 'none' : 'block';
     this._bind(); this._setHud(); this.onResize();
@@ -122,8 +122,7 @@ export class Manhunt {
 
   // ---- the thief ----------------------------------------------------------
   _spawnBandit() {
-    const chip = makeWalkerChip('deaglan', false, 1.0);
-    if (chip.material && chip.material.color) chip.material.color.setRGB(1.0, 0.7, 0.6); // a ruddy, furtive look
+    const chip = makeWalkerChip('man_at_arms', false, 1.05); // an imperial man-at-arms, plundering the ráth
     const m = this.map;
     // start at a store if there is one, else the map entrance
     const stores = this._stores();
@@ -318,16 +317,16 @@ export class Manhunt {
     // loot / flee: follow the road path
     if (!b.path || b.pi >= b.path.length) { if (b.state === 'flee') { this._end(false, 'escaped'); return; } b.wait -= dt; if (b.wait <= 0) { b.lootLeft -= 1; b.tile = this.map.worldToTile(b.chip.position.x, b.chip.position.z) || b.tile; this._routeToNextStore(); } b.chip.position.y = 0.05; if (b.chip.animate) b.chip.animate(dt, false); return; }
     const tgt = this._tileCenter(b.path[b.pi]); const to = TMP.set(tgt.x - b.chip.position.x, 0, tgt.z - b.chip.position.z); const dd = to.length();
-    if (dd < 0.25) { b.pi += 1; if (b.pi >= b.path.length && b.state === 'loot') { b.wait = 1.4; this._mission.textContent = 'The thief rifles a store — close the distance!'; } }
+    if (dd < 0.25) { b.pi += 1; if (b.pi >= b.path.length && b.state === 'loot') { b.wait = 1.4; this._mission.textContent = 'He ransacks a store — close the distance!'; } }
     else { const n = to.normalize(); b.chip.position.x += n.x * BANDIT_SPD * dt; b.chip.position.z += n.z * BANDIT_SPD * dt; if (b.chip.faceWorld) b.chip.faceWorld(n.x, n.z); if (b.chip.animate) b.chip.animate(dt, true); }
     b.chip.position.y = 0.05;
   }
 
   _end(won, how) {
     if (this._over) return; this._over = true;
-    if (won) { this._banner.innerHTML = '<div style="color:#8fd18f">The thief is taken!</div><div style="font-size:15px;opacity:.9;margin-top:8px">The ráth\'s goods are recovered.' + (this._casualties ? ` But ${this._casualties} fell in the chase.` : '') + '</div>'; }
-    else if (how === 'beaten') { this._banner.innerHTML = '<div style="color:#d9534f">You are beaten</div><div style="font-size:15px;opacity:.9;margin-top:8px">The thief slips away in the confusion.</div>'; this.game.cattle = Math.max(0, this.game.cattle - 5); }
-    else { this._banner.innerHTML = '<div style="color:#d9534f">The thief escapes</div><div style="font-size:15px;opacity:.9;margin-top:8px">He makes the road with your cattle — −5 head.</div>'; this.game.cattle = Math.max(0, this.game.cattle - 5); }
+    if (won) { this._banner.innerHTML = '<div style="color:#8fd18f">The soldier is cut down!</div><div style="font-size:15px;opacity:.9;margin-top:8px">The ráth\'s goods are recovered.' + (this._casualties ? ` But ${this._casualties} fell in the chase.` : '') + '</div>'; }
+    else if (how === 'beaten') { this._banner.innerHTML = '<div style="color:#d9534f">You are beaten</div><div style="font-size:15px;opacity:.9;margin-top:8px">The soldier slips away in the confusion.</div>'; this.game.cattle = Math.max(0, this.game.cattle - 5); }
+    else { this._banner.innerHTML = '<div style="color:#d9534f">The soldier escapes</div><div style="font-size:15px;opacity:.9;margin-top:8px">He makes the road with your cattle — −5 head.</div>'; this.game.cattle = Math.max(0, this.game.cattle - 5); }
     this._banner.style.display = 'block';
     this._exitBtn.style.display = 'block'; this._exitBtn.textContent = '✕ Done';
   }

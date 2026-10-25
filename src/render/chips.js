@@ -44,15 +44,16 @@ const WALK_FILE = {
   finn: 'finn', finn_run: 'finn_run', vigil: 'vigil', vigil_f: 'vigil_f',
   // Next-gen character art: hurler (f: camogie player) and the sluagh (restless dead).
   hurler: 'hurler', sluagh: 'sluagh', somhairlin: 'somhairlin', fomorian: 'fomorian',
+  man_at_arms: 'man_at_arms', // the imperial soldier — the ráth's raider
 };
 
 // Roles drawn as a single figure with no female counterpart (no `<role>_f` set).
-const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluagh', 'somhairlin']);
+const SOLO_ROLES = new Set(['deaglan', 'deaglan_dig', 'finn', 'finn_run', 'sluagh', 'somhairlin', 'man_at_arms']);
 // Roles with a real multi-frame stride in their art animate their own legs, so
 // they skip the procedural step-bob (which would just lift a bottom-anchored
 // sprite off the ground and read as floating). Everyone else has only a static
 // frame and leans on the bob to read as walking.
-const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run', 'deaglan', 'finn', 'vigil']);
+const ANIMATED_WALK_ROLES = new Set(['somhairlin', 'deaglan_dig', 'finn_run', 'deaglan', 'finn', 'vigil', 'man_at_arms']);
 const DIAG_DIRS = new Set(['ne', 'nw', 'se', 'sw']); // the facings that carry real walk art
 // Roles that always hold their stand frame even on a diagonal (none at present —
 // the carriers DO stride on the diagonals; only their cardinal facings are copies).
