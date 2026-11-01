@@ -647,7 +647,7 @@ export class Eachtra {
         b.style.cssText = 'background:#1e2230;border:1px solid #4a5068;border-radius:7px;padding:8px 12px;font-size:15px;color:#e8e2d0;cursor:pointer';
         b.addEventListener('pointerenter', () => { b.style.background = '#2b3147'; });
         b.addEventListener('pointerleave', () => { b.style.background = '#1e2230'; });
-        b.addEventListener('click', (e) => { e.stopPropagation(); this._dlgChoose(i); });
+        b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); this._dlgChoose(i); });
         this._dlgChoices.appendChild(b);
       });
     } else { this._dlgArrow.style.opacity = '1'; }
@@ -829,7 +829,7 @@ export class Eachtra {
     this._dlgArrow.textContent = '▸';
     this._dlgArrow.style.cssText = 'position:absolute;right:16px;bottom:10px;color:#b89a52;font-size:18px;opacity:0;animation:none';
     this._dlg.appendChild(this._dlgName); this._dlg.appendChild(this._dlgText); this._dlg.appendChild(this._dlgChoices); this._dlg.appendChild(this._dlgArrow);
-    this._dlg.addEventListener('click', (e) => { e.stopPropagation(); this._dlgAdvance(); });
+    this._dlg.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); this._dlgAdvance(); }); // tap the box to advance (choices handle themselves)
     h.appendChild(this._dlg);
     // touch controls: a move stick (left) and two action buttons (right)
     this._stick = document.createElement('div');
@@ -972,7 +972,9 @@ export class Eachtra {
     this._keys.clear(); this._joy = null; this._look = null;
   }
   _pointerDown(e) {
-    if (e.target === this._btnStrike || e.target === this._btnThrow) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('button')) return; // HUD buttons (strike, throw, continue, map, fullscreen) take their own taps
+    if (this._dlgActive) { if (!this._dlgChoices.contains(t)) this._dlgAdvance(); return; } // a parley freezes the field — a tap advances the line
     e.preventDefault();
     try { this.hud.setPointerCapture(e.pointerId); } catch (_) {} // keep this finger's moves coming to the HUD
     if (e.clientX < window.innerWidth * 0.42) { // left: the move stick springs up where you press
