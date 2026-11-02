@@ -60,6 +60,7 @@ export class FieldView {
   // ---- lifecycle ----------------------------------------------------------
   onBattleStart() {
     this._buildSky();
+    this._buildSurround();
     this._buildWeather();
     this._dom();
     this._ensureOrbs();
@@ -71,6 +72,7 @@ export class FieldView {
   // fog colour otherwise (the "everything went white" bug). Toggle them with the view.
   _applyAtmosphere(on) {
     if (this._dome) this._dome.visible = on;
+    if (this._surround) this._surround.visible = on;
     if (this._rain) this._rain.visible = on && this._weather !== 'clear';
     this.scene.fog = on ? this._fog : (this._origFog || null);
     this.scene.background = on ? new THREE.Color(0x9fb4c2) : (this._origBg || new THREE.Color(0x1d2a19));
@@ -403,6 +405,56 @@ export class FieldView {
     this._sky = sky;
     const wintry = sky === 'sky_geimhreadh';
     this._fog = new THREE.Fog(wintry ? 0xaab6c0 : 0xc3cbb6, 24, 170); // held, applied only in the field view
+  }
+  // Frame the battlefield so it doesn't read as a chessboard floating in the sky:
+  // a pasture apron running out to the horizon, a band of tall trees ringing the
+  // pitch, and a low shrub fringe hiding the lip. Field-view only (toggled with
+  // the atmosphere), built once.
+  _buildSurround() {
+    if (this._surround) return;
+    const g = new THREE.Group(); g.visible = false; this._surround = g; this.scene.add(g);
+    const half = this.b.map.half;
+    const tl = new THREE.TextureLoader();
+    // ground apron: sits just below the battlefield tiles so theirs always win,
+    // and runs far enough to fall into the fog at the horizon
+    const grass = tl.load('assets/terrain/tiles/pasture.png?v=CBUST');
+    grass.wrapS = grass.wrapT = THREE.RepeatWrapping; grass.repeat.set(70, 70); grass.colorSpace = THREE.SRGBColorSpace;
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(560, 560), new THREE.MeshLambertMaterial({ map: grass, fog: true }));
+    apron.rotation.x = -Math.PI / 2; apron.position.y = -0.25; g.add(apron);
+    // one shared billboard material per species, so hundreds of trees are cheap
+    const mats = {};
+    const matOf = (name) => {
+      if (!mats[name]) {
+        const m = new THREE.SpriteMaterial({ transparent: true, alphaTest: 0.3, fog: true });
+        tl.load(`assets/wood/tree_${name}.png?v=CBUST`, (t) => { t.colorSpace = THREE.SRGBColorSpace; m.map = t; m.needsUpdate = true; });
+        mats[name] = m;
+      }
+      return mats[name];
+    };
+    const addProp = (x, z, name, h, aspect) => {
+      const s = new THREE.Sprite(matOf(name)); s.center.set(0.5, 0);
+      s.scale.set(h * (aspect || 0.75), h, 1); s.position.set(x, -0.1, z); g.add(s);
+    };
+    const R = half + 22;
+    const canopy = ['oak', 'pine', 'birch', 'rowan', 'hawthorn', 'willow'];
+    const fringe = ['gorse', 'bramble', 'fern', 'reeds', 'hawthorn'];
+    // a deep band of tall trees around the pitch (square ring: never on the field)
+    for (let i = 0; i < 200; i++) {
+      let x, z, tries = 0;
+      do { x = (Math.random() * 2 - 1) * R; z = (Math.random() * 2 - 1) * R; } while (Math.max(Math.abs(x), Math.abs(z)) < half + 1.4 && ++tries < 8);
+      if (Math.max(Math.abs(x), Math.abs(z)) < half + 1.4) continue;
+      const back = Math.max(Math.abs(x), Math.abs(z)) - half; // taller the further out
+      addProp(x, z, canopy[(Math.random() * canopy.length) | 0], 4.5 + Math.random() * 3.5 + back * 0.12, 0.72);
+    }
+    // a low shrub fringe hugging the very edge to hide the drop-off lip
+    for (let i = 0; i < 120; i++) {
+      const edge = half + 0.4 + Math.random() * 1.8;
+      const along = (Math.random() * 2 - 1) * (half + 1.5);
+      const side = Math.floor(Math.random() * 4);
+      const x = side === 0 ? along : side === 1 ? along : (side === 2 ? -edge : edge);
+      const z = side === 0 ? -edge : side === 1 ? edge : along;
+      addProp(x, z, fringe[(Math.random() * fringe.length) | 0], 1.1 + Math.random() * 1.3, 0.9);
+    }
   }
   _buildWeather() {
     this._weather = Math.random() < 0.45 ? (this._sky === 'sky_geimhreadh' ? 'snow' : 'rain') : 'clear';
