@@ -2311,7 +2311,7 @@ function billboardBuildings(cam, upright, raven) {
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
-  if (battle.active) { setCamera(battle.camera); battle.update(dt); battle.render(renderer); return; }
+  if (battle.active) { setCamera(battle.renderCam()); battle.update(dt); battle.render(renderer); return; }
   if (hurling.active) { setCamera(hurling.renderCam()); hurling.update(dt); hurling.render(renderer); return; }
   if (sparring.active) { setCamera(sparring.renderCam()); sparring.update(dt); sparring.render(renderer); return; }
   if (eachtra.active) { setCamera(eachtra.renderCam()); eachtra.update(dt); eachtra.render(renderer); return; }

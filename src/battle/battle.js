@@ -4,6 +4,7 @@ import { Tilemap, T } from '../sim/tilemap.js?v=CBUST';
 import { WorldView } from '../render/world_view.js?v=CBUST';
 import { makeBuildingChip, makeWalkerChip, makeWarriorChip } from '../render/chips.js?v=CBUST';
 import { gaitBob } from '../sim/walkers.js?v=CBUST';
+import { FieldView } from './field_view.js?v=CBUST';
 import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNickname, UPSKILL, EMPLOYEES } from './units.js?v=CBUST';
 
 const MAP = 20;
@@ -156,6 +157,7 @@ export class Battle {
     this.fxGroup = new THREE.Group(); this.scene.add(this.fxGroup); this._embers = [];
     this.raycaster = new THREE.Raycaster();
     this._dom();
+    this.field = new FieldView(this); // the first-person Field View: free-cam + possession
   }
 
   _worldOf(tx, tz) { return { x: tx - this.map.half + 0.5, z: tz - this.map.half + 0.5 }; }
@@ -203,6 +205,7 @@ export class Battle {
     this.scenario = scenario;
     this.cfg = SCENARIOS[scenario] || SCENARIOS.defend;
     this.active = true; this.started = false; this.phase = 'muster';
+    if (this.field) this.field.reset();
     for (const u of this.units) this.unitGroup.remove(u.mesh);
     for (const c of this._dying || []) this.unitGroup.remove(c.u.mesh);
     for (const e of this._embers || []) { this.fxGroup.remove(e.s); e.s.material.dispose(); }
@@ -230,6 +233,7 @@ export class Battle {
   }
   exit() {
     this.active = false; this.started = false; this.phase = 'idle';
+    if (this.field) this.field.teardown();
     document.getElementById('battle-ui').classList.add('hidden');
     document.getElementById('battle-sidebar').classList.add('hidden');
     document.body.classList.remove('in-battle');
@@ -256,6 +260,7 @@ export class Battle {
       if (c.team === 'enemy' && this.cfg.defend) { const b = pick(c, this.buildings.filter((x) => !x.dead)); if (b) c.target = { foe: b }; }
       if (c.team === 'player' && this.cfg.defend) c.morale = Math.min(100, c.morale + 6);
     }
+    if (this.field) this.field.onBattleStart(); // the Field View becomes available now that folk are on the pitch
     this._showPhase();
   }
 
@@ -423,7 +428,8 @@ export class Battle {
   // ---------- sim ----------
   update(dt) {
     if (!this.active) return;
-    if (this.phase !== 'battle' || !this.started) return;
+    const inBattle = this.phase === 'battle' && this.started;
+    if (!inBattle) { if (this.field && this.field.active) this.field.update(dt, false); return; }
     dt = Math.min(dt, 0.05);
     for (const c of this.companies) if (c.cryT > 0) c.cryT -= dt;
     for (const u of this.units) if (!u.dead) this._move(u, dt);
@@ -449,12 +455,14 @@ export class Battle {
     this._clashAcc += dt;
     if (this._clashAcc >= CLASH_DT) { this._clashAcc -= CLASH_DT; this._enemyTactics(); this._clash(); this._checkEnd(); }
     if (this.selected.size) this._renderCommand();
+    if (this.field && this.field.active) this.field.update(dt, true);
   }
 
   _companyPos(c) { const l = c.units.filter((u) => !u.dead); if (!l.length) return null; let x = 0, z = 0; for (const u of l) { x += u.pos.x; z += u.pos.z; } return { x: x / l.length, z: z / l.length }; }
   _targetPos(c) { const t = c.target; if (!t) return null; if (t.foe) return t.foe.dead ? null : t.foe.pos; if (t.point) return t.point; return null; }
 
   _move(u, dt) {
+    if (u.possessed) return; // the player drives this body directly (see FieldView._driveUnit)
     const c = u.company;
     u._moving = false;
     if (c.routing) {
@@ -631,6 +639,7 @@ export class Battle {
   }
 
   pointerDown(e) {
+    if (this.field && this.field.active) { this.field.pointerDown(e); return; }
     this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (this._pointers.size >= 2) { this._pinch = this._pointerDist(); this._panMid = this._pointerMid(); this._dragStart = null; return; }
     if (e.button === 2) { this._panLast = { x: e.clientX, y: e.clientY }; return; } // right-drag pans
@@ -638,6 +647,7 @@ export class Battle {
     this._panLast = { x: e.clientX, y: e.clientY }; // one-finger drag pans, like the city map
   }
   pointerMove(e) {
+    if (this.field && this.field.active) { this.field.pointerMove(e); return; }
     if (this._pointers.has(e.pointerId)) this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (this._pointers.size >= 2) { const d = this._pointerDist(); if (this._pinch && d > 0) this.zoom(this._pinch / d); this._pinch = d;
       const m = this._pointerMid(); if (this._panMid) this._panScreen(m.x - this._panMid.x, m.y - this._panMid.y); this._panMid = m; return; }
@@ -653,6 +663,7 @@ export class Battle {
     }
   }
   pointerUp(e) {
+    if (this.field && this.field.active) { this.field.pointerUp(e); return; }
     const wasMulti = this._pointers.size >= 2;
     this._pointers.delete(e.pointerId);
     if (e.button === 2) { this._panLast = null; return; }
@@ -721,10 +732,34 @@ export class Battle {
   // The Ollphéist's remaining HP after a menace battle, to carry to the next one
   // (0 once he is slain). null when there was no menace unit this fight.
   menaceRemainingHp() { if (!this._menaceUnit) return null; return this._menaceUnit.dead ? 0 : Math.max(0, this._menaceUnit.hp); }
-  rotate(d) { rotateIsoCamera(this.camera, d); }
-  zoom(f) { zoomIsoCamera(this.camera, f, this.aspect); }
-  resize(aspect) { this.aspect = aspect; resizeIsoCamera(this.camera, aspect); }
-  render(renderer) { renderer.render(this.scene, this.camera); }
+  rotate(d) { if (this.field && this.field.active) return; rotateIsoCamera(this.camera, d); }
+  zoom(f) { if (this.field && this.field.active) return; zoomIsoCamera(this.camera, f, this.aspect); }
+  resize(aspect) { this.aspect = aspect; resizeIsoCamera(this.camera, aspect); if (this.field) this.field.resize(aspect); }
+  renderCam() { return (this.field && this.field.active) ? this.field.renderCam() : this.camera; }
+  render(renderer) { renderer.render(this.scene, this.renderCam()); }
+
+  // A blow landed by a possessed body (see FieldView). Applies damage outside the
+  // clash cadence so player strikes feel immediate; shares the clash's death path.
+  _applyHit(t, dmg) {
+    if (!t || t.dead) return false;
+    t.hp -= dmg;
+    if (t.kind === 'unit') {
+      const c = t.company;
+      c.morale = Math.max(0, c.morale - (dmg / t.hp0) * 10);
+      drawBar(t.bar, Math.max(0, t.hp) / t.hp0, t.hp / t.hp0 > 0.5 ? 0x6cc551 : t.hp / t.hp0 > 0.25 ? 0xe0b83a : 0xe0563a);
+      if (t.hp <= 0) {
+        t.dead = true; t.killed = true;
+        if (c.leader === t) c.morale = Math.max(0, c.morale - 20);
+        if (c.bondPair && BOND_TYPES.includes(t.type)) { c.bondPair = false; c.morale = Math.max(0, c.morale - BOND_MORALE); }
+        this._killVisual(t);
+        if (c.morale < ROUT_MISNEACH && !c.spectral) { c.routing = true; this.selected.delete(c); }
+      }
+    } else {
+      drawBar(t.bar, Math.max(0, t.hp) / t.hp0, t.hp / t.hp0 > 0.5 ? 0x6cc551 : 0xe0b83a);
+      if (t.hp <= 0) { t.dead = true; this.buildingGroup.remove(t.chip); this.buildingGroup.remove(t.bar); }
+    }
+    return t.dead;
+  }
 
   // ---------- selection ----------
   _select(list) {
