@@ -52,6 +52,7 @@ export class FieldView {
     this._shake = 0; this._flashT = 0; this._lightCd = 6 + Math.random() * 6;
     this._orbTex = softTex();
     this._smoke = []; this._darts = [];
+    this._eDarts = []; this._shooters = []; this._hurtT = 0; // the foe's return fire
     this._handlers = {};
     this._built = false;
   }
@@ -62,12 +63,23 @@ export class FieldView {
     this._buildWeather();
     this._dom();
     this._ensureOrbs();
+    this._applyAtmosphere(false); // sky/fog belong to the field view only — never the iso map
     this._toggleBtn.style.display = 'block';
   }
-  reset() { this._clearOrbs(); this._clearSmoke(); this._clearDarts(); if (this.active) this._leaveField(); }
+  // The sky dome, fog and weather live on the shared scene, but must only show
+  // under the perspective field camera — the orthographic iso view washes to the
+  // fog colour otherwise (the "everything went white" bug). Toggle them with the view.
+  _applyAtmosphere(on) {
+    if (this._dome) this._dome.visible = on;
+    if (this._rain) this._rain.visible = on && this._weather !== 'clear';
+    this.scene.fog = on ? this._fog : (this._origFog || null);
+    this.scene.background = on ? new THREE.Color(0x9fb4c2) : (this._origBg || new THREE.Color(0x1d2a19));
+  }
+  reset() { this._clearOrbs(); this._clearSmoke(); this._clearDarts(); this._clearEnemyFire(); if (this.active) this._leaveField(); }
   teardown() {
     if (this.active) this._leaveField();
-    this._clearOrbs(); this._clearSmoke(); this._clearDarts();
+    this._clearOrbs(); this._clearSmoke(); this._clearDarts(); this._clearEnemyFire();
+    this._applyAtmosphere(false);
     if (this._toggleBtn) this._toggleBtn.style.display = 'none';
     if (this._hud) this._hud.style.display = 'none';
   }
@@ -78,6 +90,7 @@ export class FieldView {
     this._ensureOrbs();
     // start the free-cam above the player's side, gazing toward the foe
     this.pos.set(0, 10, this.b.map.half + 3); this.yaw = 0; this.pitch = -0.55;
+    this._applyAtmosphere(true);
     this._hud.style.display = 'block';
     this._toggleBtn.innerHTML = '🗺 Battle map';
     const sb = document.getElementById('battle-sidebar'); if (sb) sb.style.visibility = 'hidden';
@@ -88,6 +101,8 @@ export class FieldView {
   _leaveField() {
     this.release('silent');
     this.active = false;
+    this._applyAtmosphere(false);
+    this._clearEnemyFire();
     if (this._hud) this._hud.style.display = 'none';
     if (this._toggleBtn) this._toggleBtn.innerHTML = '⚔ Enter the field';
     const sb = document.getElementById('battle-sidebar'); if (sb) sb.style.visibility = '';
@@ -133,7 +148,10 @@ export class FieldView {
     this._emitSmoke(dt, inBattle);
     this._updateSmoke(dt);
     this._updateDarts(dt, inBattle);
+    this._updateEnemyFire(dt, inBattle);
     this._updateWeather(dt);
+    if (this._hurtT > 0) { this._hurtT -= dt; if (this._hurt) this._hurt.style.opacity = String(Math.max(0, this._hurtT * 2.4)); }
+    else if (this._hurt && this._hurt.style.opacity !== '0') this._hurt.style.opacity = '0';
   }
 
   _flyCam(dt) {
@@ -249,6 +267,71 @@ export class FieldView {
   }
   _clearDarts() { for (const d of this._darts) { this.scene.remove(d.s); d.s.material.dispose(); } this._darts = []; }
 
+  // ---- the foe fires back -------------------------------------------------
+  // So a possessed archer isn't picking a host apart untouched: a handful of the
+  // enemy are told off as shooters (at least one), and they loose back at you
+  // whenever you fight from range. They home a little, so standing off is no safe.
+  _updateEnemyFire(dt, inBattle) {
+    const u = this.possessed;
+    if (!inBattle || !u || u.dead) { if (this._shooters.length) this._shooters = []; this._updateEnemyDarts(dt, false); return; }
+    this._shooters = this._shooters.filter((s) => s.u && !s.u.dead && !s.u.company.routing);
+    const live = this.b.units.filter((x) => x.team === 'enemy' && !x.dead && !x.company.routing);
+    const want = Math.max(1, Math.round(live.length / 5));
+    if (this._shooters.length < want && live.length) {
+      const have = new Set(this._shooters.map((s) => s.u));
+      const pool = live.filter((x) => !have.has(x));
+      for (let i = this._shooters.length; i < want && pool.length; i++) {
+        const pick = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+        this._shooters.push({ u: pick, cd: 0.8 + Math.random() * 1.6 });
+      }
+    }
+    for (const s of this._shooters) {
+      s.cd -= dt; if (s.cd > 0) continue;
+      const dx = u.pos.x - s.u.pos.x, dz = u.pos.z - s.u.pos.z, d = Math.hypot(dx, dz);
+      if (d < 2.2 || d > 30) { s.cd = 0.6; continue; } // in melee it swings instead; too far, it holds
+      s.cd = 1.6 + Math.random() * 1.8;
+      this._fireEnemy(s.u);
+    }
+    this._updateEnemyDarts(dt, true);
+  }
+  _fireEnemy(shooter) {
+    const u = this.possessed; if (!u) return;
+    const eye = unitTall(shooter.type) * 0.7;
+    const tx = u.pos.x, ty = unitTall(u.type) * 0.75, tz = u.pos.z;
+    const dir = new THREE.Vector3(tx - shooter.pos.x, ty - eye, tz - shooter.pos.z).normalize();
+    const mat = new THREE.SpriteMaterial({ map: this._orbTex, color: 0xff5a2a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    const s = new THREE.Sprite(mat); s.scale.set(0.5, 0.5, 1);
+    s.position.set(shooter.pos.x, eye, shooter.pos.z);
+    this.scene.add(s);
+    const dmg = UNIT_TYPES[shooter.type].atk * matchup(shooter.type, u.type) * 0.55;
+    this._eDarts.push({ s, dir, life: 2.2, spd: 17, dmg });
+    const spr = shooter.mesh.userData.spr; if (spr && spr.strike) spr.strike();
+  }
+  _updateEnemyDarts(dt, inBattle) {
+    const u = this.possessed;
+    for (let i = this._eDarts.length - 1; i >= 0; i--) {
+      const d = this._eDarts[i]; d.life -= dt;
+      if (inBattle && u && !u.dead) { // gentle homing so standing still is deadly, dodging works
+        const tx = u.pos.x, ty = unitTall(u.type) * 0.75, tz = u.pos.z;
+        const want = new THREE.Vector3(tx - d.s.position.x, ty - d.s.position.y, tz - d.s.position.z).normalize();
+        d.dir.lerp(want, Math.min(1, 2.0 * dt)).normalize();
+      }
+      d.s.position.addScaledVector(d.dir, d.spd * dt);
+      let hit = false;
+      if (inBattle && u && !u.dead) {
+        const dx = u.pos.x - d.s.position.x, dy = unitTall(u.type) * 0.75 - d.s.position.y, dz = u.pos.z - d.s.position.z;
+        if (dx * dx + dy * dy + dz * dz < 0.9 * 0.9) {
+          const killed = this.b._applyHit(u, d.dmg);
+          this._hurtT = 0.5; this._shake = Math.max(this._shake, killed ? 0.9 : 0.5);
+          for (let k = 0; k < 4; k++) this._spawnSmoke(u.pos.x, unitTall(u.type) * 0.6, u.pos.z, tierOf(u.type), true);
+          hit = true;
+        }
+      }
+      if (hit || d.life <= 0 || d.s.position.y < -0.5) { this.scene.remove(d.s); d.s.material.dispose(); this._eDarts.splice(i, 1); }
+    }
+  }
+  _clearEnemyFire() { for (const d of this._eDarts) { this.scene.remove(d.s); d.s.material.dispose(); } this._eDarts = []; this._shooters = []; }
+
   // ---- soul-orbs ----------------------------------------------------------
   _ensureOrbs() {
     for (const u of this.b.units) {
@@ -310,15 +393,16 @@ export class FieldView {
 
   // ---- sky & weather ------------------------------------------------------
   _buildSky() {
+    if (this._origFog === undefined) { this._origFog = this.scene.fog || null; this._origBg = this.scene.background || null; }
     if (!this._dome) {
       this._dome = new THREE.Mesh(new THREE.SphereGeometry(320, 24, 14), new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false, depthWrite: false, color: 0x9fb4c2 }));
-      this.scene.add(this._dome);
+      this._dome.visible = false; this.scene.add(this._dome);
     }
     const sky = SKIES[Math.floor(Math.random() * SKIES.length)];
     new THREE.TextureLoader().load(`assets/sky/${sky}.jpg?v=CBUST`, (t) => { t.colorSpace = THREE.SRGBColorSpace; this._dome.material.map = t; this._dome.material.color.setHex(0xffffff); this._dome.material.needsUpdate = true; });
     this._sky = sky;
     const wintry = sky === 'sky_geimhreadh';
-    this.scene.fog = new THREE.Fog(wintry ? 0xaab6c0 : 0xc3cbb6, 22, 150);
+    this._fog = new THREE.Fog(wintry ? 0xaab6c0 : 0xc3cbb6, 24, 170); // held, applied only in the field view
   }
   _buildWeather() {
     this._weather = Math.random() < 0.45 ? (this._sky === 'sky_geimhreadh' ? 'snow' : 'rain') : 'clear';
@@ -329,9 +413,8 @@ export class FieldView {
       for (let i = 0; i < N; i++) this._drop.push({ x: (Math.random() * 2 - 1) * R, z: (Math.random() * 2 - 1) * R, y: Math.random() * H, len: 0.4 + Math.random() * 0.5, spd: 18 + Math.random() * 10 });
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       this._rain = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xbcc8d4, transparent: true, opacity: 0.32, fog: true, depthWrite: false }));
-      this._rain.frustumCulled = false; this.scene.add(this._rain);
+      this._rain.frustumCulled = false; this._rain.visible = false; this.scene.add(this._rain);
     }
-    this._rain.visible = this._weather !== 'clear';
     this._rain.material.color.setHex(this._weather === 'snow' ? 0xffffff : 0xbcc8d4);
     this._rain.material.opacity = this._weather === 'snow' ? 0.8 : 0.32;
   }
@@ -456,6 +539,9 @@ export class FieldView {
     this._flash = document.createElement('div');
     this._flash.style.cssText = 'position:absolute;inset:0;pointer-events:none;background:#eaf0ff;opacity:0';
     h.appendChild(this._flash);
+    this._hurt = document.createElement('div'); // red edge-glow when the foe's fire lands on you
+    this._hurt.style.cssText = 'position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 150px 45px rgba(190,20,20,0.9)';
+    h.appendChild(this._hurt);
     this._cross = document.createElement('div');
     this._cross.style.cssText = 'position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;pointer-events:none;opacity:.7;display:none';
     this._cross.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16"><g stroke="#fff" stroke-width="1.6"><line x1="8" y1="1" x2="8" y2="5"/><line x1="8" y1="11" x2="8" y2="15"/><line x1="1" y1="8" x2="5" y2="8"/><line x1="11" y1="8" x2="15" y2="8"/></g></svg>';
