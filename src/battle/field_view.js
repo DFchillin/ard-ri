@@ -224,22 +224,23 @@ export class FieldView {
   }
 
   // ---- per-frame ----------------------------------------------------------
-  update(dt, inBattle) {
+  update(dt, inBattle, realDt) {
     if (!this.active) return;
     dt = Math.min(dt, 0.05);
-    if (this._strikeCd > 0) this._strikeCd -= dt;
-    if (this._throwCd > 0) this._throwCd -= dt;
+    const rdt = Math.min(realDt == null ? dt : realDt, 0.05); // your own actions ignore the slow-mo (bullet-time)
+    if (this._strikeCd > 0) this._strikeCd -= rdt;
+    if (this._throwCd > 0) this._throwCd -= rdt;
     if (this.possessed && this.possessed.dead) this.release('fallen');
 
-    if (this.possessed && inBattle) this._driveUnit(this.possessed, dt);
-    else this._flyCam(dt);
+    if (this.possessed && inBattle) this._driveUnit(this.possessed, rdt);
+    else this._flyCam(rdt);
 
     this._placeCam(dt);
-    this._updateSword(dt);
+    this._updateSword(rdt);
     this._updateOrbs(dt);
     this._emitSmoke(dt, inBattle);
     this._updateSmoke(dt);
-    this._updateDarts(dt, inBattle);
+    this._updateDarts(rdt, inBattle); // your orbs fly at full speed even in the ride-in
     this._updateEnemyFire(dt, inBattle);
     this._updateWeather(dt);
     if (this._hurtT > 0) { this._hurtT -= dt; if (this._hurt) this._hurt.style.opacity = String(Math.max(0, this._hurtT * 2.4)); }
@@ -704,7 +705,7 @@ export class FieldView {
     if (this._look && e.pointerId === this._look.id) {
       const l = this._look; this._look = null;
       const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-      if (this.possessed && l.moved < 10 && (now - l.t) < 300) this._throw(); // a quick tap/click looses the orb
+      if (this.possessed && l.moved < 16 && (now - l.t) < 400) this._throw(); // a quick tap/click looses the orb
     }
   }
 

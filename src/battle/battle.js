@@ -429,9 +429,10 @@ export class Battle {
   update(dt) {
     if (!this.active) return;
     const inBattle = this.phase === 'battle' && this.started;
-    if (!inBattle) { if (this.field && this.field.active) this.field.update(dt, false); return; }
+    if (!inBattle) { if (this.field && this.field.active) this.field.update(dt, false, dt); return; }
+    const realDt = Math.min(dt, 0.05); // your own shooting runs in real time even during the slow-mo ride-in
     const slow = (this.field && this.field.active) ? this.field.consumeSlowmo(dt) : 1; // the ride-in plays in slow motion
-    dt = Math.min(dt, 0.05) * slow;
+    dt = realDt * slow;
     if (this.field) this.field.updateMarkers(); // the shooter's silver X and your chosen rider's ring, in both views
     for (const c of this.companies) if (c.cryT > 0) c.cryT -= dt;
     for (const u of this.units) if (!u.dead) this._move(u, dt);
@@ -457,7 +458,7 @@ export class Battle {
     this._clashAcc += dt;
     if (this._clashAcc >= CLASH_DT) { this._clashAcc -= CLASH_DT; this._enemyTactics(); this._clash(); this._checkEnd(); }
     if (this.selected.size) this._renderCommand();
-    if (this.field && this.field.active) this.field.update(dt, true);
+    if (this.field && this.field.active) this.field.update(dt, true, realDt);
   }
 
   _companyPos(c) { const l = c.units.filter((u) => !u.dead); if (!l.length) return null; let x = 0, z = 0; for (const u of l) { x += u.pos.x; z += u.pos.z; } return { x: x / l.length, z: z / l.length }; }
