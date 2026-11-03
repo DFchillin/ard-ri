@@ -980,8 +980,8 @@ export class Eachtra {
     if (e.clientX < window.innerWidth * 0.42) { // left: the move stick springs up where you press
       this._joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: 0, z: 0 };
       this._stick.style.display = 'block'; this._stick.style.left = (e.clientX - 60) + 'px'; this._stick.style.top = (e.clientY - 60) + 'px';
-    } else { // right: look
-      this._look = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    } else { // right: look (and a quick tap here strikes/shoots)
+      this._look = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, t: (typeof performance !== 'undefined' ? performance.now() : Date.now()) };
     }
   }
   _pointerMove(e) {
@@ -991,15 +991,22 @@ export class Eachtra {
       this._nub.style.left = (35 + dx) + 'px'; this._nub.style.top = (35 + dy) + 'px';
       this._joy.x = dx / cap; this._joy.z = dy / cap;
     }
-    if (this._look && e.pointerId === this._look.id && !this._parley) { // the parley holds the gaze on her
-      this.yaw -= (e.clientX - this._look.x) * LOOK_SENS;
-      this.pitch = Math.max(-1.1, Math.min(1.1, this.pitch - (e.clientY - this._look.y) * LOOK_SENS));
+    if (this._look && e.pointerId === this._look.id) {
+      this._look.moved += Math.abs(e.clientX - this._look.x) + Math.abs(e.clientY - this._look.y);
+      if (!this._parley) { // the parley holds the gaze on her
+        this.yaw -= (e.clientX - this._look.x) * LOOK_SENS;
+        this.pitch = Math.max(-1.1, Math.min(1.1, this.pitch - (e.clientY - this._look.y) * LOOK_SENS));
+      }
       this._look.x = e.clientX; this._look.y = e.clientY;
     }
   }
   _pointerUp(e) {
     if (this._joy && e.pointerId === this._joy.id) { this._joy = null; this._stick.style.display = 'none'; this._nub.style.left = '35px'; this._nub.style.top = '35px'; }
-    if (this._look && e.pointerId === this._look.id) this._look = null;
+    if (this._look && e.pointerId === this._look.id) {
+      const l = this._look; this._look = null;
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      if (!this._parley && !this._dlgActive && l.moved < 10 && (now - l.t) < 300) this._strike(); // a quick tap/click strikes & shoots
+    }
   }
 
   // ---- combat --------------------------------------------------------------
