@@ -23,7 +23,7 @@ const SMOKE_CAP = 220;
 const OCCUPY_RANGE = 2.2;     // a player within this of the shooter keeps it too busy to shoot
 const ORB_WEAK = 1 / 3;       // an orb's bite on an ordinary (non-enchanted) soul
 const SHOOT_MIN = 2.4, SHOOT_MAX = 34;
-const SLOW_DUR = 3.0;         // seconds (real time) the ride-in plays in slow motion
+const SLOW_DUR = 5.0;         // seconds (real time) the ride-in plays in slow motion
 const SLOW_SCALE = 0.32;      // how slow the world runs during that window
 
 // The war-cry bank — raised in the sky as you take a body. A mix of Irish, English
@@ -678,7 +678,7 @@ export class FieldView {
       this._stick.style.display = 'block'; this._stick.style.left = (e.clientX - 60) + 'px'; this._stick.style.top = (e.clientY - 60) + 'px';
       this._nub.style.left = '35px'; this._nub.style.top = '35px';
     } else {
-      this._look = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      this._look = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, t: (typeof performance !== 'undefined' ? performance.now() : Date.now()) };
     }
   }
   pointerMove(e) {
@@ -689,14 +689,20 @@ export class FieldView {
       this._joy.x = dx / cap; this._joy.z = dy / cap;
     }
     if (this._look && e.pointerId === this._look.id) {
-      this.yaw -= (e.clientX - this._look.x) * LOOK_SENS;
-      this.pitch = Math.max(-1.2, Math.min(1.2, this.pitch - (e.clientY - this._look.y) * LOOK_SENS));
+      const ddx = e.clientX - this._look.x, ddy = e.clientY - this._look.y;
+      this._look.moved += Math.abs(ddx) + Math.abs(ddy);
+      this.yaw -= ddx * LOOK_SENS;
+      this.pitch = Math.max(-1.2, Math.min(1.2, this.pitch - ddy * LOOK_SENS));
       this._look.x = e.clientX; this._look.y = e.clientY;
     }
   }
   pointerUp(e) {
     if (this._joy && e.pointerId === this._joy.id) { this._joy = null; this._stick.style.display = 'none'; }
-    if (this._look && e.pointerId === this._look.id) this._look = null;
+    if (this._look && e.pointerId === this._look.id) {
+      const l = this._look; this._look = null;
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      if (this.possessed && l.moved < 10 && (now - l.t) < 300) this._throw(); // a quick tap/click looses the orb
+    }
   }
 
   _bindKeys() {
@@ -705,8 +711,8 @@ export class FieldView {
       const k = e.key.toLowerCase(); this._keys.add(k);
       if (k === 'v' || k === 'escape') { this._leaveField(); e.preventDefault(); }
       else if (k === 'r') { if (this.possessed) this.release('eject'); }
-      else if (k === ' ') { if (this.possessed) { this._strike(); e.preventDefault(); } }
-      else if (k === 'f') { if (this.possessed) this._throw(); }
+      else if (k === ' ') { if (this.possessed) { this._throw(); e.preventDefault(); } } // space looses the orb
+      else if (k === 'f') { if (this.possessed) this._strike(); }                        // f swings the sword
     };
     H.ku = (e) => this._keys.delete(e.key.toLowerCase());
     window.addEventListener('keydown', H.kd); window.addEventListener('keyup', H.ku);
@@ -802,8 +808,8 @@ export class FieldView {
     this._cryEl.style.transition = 'none'; this._cryEl.style.opacity = '0'; this._cryEl.style.display = 'block';
     requestAnimationFrame(() => { if (this._cryEl) { this._cryEl.style.transition = 'opacity .45s, transform .45s'; this._cryEl.style.opacity = '1'; } });
     clearTimeout(this._cryTo); clearTimeout(this._cryHideTo);
-    this._cryTo = setTimeout(() => { if (this._cryEl) this._cryEl.style.opacity = '0'; }, 2800);
-    this._cryHideTo = setTimeout(() => { if (this._cryEl) this._cryEl.style.display = 'none'; }, 3350);
+    this._cryTo = setTimeout(() => { if (this._cryEl) this._cryEl.style.opacity = '0'; }, 4500);
+    this._cryHideTo = setTimeout(() => { if (this._cryEl) this._cryEl.style.display = 'none'; }, 5100);
   }
   _toast(text) {
     if (!this._toastEl) return;
