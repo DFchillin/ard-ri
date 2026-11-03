@@ -1,28 +1,37 @@
 import * as THREE from 'three';
 import { UNIT_TYPES, matchup } from './units.js?v=CBUST';
 
-// The Field View: step down off the iso map and into the battle itself. A free-
-// flying spectator camera soars over the live clash; tap a warrior and you take
-// their body — first-person, the same controls as the Eachtra — and fight in the
-// line until you fall or let them go. Every soul on the field wears a soul-orb:
-// gold for gods and demigods, blue for the trained, green for the folk of the
-// túath, and their rising smoke burns the same colour.
+// The Field View: step off the iso map and into the battle. From the plan view you
+// either TAKE THE FIELD TO OBSERVE (a free-flying camera over the clash) or TAKE
+// THE FIELD WITH a warrior you have chosen — double-tap one of your own on the iso
+// map first — and ride them as the ENCHANTED, first-person, the Eachtra controls.
+// You cannot switch bodies in the field: go back to the plan to ride another.
+//
+// The foe fields ONE appointed shooter (silver X underneath). It looses orbs at
+// your enchanted warrior — but only while it is free: march a company onto it and
+// it cannot shoot. An orb does full damage to the enchanted (yours) and to that
+// shooter, but only a third to any ordinary soul — so the shootout matters, yet
+// the sword still decides the day.
 
 const LOOK_SENS = 0.0026;
-const FLY_SPD = 11;          // free-cam metres/sec
+const FLY_SPD = 11;
 const STRIKE_CD = 0.42;
 const THROW_CD = 0.7;
 const MELEE_REACH = 2.3;
-const MELEE_ARC = 0.25;      // 1 - dot: a ~75° frontal cone
-const SMOKE_CAP = 150;
+const MELEE_ARC = 0.25;
+const SMOKE_CAP = 220;
+const OCCUPY_RANGE = 2.2;     // a player within this of the shooter keeps it too busy to shoot
+const ORB_WEAK = 1 / 3;       // an orb's bite on an ordinary (non-enchanted) soul
+const SHOOT_MIN = 2.4, SHOOT_MAX = 34;
 
 const SKIES = ['sky_earrach', 'sky_samhradh', 'sky_fomhar', 'sky_geimhreadh'];
-// orb/smoke colour by the unit's category — the three tiers the player asked for
 const TIER = { god: 'gold', hero: 'gold', special: 'blue', seasoned: 'blue', warrior: 'blue', regular: 'green' };
 const ORB_RGB = { gold: 0xffcf4a, blue: 0x49a6ff, green: 0x57e079 };
 
 function tierOf(type) { const t = UNIT_TYPES[type]; return TIER[t ? t.cat : 'regular'] || 'blue'; }
+function isGod(type) { const t = UNIT_TYPES[type]; return !!t && t.cat === 'god'; }
 function unitTall(type) { const t = UNIT_TYPES[type] || {}; return t.battle ? t.battle.h : t.piece ? t.piece.tall + 0.5 : 1.4; }
+function labelOf(type) { return (UNIT_TYPES[type] && UNIT_TYPES[type].label) || 'warrior'; }
 
 function softTex() {
   const c = document.createElement('canvas'); c.width = c.height = 64;
@@ -32,6 +41,29 @@ function softTex() {
   grd.addColorStop(0.4, 'rgba(255,255,255,0.65)');
   grd.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = grd; g.beginPath(); g.arc(32, 32, 32, 0, Math.PI * 2); g.fill();
+  return new THREE.CanvasTexture(c);
+}
+function pipTex() { // a coin-like gold pip with a dark rim — a god's life, readable on any backdrop
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  x.fillStyle = 'rgba(10,12,16,0.92)'; x.beginPath(); x.arc(32, 32, 28, 0, Math.PI * 2); x.fill();
+  const g = x.createRadialGradient(26, 24, 2, 32, 32, 26);
+  g.addColorStop(0, '#fff2bf'); g.addColorStop(0.5, '#ffcf4a'); g.addColorStop(1, '#c98a1e');
+  x.fillStyle = g; x.beginPath(); x.arc(32, 32, 23, 0, Math.PI * 2); x.fill();
+  return new THREE.CanvasTexture(c);
+}
+function xTex() { // a silver X — the shooter's mark on the ground
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  const stroke = (col, w) => { x.strokeStyle = col; x.lineWidth = w; x.lineCap = 'round'; x.beginPath();
+    x.moveTo(30, 30); x.lineTo(98, 98); x.moveTo(98, 30); x.lineTo(30, 98); x.stroke(); };
+  stroke('rgba(10,12,16,0.85)', 24);
+  const g = x.createLinearGradient(30, 30, 98, 98); g.addColorStop(0, '#f6f8fb'); g.addColorStop(0.5, '#c7ccd4'); g.addColorStop(1, '#eef1f6');
+  stroke(g, 14);
+  return new THREE.CanvasTexture(c);
+}
+function ringTex() { // a bright ring — the warrior you have chosen to ride
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  x.strokeStyle = 'rgba(10,12,16,0.7)'; x.lineWidth = 14; x.beginPath(); x.arc(64, 64, 46, 0, Math.PI * 2); x.stroke();
+  x.strokeStyle = '#ffe08a'; x.lineWidth = 8; x.beginPath(); x.arc(64, 64, 46, 0, Math.PI * 2); x.stroke();
   return new THREE.CanvasTexture(c);
 }
 
@@ -45,16 +77,20 @@ export class FieldView {
     this.cam.rotation.order = 'YXZ';
     this.pos = new THREE.Vector3(0, 10, 12);
     this.yaw = 0; this.pitch = -0.5;
-    this.possessed = null;
+    this.possessed = null;          // the enchanted warrior you are riding
+    this._chosen = null;            // the warrior picked (double-tap) from the plan view
+    this._shooter = null;           // the foe's one appointed shooter
+    this._shooterCd = 0;
     this._keys = new Set();
-    this._joy = null; this._look = null; this._tapCand = null;
+    this._joy = null; this._look = null;
     this._strikeCd = 0; this._throwCd = 0;
-    this._shake = 0; this._flashT = 0; this._lightCd = 6 + Math.random() * 6;
-    this._orbTex = softTex();
-    this._smoke = []; this._darts = [];
-    this._eDarts = []; this._shooters = []; this._hurtT = 0; // the foe's return fire
+    this._shake = 0; this._flashT = 0; this._lightCd = 6 + Math.random() * 6; this._hurtT = 0;
+    this._orbTex = softTex(); this._pipTex = pipTex(); this._xTex = xTex(); this._ringTex = ringTex();
+    this._tipV = new THREE.Vector3();
+    this._smoke = []; this._darts = []; this._eDarts = [];
     this._handlers = {};
     this._built = false;
+    this._buildSword();
   }
 
   // ---- lifecycle ----------------------------------------------------------
@@ -64,12 +100,10 @@ export class FieldView {
     this._buildWeather();
     this._dom();
     this._ensureOrbs();
-    this._applyAtmosphere(false); // sky/fog belong to the field view only — never the iso map
-    this._toggleBtn.style.display = 'block';
+    this._pickShooter();
+    this._applyAtmosphere(false);
+    this._showPlanButtons(true);
   }
-  // The sky dome, fog and weather live on the shared scene, but must only show
-  // under the perspective field camera — the orthographic iso view washes to the
-  // fog colour otherwise (the "everything went white" bug). Toggle them with the view.
   _applyAtmosphere(on) {
     if (this._dome) this._dome.visible = on;
     if (this._surround) this._surround.visible = on;
@@ -77,41 +111,60 @@ export class FieldView {
     this.scene.fog = on ? this._fog : (this._origFog || null);
     this.scene.background = on ? new THREE.Color(0x9fb4c2) : (this._origBg || new THREE.Color(0x1d2a19));
   }
-  reset() { this._clearOrbs(); this._clearSmoke(); this._clearDarts(); this._clearEnemyFire(); if (this.active) this._leaveField(); }
+  reset() { this._clearOrbs(); this._clearSmoke(); this._clearDarts(); this._clearEnemyFire(); this._clearMarkers(); this._chosen = null; this._updateRideLabel(); if (this.active) this._leaveField(); }
   teardown() {
     if (this.active) this._leaveField();
-    this._clearOrbs(); this._clearSmoke(); this._clearDarts(); this._clearEnemyFire();
+    this._clearOrbs(); this._clearSmoke(); this._clearDarts(); this._clearEnemyFire(); this._clearMarkers();
     this._applyAtmosphere(false);
-    if (this._toggleBtn) this._toggleBtn.style.display = 'none';
+    this._showPlanButtons(false);
+    if (this._returnBtn) this._returnBtn.style.display = 'none';
     if (this._hud) this._hud.style.display = 'none';
   }
 
-  toggle() { this.active ? this._leaveField() : this._enterField(); }
+  // ---- entering / leaving the field ---------------------------------------
+  observe() { if (!this.active) this._enterField(); this.release('silent'); this._setMode('free'); }
+  ride() {
+    if (!this._chosen || this._chosen.dead) { this._toast('Double-tap one of your warriors on the map to choose who you ride with.'); return; }
+    if (!this.active) this._enterField();
+    this.possess(this._chosen);
+  }
   _enterField() {
     this.active = true;
+    this.scene.add(this.cam); // so the held sword (a camera child) renders
     this._ensureOrbs();
-    // start the free-cam above the player's side, gazing toward the foe
     this.pos.set(0, 10, this.b.map.half + 3); this.yaw = 0; this.pitch = -0.55;
     this._applyAtmosphere(true);
     this._hud.style.display = 'block';
-    this._toggleBtn.innerHTML = '🗺 Battle map';
+    this._showPlanButtons(false);
+    if (this._returnBtn) this._returnBtn.style.display = 'block';
     const sb = document.getElementById('battle-sidebar'); if (sb) sb.style.visibility = 'hidden';
-    const mc = document.getElementById('map-controls'); if (mc) mc.style.visibility = 'hidden'; // iso rotate/zoom do nothing here
+    const mc = document.getElementById('map-controls'); if (mc) mc.style.visibility = 'hidden';
     this._bindKeys();
     this._setMode('free');
   }
   _leaveField() {
     this.release('silent');
     this.active = false;
+    this.scene.remove(this.cam);
     this._applyAtmosphere(false);
     this._clearEnemyFire();
     if (this._hud) this._hud.style.display = 'none';
-    if (this._toggleBtn) this._toggleBtn.innerHTML = '⚔ Enter the field';
+    if (this._returnBtn) this._returnBtn.style.display = 'none';
+    this._showPlanButtons(true);
     const sb = document.getElementById('battle-sidebar'); if (sb) sb.style.visibility = '';
     const mc = document.getElementById('map-controls'); if (mc) mc.style.visibility = '';
     this._unbindKeys();
-    this._joy = this._look = this._tapCand = null;
+    this._joy = this._look = null;
     if (this._stick) this._stick.style.display = 'none';
+  }
+
+  // ---- choosing a rider (from the iso plan view) --------------------------
+  chooseRider(u) {
+    if (!u || u.dead || u.team !== 'player') return;
+    this._chosen = u;
+    this._updateRideLabel();
+    this.updateMarkers();
+    this._toast(`${labelOf(u.type)} will answer your enchantment.`);
   }
 
   // ---- possession ---------------------------------------------------------
@@ -119,19 +172,23 @@ export class FieldView {
     if (!u || u.dead || u.team !== 'player') return;
     this.release('silent');
     this.possessed = u; u.possessed = true;
-    const spr = u.mesh.userData.spr; if (spr) spr.visible = false; // first person: step inside the body
-    if (u._orb) u._orb.visible = false;
+    const spr = u.mesh.userData.spr; if (spr) spr.visible = false; // first person
+    if (this._sword) this._sword.visible = true;
+    this._setUnitOrbVisible(u, false);
     this.yaw = Math.atan2(-(u._dx || 0), -(u._dz || -1)) || 0;
     this._setMode('possess');
-    this._banner(`You take ${UNIT_TYPES[u.type].label} — fight!`, ORB_RGB[tierOf(u.type)]);
+    this._banner(`Enchanted — you ride ${labelOf(u.type)}.`, ORB_RGB[tierOf(u.type)]);
   }
   release(mode) {
-    const u = this.possessed; if (!u) { if (mode !== 'silent') this._setMode('free'); return; }
+    const u = this.possessed; if (!u) { if (mode && mode !== 'silent') this._setMode('free'); return; }
     this.possessed = null; u.possessed = false;
+    if (this._sword) this._sword.visible = false;
     const spr = u.mesh.userData.spr; if (spr && !u.dead) spr.visible = true;
-    if (u._orb && !u.dead) u._orb.visible = true;
-    if (!u.dead) { this.pos.set(u.pos.x, unitTall(u.type) * 0.95 + 0.3, u.pos.z); } // step out where they stood
-    if (this.active && mode !== 'silent') { this._setMode('free'); if (mode === 'fallen') this._banner('Your vessel has fallen. Choose another.', 0xe0563a); }
+    if (!u.dead) { this._setUnitOrbVisible(u, true); this.pos.set(u.pos.x, unitTall(u.type) * 0.95 + 0.3, u.pos.z); }
+    if (this.active && mode && mode !== 'silent') {
+      this._setMode('free');
+      if (mode === 'fallen') this._banner('Your enchanted warrior has fallen — return to the plan to ride another.', 0xe0563a);
+    }
   }
 
   // ---- per-frame ----------------------------------------------------------
@@ -146,6 +203,7 @@ export class FieldView {
     else this._flyCam(dt);
 
     this._placeCam(dt);
+    this._updateSword(dt);
     this._updateOrbs(dt);
     this._emitSmoke(dt, inBattle);
     this._updateSmoke(dt);
@@ -213,10 +271,46 @@ export class FieldView {
   renderCam() { return this.cam; }
   resize(aspect) { this.aspect = aspect; this.cam.aspect = aspect; this.cam.updateProjectionMatrix(); }
 
+  // ---- the held, smoking blade -------------------------------------------
+  _buildSword() {
+    this._swordH = 0.74;
+    const mat = new THREE.SpriteMaterial({ transparent: true, depthTest: false, depthWrite: false, fog: false });
+    const s = new THREE.Sprite(mat); s.center.set(0.5, 0.5); s.renderOrder = 20; s.visible = false;
+    s.scale.set(this._swordH * 0.45, this._swordH, 1);
+    new THREE.TextureLoader().load('assets/weapons/fp_sword0.png?v=CBUST', (t) => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; const im = t.image; if (im && im.width) s.scale.set(this._swordH * (im.width / im.height), this._swordH, 1); });
+    this._swordBasePos = new THREE.Vector3(0.23, -0.30, -0.62);
+    s.position.copy(this._swordBasePos);
+    this.cam.add(s); this._sword = s;
+  }
+  _updateSword(dt) {
+    const s = this._sword; if (!s) return;
+    const on = !!(this.possessed && !this.possessed.dead);
+    s.visible = on;
+    if (!on) return;
+    this.cam.updateMatrixWorld();
+    this._swingT = Math.max(0, (this._swingT || 0) - dt);
+    const swing = this._swingT > 0 ? Math.sin((1 - this._swingT / 0.22) * Math.PI) : 0;
+    s.material.rotation = -0.95 * swing;
+    const bp = this._swordBasePos;
+    s.position.set(bp.x + 0.04 * swing, bp.y - 0.14 * swing, bp.z + 0.06 * swing);
+    // the enchanted blade smokes in the rider's own colour
+    const tier = tierOf(this.possessed.type);
+    this._bladeAcc = (this._bladeAcc || 0) + dt * 24;
+    this._tipV.set(bp.x - 0.03, bp.y + this._swordH * 0.5, bp.z); this.cam.localToWorld(this._tipV);
+    while (this._bladeAcc >= 1) { this._bladeAcc -= 1; this._spawnSmoke(this._tipV.x, this._tipV.y, this._tipV.z, tier, false); }
+  }
+
   // ---- combat -------------------------------------------------------------
+  // An orb's damage: full against the enchanted (your rider) and against the foe's
+  // appointed shooter — their duel is a real one — but only a third against any
+  // ordinary soul, so orbs can't scythe down a host.
+  _orbHit(target, base) {
+    const full = target === this.possessed || target === this._shooter;
+    return this.b._applyHit(target, base * (full ? 1 : ORB_WEAK));
+  }
   _strike() {
     const u = this.possessed; if (!u || u.dead || this._strikeCd > 0) return;
-    this._strikeCd = STRIKE_CD;
+    this._strikeCd = STRIKE_CD; this._swingT = 0.22;
     const spr = u.mesh.userData.spr; if (spr && spr.strike) spr.strike();
     const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     let best = null, bd = MELEE_REACH * MELEE_REACH;
@@ -225,11 +319,11 @@ export class FieldView {
       const dx = o.pos.x - u.pos.x, dz = o.pos.z - u.pos.z, d = dx * dx + dz * dz;
       if (d > bd) continue;
       const dn = Math.hypot(dx, dz) || 1;
-      if ((dx / dn) * fwd.x + (dz / dn) * fwd.z < 1 - MELEE_ARC - 0.5) continue; // roughly in front
+      if ((dx / dn) * fwd.x + (dz / dn) * fwd.z < 1 - MELEE_ARC - 0.5) continue;
       if (d < bd) { bd = d; best = o; }
     }
     if (!best) { for (const bl of this.b.buildings) if (!bl.dead && bl.team !== u.team) { const dx = bl.pos.x - u.pos.x, dz = bl.pos.z - u.pos.z; if (dx * dx + dz * dz < (MELEE_REACH + 1) * (MELEE_REACH + 1)) { best = bl; break; } } }
-    if (best) {
+    if (best) { // the sword bites in full — this is how a host is cleared
       const mult = best.kind === 'building' ? 2.4 : matchup(u.type, best.type);
       const killed = this.b._applyHit(best, u.atk * mult * 1.1);
       this._hitSpark(best.pos.x, (best.kind === 'building' ? 0.8 : unitTall(best.type || 'villager') * 0.5), best.pos.z, killed);
@@ -237,8 +331,7 @@ export class FieldView {
   }
   _throw() {
     const u = this.possessed; if (!u || u.dead || this._throwCd > 0) return;
-    this._throwCd = THROW_CD;
-    const spr = u.mesh.userData.spr; if (spr && spr.strike) spr.strike();
+    this._throwCd = THROW_CD; this._swingT = 0.18;
     const dir = new THREE.Vector3(-Math.sin(this.yaw), Math.sin(this.pitch) * 0.5, -Math.cos(this.yaw)).normalize();
     const mat = new THREE.SpriteMaterial({ map: this._orbTex, color: ORB_RGB[tierOf(u.type)], transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
     const s = new THREE.Sprite(mat); s.scale.set(0.5, 0.5, 1);
@@ -256,7 +349,7 @@ export class FieldView {
         if (o.dead || o.team === d.u.team) continue;
         const dx = o.pos.x - d.s.position.x, dz = o.pos.z - d.s.position.z;
         if (dx * dx + dz * dz < 0.9 * 0.9) {
-          const killed = this.b._applyHit(o, d.u.atk * matchup(d.u.type, o.type) * 1.2);
+          const killed = this._orbHit(o, d.u.atk * matchup(d.u.type, o.type) * 1.2);
           this._hitSpark(o.pos.x, unitTall(o.type) * 0.5, o.pos.z, killed); hit = true; break;
         }
       }
@@ -269,88 +362,139 @@ export class FieldView {
   }
   _clearDarts() { for (const d of this._darts) { this.scene.remove(d.s); d.s.material.dispose(); } this._darts = []; }
 
-  // ---- the foe fires back -------------------------------------------------
-  // So a possessed archer isn't picking a host apart untouched: a handful of the
-  // enemy are told off as shooters (at least one), and they loose back at you
-  // whenever you fight from range. They home a little, so standing off is no safe.
+  // ---- the foe's one appointed shooter ------------------------------------
+  _pickShooter() {
+    this._shooter = null;
+    const live = this.b.units.filter((x) => x.team === 'enemy' && !x.dead && !x.company.routing);
+    if (!live.length) return;
+    let top = -Infinity; for (const x of live) top = Math.max(top, UNIT_TYPES[x.type].rank);
+    const champs = live.filter((x) => UNIT_TYPES[x.type].rank === top); // the foe's best stands as their shooter
+    this._shooter = champs[Math.floor(Math.random() * champs.length)];
+    this._shooterCd = 1.4 + Math.random() * 1.6;
+  }
+  _shooterOccupied() {
+    const s = this._shooter; if (!s) return true;
+    for (const o of this.b.units) if (o.team === 'player' && !o.dead && !o.company.routing) {
+      const dx = o.pos.x - s.pos.x, dz = o.pos.z - s.pos.z; if (dx * dx + dz * dz < OCCUPY_RANGE * OCCUPY_RANGE) return true;
+    }
+    return false;
+  }
   _updateEnemyFire(dt, inBattle) {
     const u = this.possessed;
-    if (!inBattle || !u || u.dead) { if (this._shooters.length) this._shooters = []; this._updateEnemyDarts(dt, false); return; }
-    this._shooters = this._shooters.filter((s) => s.u && !s.u.dead && !s.u.company.routing);
-    const live = this.b.units.filter((x) => x.team === 'enemy' && !x.dead && !x.company.routing);
-    const want = Math.max(1, Math.round(live.length / 5));
-    if (this._shooters.length < want && live.length) {
-      const have = new Set(this._shooters.map((s) => s.u));
-      const pool = live.filter((x) => !have.has(x));
-      for (let i = this._shooters.length; i < want && pool.length; i++) {
-        const pick = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
-        this._shooters.push({ u: pick, cd: 0.8 + Math.random() * 1.6 });
+    if (this._shooter && (this._shooter.dead || this._shooter.company.routing)) this._shooter = null;
+    if (inBattle && u && !u.dead && this._shooter) {
+      this._shooterCd -= dt;
+      if (this._shooterCd <= 0) {
+        const dx = u.pos.x - this._shooter.pos.x, dz = u.pos.z - this._shooter.pos.z, d = Math.hypot(dx, dz);
+        if (this._shooterOccupied() || d < SHOOT_MIN || d > SHOOT_MAX) this._shooterCd = 0.5; // held: busy, or no clean shot
+        else { this._shooterCd = 1.9 + Math.random() * 1.8; this._fireShooter(); }
       }
     }
-    for (const s of this._shooters) {
-      s.cd -= dt; if (s.cd > 0) continue;
-      const dx = u.pos.x - s.u.pos.x, dz = u.pos.z - s.u.pos.z, d = Math.hypot(dx, dz);
-      if (d < 2.2 || d > 30) { s.cd = 0.6; continue; } // in melee it swings instead; too far, it holds
-      s.cd = 1.6 + Math.random() * 1.8;
-      this._fireEnemy(s.u);
-    }
-    this._updateEnemyDarts(dt, true);
+    this._updateEnemyDarts(dt, inBattle);
   }
-  _fireEnemy(shooter) {
-    const u = this.possessed; if (!u) return;
-    const eye = unitTall(shooter.type) * 0.7;
-    const tx = u.pos.x, ty = unitTall(u.type) * 0.75, tz = u.pos.z;
-    const dir = new THREE.Vector3(tx - shooter.pos.x, ty - eye, tz - shooter.pos.z).normalize();
-    const mat = new THREE.SpriteMaterial({ map: this._orbTex, color: 0xff5a2a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-    const s = new THREE.Sprite(mat); s.scale.set(0.5, 0.5, 1);
-    s.position.set(shooter.pos.x, eye, shooter.pos.z);
+  _fireShooter() {
+    const sh = this._shooter, u = this.possessed; if (!sh || !u) return;
+    const eye = unitTall(sh.type) * 0.7;
+    const ty = unitTall(u.type) * 0.75;
+    const dir = new THREE.Vector3(u.pos.x - sh.pos.x, ty - eye, u.pos.z - sh.pos.z).normalize();
+    const gold = isGod(sh.type);
+    const mat = new THREE.SpriteMaterial({ map: this._orbTex, color: gold ? 0xffd34a : 0xff5a2a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    const s = new THREE.Sprite(mat); s.scale.set(gold ? 0.62 : 0.5, gold ? 0.62 : 0.5, 1);
+    s.position.set(sh.pos.x, eye, sh.pos.z);
     this.scene.add(s);
-    const dmg = UNIT_TYPES[shooter.type].atk * matchup(shooter.type, u.type) * 0.55;
-    this._eDarts.push({ s, dir, life: 2.2, spd: 17, dmg });
-    const spr = shooter.mesh.userData.spr; if (spr && spr.strike) spr.strike();
+    const dmg = UNIT_TYPES[sh.type].atk * matchup(sh.type, u.type); // full: the enchanted takes an orb's full bite
+    this._eDarts.push({ s, dir, life: 2.4, spd: 18, dmg });
+    const spr = sh.mesh.userData.spr; if (spr && spr.strike) spr.strike();
   }
   _updateEnemyDarts(dt, inBattle) {
     const u = this.possessed;
     for (let i = this._eDarts.length - 1; i >= 0; i--) {
       const d = this._eDarts[i]; d.life -= dt;
-      if (inBattle && u && !u.dead) { // gentle homing so standing still is deadly, dodging works
-        const tx = u.pos.x, ty = unitTall(u.type) * 0.75, tz = u.pos.z;
-        const want = new THREE.Vector3(tx - d.s.position.x, ty - d.s.position.y, tz - d.s.position.z).normalize();
-        d.dir.lerp(want, Math.min(1, 2.0 * dt)).normalize();
+      if (inBattle && u && !u.dead) {
+        const ty = unitTall(u.type) * 0.75;
+        const want = new THREE.Vector3(u.pos.x - d.s.position.x, ty - d.s.position.y, u.pos.z - d.s.position.z).normalize();
+        d.dir.lerp(want, Math.min(1, 1.8 * dt)).normalize();
       }
       d.s.position.addScaledVector(d.dir, d.spd * dt);
       let hit = false;
       if (inBattle && u && !u.dead) {
         const dx = u.pos.x - d.s.position.x, dy = unitTall(u.type) * 0.75 - d.s.position.y, dz = u.pos.z - d.s.position.z;
-        if (dx * dx + dy * dy + dz * dz < 0.9 * 0.9) {
-          const killed = this.b._applyHit(u, d.dmg);
-          this._hurtT = 0.5; this._shake = Math.max(this._shake, killed ? 0.9 : 0.5);
-          for (let k = 0; k < 4; k++) this._spawnSmoke(u.pos.x, unitTall(u.type) * 0.6, u.pos.z, tierOf(u.type), true);
+        if (dx * dx + dy * dy + dz * dz < 0.95 * 0.95) {
+          const killed = this.b._applyHit(u, d.dmg); // u is the enchanted → full
+          this._hurtT = 0.55; this._shake = Math.max(this._shake, killed ? 0.95 : 0.55);
+          for (let k = 0; k < 5; k++) this._spawnSmoke(u.pos.x, unitTall(u.type) * 0.6, u.pos.z, tierOf(u.type), true);
           hit = true;
         }
       }
       if (hit || d.life <= 0 || d.s.position.y < -0.5) { this.scene.remove(d.s); d.s.material.dispose(); this._eDarts.splice(i, 1); }
     }
   }
-  _clearEnemyFire() { for (const d of this._eDarts) { this.scene.remove(d.s); d.s.material.dispose(); } this._eDarts = []; this._shooters = []; }
+  _clearEnemyFire() { for (const d of this._eDarts) { this.scene.remove(d.s); d.s.material.dispose(); } this._eDarts = []; }
+
+  // ---- ground markers (shown in both views during the battle) -------------
+  _flatDecal(tex, size) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+    m.rotation.x = -Math.PI / 2; m.renderOrder = 5; return m;
+  }
+  updateMarkers() {
+    // the foe's appointed shooter — a silver X underfoot
+    if (this._shooter && (this._shooter.dead || this._shooter.company.routing)) this._shooter = null;
+    if (this._shooter) {
+      if (!this._xMarker) { this._xMarker = this._flatDecal(this._xTex, 2.1); this.scene.add(this._xMarker); }
+      this._xMarker.visible = true; this._xMarker.position.set(this._shooter.pos.x, 0.08, this._shooter.pos.z);
+    } else if (this._xMarker) this._xMarker.visible = false;
+    // the warrior you have chosen to ride — a gold ring
+    if (this._chosen && this._chosen.dead) { this._chosen = null; this._updateRideLabel(); }
+    if (this._chosen) {
+      if (!this._ringMarker) { this._ringMarker = this._flatDecal(this._ringTex, 1.4); this.scene.add(this._ringMarker); }
+      this._ringMarker.visible = true; this._ringMarker.position.set(this._chosen.pos.x, 0.07, this._chosen.pos.z);
+    } else if (this._ringMarker) this._ringMarker.visible = false;
+  }
+  _clearMarkers() {
+    for (const k of ['_xMarker', '_ringMarker']) { const m = this[k]; if (m) { this.scene.remove(m); m.geometry.dispose(); m.material.dispose(); this[k] = null; } }
+  }
 
   // ---- soul-orbs ----------------------------------------------------------
+  // Ordinary folk wear a single tier-coloured soul-orb. Gods wear up to three gold
+  // orbs that wink out as their life fails: three while hale, one when low, none
+  // when all but spent — the same read as the gods in the Eachtra.
   _ensureOrbs() {
     for (const u of this.b.units) {
-      if (u.dead || u._orb) continue;
-      const tier = tierOf(u.type);
-      const mat = new THREE.SpriteMaterial({ map: this._orbTex, color: ORB_RGB[tier], transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-      const orb = new THREE.Sprite(mat);
-      const big = UNIT_TYPES[u.type].cat === 'god' || UNIT_TYPES[u.type].cat === 'hero';
-      orb.userData.sz = big ? 0.85 : 0.42; orb.scale.setScalar(orb.userData.sz);
-      orb.userData.tier = tier; orb.renderOrder = 24;
-      this.scene.add(orb); u._orb = orb;
-      if (this.possessed === u) orb.visible = false;
+      if (u.dead) continue;
+      if (isGod(u.type)) {
+        if (u._orbs) continue;
+        u._orbs = [0, 1, 2].map(() => {
+          // a rimmed gold coin (normal blend, drawn over everything) so a god's life reads on any backdrop
+          const mat = new THREE.SpriteMaterial({ map: this._pipTex, transparent: true, opacity: 1, depthWrite: false, depthTest: false, fog: false });
+          const s = new THREE.Sprite(mat); s.scale.setScalar(0.55); s.renderOrder = 25; this.scene.add(s); return s;
+        });
+        u._orbsHidden = (this.possessed === u);
+      } else {
+        if (u._orb) continue;
+        const tier = tierOf(u.type);
+        const mat = new THREE.SpriteMaterial({ map: this._orbTex, color: ORB_RGB[tier], transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+        const orb = new THREE.Sprite(mat);
+        orb.userData.sz = (UNIT_TYPES[u.type].cat === 'hero') ? 0.85 : 0.42; orb.scale.setScalar(orb.userData.sz);
+        orb.renderOrder = 24; this.scene.add(orb); u._orb = orb;
+        if (this.possessed === u) orb.visible = false;
+      }
     }
   }
+  _setUnitOrbVisible(u, vis) { if (u._orbs) u._orbsHidden = !vis; else if (u._orb) u._orb.visible = vis; }
   _updateOrbs(dt) {
     this._orbT = (this._orbT || 0) + dt;
     for (const u of this.b.units) {
+      if (u._orbs) {
+        if (u.dead) { for (const s of u._orbs) { this.scene.remove(s); s.material.dispose(); } u._orbs = null; continue; }
+        const h = unitTall(u.type), frac = Math.max(0, u.hp) / u.hp0;
+        const n = frac > 0.66 ? 3 : frac > 0.33 ? 2 : frac > 0.12 ? 1 : 0; // high→3, low→1, very low→0
+        const bob = Math.sin(this._orbT * 2 + u.id) * 0.06;
+        for (let i = 0; i < 3; i++) {
+          const s = u._orbs[i]; s.visible = !u._orbsHidden && i < n;
+          s.position.set(u.pos.x + (i - 1) * 0.46, h + 0.4 + bob, u.pos.z); // a tight row just above the god's head, below the name tag
+        }
+        continue;
+      }
       const orb = u._orb; if (!orb) continue;
       if (u.dead) { this.scene.remove(orb); orb.material.dispose(); u._orb = null; continue; }
       const h = unitTall(u.type);
@@ -358,7 +502,12 @@ export class FieldView {
       orb.material.opacity = 0.72 + Math.sin(this._orbT * 3 + u.id) * 0.18;
     }
   }
-  _clearOrbs() { for (const u of this.b.units) if (u._orb) { this.scene.remove(u._orb); u._orb.material.dispose(); u._orb = null; } }
+  _clearOrbs() {
+    for (const u of this.b.units) {
+      if (u._orb) { this.scene.remove(u._orb); u._orb.material.dispose(); u._orb = null; }
+      if (u._orbs) { for (const s of u._orbs) { this.scene.remove(s); s.material.dispose(); } u._orbs = null; }
+    }
+  }
 
   // ---- tinted smoke -------------------------------------------------------
   _emitSmoke(dt, inBattle) {
@@ -404,24 +553,17 @@ export class FieldView {
     new THREE.TextureLoader().load(`assets/sky/${sky}.jpg?v=CBUST`, (t) => { t.colorSpace = THREE.SRGBColorSpace; this._dome.material.map = t; this._dome.material.color.setHex(0xffffff); this._dome.material.needsUpdate = true; });
     this._sky = sky;
     const wintry = sky === 'sky_geimhreadh';
-    this._fog = new THREE.Fog(wintry ? 0xaab6c0 : 0xc3cbb6, 24, 170); // held, applied only in the field view
+    this._fog = new THREE.Fog(wintry ? 0xaab6c0 : 0xc3cbb6, 24, 170);
   }
-  // Frame the battlefield so it doesn't read as a chessboard floating in the sky:
-  // a pasture apron running out to the horizon, a band of tall trees ringing the
-  // pitch, and a low shrub fringe hiding the lip. Field-view only (toggled with
-  // the atmosphere), built once.
   _buildSurround() {
     if (this._surround) return;
     const g = new THREE.Group(); g.visible = false; this._surround = g; this.scene.add(g);
     const half = this.b.map.half;
     const tl = new THREE.TextureLoader();
-    // ground apron: sits just below the battlefield tiles so theirs always win,
-    // and runs far enough to fall into the fog at the horizon
     const grass = tl.load('assets/terrain/tiles/pasture.png?v=CBUST');
     grass.wrapS = grass.wrapT = THREE.RepeatWrapping; grass.repeat.set(70, 70); grass.colorSpace = THREE.SRGBColorSpace;
     const apron = new THREE.Mesh(new THREE.PlaneGeometry(560, 560), new THREE.MeshLambertMaterial({ map: grass, fog: true }));
     apron.rotation.x = -Math.PI / 2; apron.position.y = -0.25; g.add(apron);
-    // one shared billboard material per species, so hundreds of trees are cheap
     const mats = {};
     const matOf = (name) => {
       if (!mats[name]) {
@@ -438,20 +580,18 @@ export class FieldView {
     const R = half + 22;
     const canopy = ['oak', 'pine', 'birch', 'rowan', 'hawthorn', 'willow'];
     const fringe = ['gorse', 'bramble', 'fern', 'reeds', 'hawthorn'];
-    // a deep band of tall trees around the pitch (square ring: never on the field)
     for (let i = 0; i < 200; i++) {
       let x, z, tries = 0;
       do { x = (Math.random() * 2 - 1) * R; z = (Math.random() * 2 - 1) * R; } while (Math.max(Math.abs(x), Math.abs(z)) < half + 1.4 && ++tries < 8);
       if (Math.max(Math.abs(x), Math.abs(z)) < half + 1.4) continue;
-      const back = Math.max(Math.abs(x), Math.abs(z)) - half; // taller the further out
+      const back = Math.max(Math.abs(x), Math.abs(z)) - half;
       addProp(x, z, canopy[(Math.random() * canopy.length) | 0], 4.5 + Math.random() * 3.5 + back * 0.12, 0.72);
     }
-    // a low shrub fringe hugging the very edge to hide the drop-off lip
     for (let i = 0; i < 120; i++) {
       const edge = half + 0.4 + Math.random() * 1.8;
       const along = (Math.random() * 2 - 1) * (half + 1.5);
       const side = Math.floor(Math.random() * 4);
-      const x = side === 0 ? along : side === 1 ? along : (side === 2 ? -edge : edge);
+      const x = side === 2 ? -edge : side === 3 ? edge : along;
       const z = side === 0 ? -edge : side === 1 ? edge : along;
       addProp(x, z, fringe[(Math.random() * fringe.length) | 0], 1.1 + Math.random() * 1.3, 0.9);
     }
@@ -483,7 +623,6 @@ export class FieldView {
       }
       this._rain.geometry.attributes.position.needsUpdate = true;
     }
-    // lightning when it storms
     if (this._weather === 'rain') {
       this._lightCd -= dt;
       if (this._lightCd <= 0) { this._lightCd = 5 + Math.random() * 8; this._flashT = 0.18; this._shake = Math.max(this._shake, 0.4); }
@@ -497,14 +636,13 @@ export class FieldView {
     const t = e.target;
     if (t && t.closest && t.closest('button')) return;
     e.preventDefault();
-    try { t.setPointerCapture(e.pointerId); } catch (_) {} // capture on the canvas (the event target) so drags keep coming
+    try { t.setPointerCapture(e.pointerId); } catch (_) {}
     if (e.clientX < window.innerWidth * 0.42) {
       this._joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: 0, z: 0 };
       this._stick.style.display = 'block'; this._stick.style.left = (e.clientX - 60) + 'px'; this._stick.style.top = (e.clientY - 60) + 'px';
       this._nub.style.left = '35px'; this._nub.style.top = '35px';
     } else {
-      this._look = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 };
-      this._tapCand = { x: e.clientX, y: e.clientY, t: performance.now() };
+      this._look = { id: e.pointerId, x: e.clientX, y: e.clientY };
     }
   }
   pointerMove(e) {
@@ -515,41 +653,22 @@ export class FieldView {
       this._joy.x = dx / cap; this._joy.z = dy / cap;
     }
     if (this._look && e.pointerId === this._look.id) {
-      const ddx = e.clientX - this._look.x, ddy = e.clientY - this._look.y;
-      this._look.moved += Math.abs(ddx) + Math.abs(ddy);
-      this.yaw -= ddx * LOOK_SENS;
-      this.pitch = Math.max(-1.2, Math.min(1.2, this.pitch - ddy * LOOK_SENS));
+      this.yaw -= (e.clientX - this._look.x) * LOOK_SENS;
+      this.pitch = Math.max(-1.2, Math.min(1.2, this.pitch - (e.clientY - this._look.y) * LOOK_SENS));
       this._look.x = e.clientX; this._look.y = e.clientY;
     }
   }
   pointerUp(e) {
     if (this._joy && e.pointerId === this._joy.id) { this._joy = null; this._stick.style.display = 'none'; }
-    if (this._look && e.pointerId === this._look.id) {
-      const tap = this._tapCand;
-      const quick = tap && (performance.now() - tap.t) < 320 && this._look.moved < 10;
-      this._look = null; this._tapCand = null;
-      if (quick && !this.possessed) this._tapPossess(tap.x, tap.y);
-    }
-  }
-  _tapPossess(px, py) {
-    const ndc = new THREE.Vector2((px / window.innerWidth) * 2 - 1, -(py / window.innerHeight) * 2 + 1);
-    const ray = this.b.raycaster; ray.setFromCamera(ndc, this.cam);
-    const hit = ray.intersectObject(this.b.pickPlane)[0]; if (!hit) return;
-    let best = null, bd = 2.0 * 2.0;
-    for (const u of this.b.units) {
-      if (u.dead || u.team !== 'player' || u.company.routing) continue;
-      const dx = u.pos.x - hit.point.x, dz = u.pos.z - hit.point.z, d = dx * dx + dz * dz;
-      if (d < bd) { bd = d; best = u; }
-    }
-    if (best) this.possess(best); else this._banner('No warrior of yours there — tap one of your own.', 0xd8d2c0);
+    if (this._look && e.pointerId === this._look.id) this._look = null;
   }
 
   _bindKeys() {
     const H = this._handlers;
     H.kd = (e) => {
       const k = e.key.toLowerCase(); this._keys.add(k);
-      if (k === 'v') { this.toggle(); e.preventDefault(); }
-      else if (k === 'escape' || k === 'r') { if (this.possessed) this.release('eject'); }
+      if (k === 'v' || k === 'escape') { this._leaveField(); e.preventDefault(); }
+      else if (k === 'r') { if (this.possessed) this.release('eject'); }
       else if (k === ' ') { if (this.possessed) { this._strike(); e.preventDefault(); } }
       else if (k === 'f') { if (this.possessed) this._throw(); }
     };
@@ -567,31 +686,35 @@ export class FieldView {
     this._btnUp.style.display = poss ? 'none' : 'flex';
     this._btnDown.style.display = poss ? 'none' : 'flex';
     this._cross.style.display = poss ? 'block' : 'none';
-    this._hint.textContent = poss ? '' : 'Fly the field — tap one of your own to take their body';
+    this._hint.textContent = poss ? '' : 'Observing — fly freely. Return to the plan to ride a warrior.';
     this._hint.style.opacity = poss ? '0' : '0.9';
   }
 
   // ---- DOM ----------------------------------------------------------------
   _dom() {
     if (this._built) return; this._built = true;
-    const mkToggle = () => {
-      const b = document.createElement('button'); b.id = 'field-toggle';
-      b.innerHTML = '⚔ Enter the field';
-      b.style.cssText = 'position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:62;background:#13110bdd;color:#f2e6c8;border:1px solid #b89a52;border-radius:9px;padding:7px 15px;font:600 14px Georgia,serif;cursor:pointer;display:none';
-      b.addEventListener('click', () => this.toggle());
+    const topBtn = (id, left, html) => {
+      const b = document.createElement('button'); b.id = id; b.innerHTML = html;
+      b.style.cssText = `position:fixed;top:10px;left:${left};transform:translateX(-50%);z-index:62;background:#13110bdd;color:#f2e6c8;border:1px solid #b89a52;border-radius:9px;padding:7px 15px;font:600 14px Georgia,serif;cursor:pointer;display:none`;
       document.body.appendChild(b); return b;
     };
-    this._toggleBtn = mkToggle();
+    this._observeBtn = topBtn('field-observe', 'calc(50% - 96px)', '👁 Observe the field');
+    this._rideBtn = topBtn('field-ride', 'calc(50% + 96px)', '⚔ Ride — pick a warrior');
+    this._returnBtn = topBtn('field-return', '50%', '🗺 Battle map');
+    this._observeBtn.addEventListener('click', () => this.observe());
+    this._rideBtn.addEventListener('click', () => this.ride());
+    this._returnBtn.addEventListener('click', () => this._leaveField());
+    this._toastEl = document.createElement('div');
+    this._toastEl.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:62;background:#0b0e14e8;color:#f2e6c8;border:1px solid #6b5a30;border-radius:8px;padding:6px 13px;font:13px Georgia,serif;display:none;max-width:86%;text-align:center';
+    document.body.appendChild(this._toastEl);
 
     const h = document.createElement('div'); h.id = 'field-hud';
-    // pointer-events:none so look/move/tap fall through to the canvas (which owns
-    // the pointer listeners); only the buttons below re-enable pointer-events.
     h.style.cssText = 'position:fixed;inset:0;z-index:60;display:none;color:#eee;user-select:none;-webkit-user-select:none;touch-action:none;overflow:hidden;pointer-events:none';
     this._hud = h;
     this._flash = document.createElement('div');
     this._flash.style.cssText = 'position:absolute;inset:0;pointer-events:none;background:#eaf0ff;opacity:0';
     h.appendChild(this._flash);
-    this._hurt = document.createElement('div'); // red edge-glow when the foe's fire lands on you
+    this._hurt = document.createElement('div');
     this._hurt.style.cssText = 'position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 150px 45px rgba(190,20,20,0.9)';
     h.appendChild(this._hurt);
     this._cross = document.createElement('div');
@@ -605,7 +728,6 @@ export class FieldView {
     this._bannerEl.style.cssText = 'position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font:800 26px Georgia,serif;text-align:center;text-shadow:0 2px 8px #000;display:none;width:90%;pointer-events:none';
     h.appendChild(this._bannerEl);
 
-    // move stick (springs up where you press, left half)
     this._stick = document.createElement('div');
     this._stick.style.cssText = 'position:absolute;width:120px;height:120px;border-radius:50%;background:#fff1;border:2px solid #fff3;display:none;pointer-events:none';
     this._nub = document.createElement('div');
@@ -628,6 +750,16 @@ export class FieldView {
     hold(this._btnDown, (v) => this._fall = v);
 
     document.body.appendChild(h);
+  }
+  _showPlanButtons(show) {
+    if (this._observeBtn) this._observeBtn.style.display = show ? 'block' : 'none';
+    if (this._rideBtn) this._rideBtn.style.display = show ? 'block' : 'none';
+  }
+  _updateRideLabel() { if (this._rideBtn) this._rideBtn.innerHTML = this._chosen ? `⚔ Ride with ${labelOf(this._chosen.type)}` : '⚔ Ride — pick a warrior'; }
+  _toast(text) {
+    if (!this._toastEl) return;
+    this._toastEl.textContent = text; this._toastEl.style.display = 'block';
+    clearTimeout(this._toastTo); this._toastTo = setTimeout(() => { if (this._toastEl) this._toastEl.style.display = 'none'; }, 2600);
   }
   _banner(text, color) {
     if (!this._bannerEl) return;

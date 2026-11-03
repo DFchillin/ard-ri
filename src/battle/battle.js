@@ -431,6 +431,7 @@ export class Battle {
     const inBattle = this.phase === 'battle' && this.started;
     if (!inBattle) { if (this.field && this.field.active) this.field.update(dt, false); return; }
     dt = Math.min(dt, 0.05);
+    if (this.field) this.field.updateMarkers(); // the shooter's silver X and your chosen rider's ring, in both views
     for (const c of this.companies) if (c.cryT > 0) c.cryT -= dt;
     for (const u of this.units) if (!u.dead) this._move(u, dt);
     for (const u of this.units) {
@@ -637,6 +638,11 @@ export class Battle {
     for (const u of this.units) if (!u.dead && !u.company.routing && (!team || u.team === team)) { const d = dist2(u.pos, w); if (d < bd) { bd = d; best = u.company; } }
     return best;
   }
+  _nearestUnit(w, team) {
+    let best = null, bd = 1.1;
+    for (const u of this.units) if (!u.dead && !u.company.routing && (!team || u.team === team)) { const d = dist2(u.pos, w); if (d < bd) { bd = d; best = u; } }
+    return best;
+  }
 
   pointerDown(e) {
     if (this.field && this.field.active) { this.field.pointerDown(e); return; }
@@ -684,6 +690,15 @@ export class Battle {
     }
     const w = this._worldAt(e); if (!w) return;
     if (this.phase === 'muster') { this._musterTap(w); return; }
+    // double-tap one of your own to pick who you'll ride with when you take the field
+    if (this.phase === 'battle') {
+      const fu = this._nearestUnit(w, 'player');
+      if (fu) {
+        const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        if (this._lastRiderU === fu && now - (this._lastRiderT || 0) < 450) { this._lastRiderU = null; if (this.field) this.field.chooseRider(fu); return; }
+        this._lastRiderT = now; this._lastRiderU = fu;
+      }
+    }
     // battle tap: command or select
     const foeCo = this._companyAt(w, 'enemy'); const bld = this._buildingAt(w); const friendCo = this._companyAt(w, 'player');
     if (this.selected.size && (foeCo || bld)) { const tgt = foeCo ? foeCo.units.find((u) => !u.dead) : bld; for (const c of this.selected) c.target = { foe: tgt }; }
