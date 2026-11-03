@@ -438,31 +438,34 @@ export class FieldView {
     const s = new THREE.Sprite(mat); s.scale.set(gold ? 0.62 : 0.5, gold ? 0.62 : 0.5, 1);
     s.position.set(sh.pos.x, eye, sh.pos.z);
     this.scene.add(s);
-    const dmg = UNIT_TYPES[sh.type].atk * matchup(sh.type, u.type); // full: the enchanted takes an orb's full bite
-    this._eDarts.push({ s, dir, life: 2.4, spd: 18, dmg });
+    this._eDarts.push({ s, dir, life: 2.4, spd: 18, atk: UNIT_TYPES[sh.type].atk, shType: sh.type });
     const spr = sh.mesh.userData.spr; if (spr && spr.strike) spr.strike();
   }
   _updateEnemyDarts(dt, inBattle) {
     const u = this.possessed;
     for (let i = this._eDarts.length - 1; i >= 0; i--) {
       const d = this._eDarts[i]; d.life -= dt;
-      if (inBattle && u && !u.dead) {
+      if (inBattle && u && !u.dead) { // it homes toward the enchanted — but the shot still travels a line
         const ty = unitTall(u.type) * 0.75;
         const want = new THREE.Vector3(u.pos.x - d.s.position.x, ty - d.s.position.y, u.pos.z - d.s.position.z).normalize();
         d.dir.lerp(want, Math.min(1, 1.8 * dt)).normalize();
       }
       d.s.position.addScaledVector(d.dir, d.spd * dt);
-      let hit = false;
-      if (inBattle && u && !u.dead) {
-        const dx = u.pos.x - d.s.position.x, dy = unitTall(u.type) * 0.75 - d.s.position.y, dz = u.pos.z - d.s.position.z;
-        if (dx * dx + dy * dy + dz * dz < 0.95 * 0.95) {
-          const killed = this.b._applyHit(u, d.dmg); // u is the enchanted → full
-          this._hurtT = 0.55; this._shake = Math.max(this._shake, killed ? 0.95 : 0.55);
-          for (let k = 0; k < 5; k++) this._spawnSmoke(u.pos.x, unitTall(u.type) * 0.6, u.pos.z, tierOf(u.type), true);
-          hit = true;
-        }
+      // anyone of your own standing in the line takes the orb first — screen your
+      // enchanted warrior with your bodies and the shot never reaches them.
+      let hitU = null, hd = 0.95 * 0.95;
+      if (inBattle) for (const o of this.b.units) {
+        if (o.dead || o.team !== 'player') continue;
+        const dx = o.pos.x - d.s.position.x, dy = unitTall(o.type) * 0.65 - d.s.position.y, dz = o.pos.z - d.s.position.z;
+        const dd = dx * dx + dy * dy + dz * dz;
+        if (dd < hd) { hd = dd; hitU = o; }
       }
-      if (hit || d.life <= 0 || d.s.position.y < -0.5) { this.scene.remove(d.s); d.s.material.dispose(); this._eDarts.splice(i, 1); }
+      if (hitU) {
+        const killed = this._orbHit(hitU, d.atk * matchup(d.shType, hitU.type)); // enchanted → full; a screen → only a third
+        if (hitU === u) { this._hurtT = 0.55; this._shake = Math.max(this._shake, killed ? 0.95 : 0.55); }
+        for (let k = 0; k < 5; k++) this._spawnSmoke(hitU.pos.x, unitTall(hitU.type) * 0.6, hitU.pos.z, tierOf(hitU.type), true);
+      }
+      if (hitU || d.life <= 0 || d.s.position.y < -0.5) { this.scene.remove(d.s); d.s.material.dispose(); this._eDarts.splice(i, 1); }
     }
   }
   _clearEnemyFire() { for (const d of this._eDarts) { this.scene.remove(d.s); d.s.material.dispose(); } this._eDarts = []; }
