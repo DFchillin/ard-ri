@@ -430,7 +430,8 @@ export class Battle {
     if (!this.active) return;
     const inBattle = this.phase === 'battle' && this.started;
     if (!inBattle) { if (this.field && this.field.active) this.field.update(dt, false); return; }
-    dt = Math.min(dt, 0.05);
+    const slow = (this.field && this.field.active) ? this.field.consumeSlowmo(dt) : 1; // the ride-in plays in slow motion
+    dt = Math.min(dt, 0.05) * slow;
     if (this.field) this.field.updateMarkers(); // the shooter's silver X and your chosen rider's ring, in both views
     for (const c of this.companies) if (c.cryT > 0) c.cryT -= dt;
     for (const u of this.units) if (!u.dead) this._move(u, dt);

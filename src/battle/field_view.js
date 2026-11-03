@@ -23,6 +23,31 @@ const SMOKE_CAP = 220;
 const OCCUPY_RANGE = 2.2;     // a player within this of the shooter keeps it too busy to shoot
 const ORB_WEAK = 1 / 3;       // an orb's bite on an ordinary (non-enchanted) soul
 const SHOOT_MIN = 2.4, SHOOT_MAX = 34;
+const SLOW_DUR = 3.0;         // seconds (real time) the ride-in plays in slow motion
+const SLOW_SCALE = 0.32;      // how slow the world runs during that window
+
+// The war-cry bank — raised in the sky as you take a body. A mix of Irish, English
+// and the two woven together. (A living list — we'll keep adding to it.)
+const CRIES = [
+  'Fág an Bealach!',                       // ga — Clear the way!
+  'Lámh Dhearg Abú!',                      // ga — The Red Hand to victory!
+  'Buaidh nó Bás!',                        // ga — Victory or death!
+  'Éire go deo!',                          // ga — Ireland forever!
+  'Cosain an fód!',                        // ga — Hold the sod!
+  'Fódla Abú!',                            // ga — up with Ireland!
+  'Éirígí — tá an lá linn!',               // ga — Rise, the day is ours!
+  'Ár! Ár! Ár!',                           // ga — Slaughter! Slaughter!
+  'Fág an Bealach — clear the way!',       // mixed
+  'Buaidh nó bás — victory or death!',     // mixed
+  'For the ráth! Lámh láidir abú!',        // mixed — the strong hand to victory
+  'The Mórrígan is watching — Ár!',        // mixed
+  'Cú Chulainn Abú — and no step back!',   // mixed
+  'Hold the sod, give no ground!',         // en
+  'Blood and the Red Branch!',             // en
+  'Into the spears, and never a step back!', // en
+  'Let the hills remember this day!',      // en
+  'Feed the ravens — forward!',            // en
+];
 
 const SKIES = ['sky_earrach', 'sky_samhradh', 'sky_fomhar', 'sky_geimhreadh'];
 const TIER = { god: 'gold', hero: 'gold', special: 'blue', seasoned: 'blue', warrior: 'blue', regular: 'green' };
@@ -83,7 +108,7 @@ export class FieldView {
     this._shooterCd = 0;
     this._keys = new Set();
     this._joy = null; this._look = null;
-    this._strikeCd = 0; this._throwCd = 0;
+    this._strikeCd = 0; this._throwCd = 0; this._slowT = 0;
     this._shake = 0; this._flashT = 0; this._lightCd = 6 + Math.random() * 6; this._hurtT = 0;
     this._orbTex = softTex(); this._pipTex = pipTex(); this._xTex = xTex(); this._ringTex = ringTex();
     this._tipV = new THREE.Vector3();
@@ -154,6 +179,8 @@ export class FieldView {
     const sb = document.getElementById('battle-sidebar'); if (sb) sb.style.visibility = '';
     const mc = document.getElementById('map-controls'); if (mc) mc.style.visibility = '';
     this._unbindKeys();
+    this._slowT = 0;
+    if (this._cryEl) this._cryEl.style.display = 'none';
     this._joy = this._look = null;
     if (this._stick) this._stick.style.display = 'none';
   }
@@ -176,12 +203,17 @@ export class FieldView {
     if (this._sword) this._sword.visible = true;
     this._setUnitOrbVisible(u, false);
     this.yaw = Math.atan2(-(u._dx || 0), -(u._dz || -1)) || 0;
+    this.pitch = 0; // gaze to the horizon, not down
+    this.pos.set(u.pos.x, unitTall(u.type) * 0.92, u.pos.z); // enter exactly at their eye, from frame one
+    this.cam.position.copy(this.pos); this.cam.rotation.set(this.pitch, this.yaw, 0);
+    this._slowT = SLOW_DUR; // the ride-in runs in slow motion
     this._setMode('possess');
+    this._showCry();
     this._banner(`Enchanted — you ride ${labelOf(u.type)}.`, ORB_RGB[tierOf(u.type)]);
   }
   release(mode) {
     const u = this.possessed; if (!u) { if (mode && mode !== 'silent') this._setMode('free'); return; }
-    this.possessed = null; u.possessed = false;
+    this.possessed = null; u.possessed = false; this._slowT = 0;
     if (this._sword) this._sword.visible = false;
     const spr = u.mesh.userData.spr; if (spr && !u.dead) spr.visible = true;
     if (!u.dead) { this._setUnitOrbVisible(u, true); this.pos.set(u.pos.x, unitTall(u.type) * 0.95 + 0.3, u.pos.z); }
@@ -270,6 +302,12 @@ export class FieldView {
 
   renderCam() { return this.cam; }
   resize(aspect) { this.aspect = aspect; this.cam.aspect = aspect; this.cam.updateProjectionMatrix(); }
+  // The battle asks this each frame for its time scale: the ride-in window slows the
+  // whole world; look stays real-time (it isn't dt-driven), so it reads as bullet-time.
+  consumeSlowmo(realDt) {
+    if (this._slowT > 0 && this.possessed && !this.possessed.dead) { this._slowT -= realDt; return SLOW_SCALE; }
+    this._slowT = 0; return 1;
+  }
 
   // ---- the held, smoking blade -------------------------------------------
   _buildSword() {
@@ -367,9 +405,7 @@ export class FieldView {
     this._shooter = null;
     const live = this.b.units.filter((x) => x.team === 'enemy' && !x.dead && !x.company.routing);
     if (!live.length) return;
-    let top = -Infinity; for (const x of live) top = Math.max(top, UNIT_TYPES[x.type].rank);
-    const champs = live.filter((x) => UNIT_TYPES[x.type].rank === top); // the foe's best stands as their shooter
-    this._shooter = champs[Math.floor(Math.random() * champs.length)];
+    this._shooter = live[Math.floor(Math.random() * live.length)]; // a randomer among the host stands as their shooter
     this._shooterCd = 1.4 + Math.random() * 1.6;
   }
   _shooterOccupied() {
@@ -707,6 +743,10 @@ export class FieldView {
     this._toastEl = document.createElement('div');
     this._toastEl.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:62;background:#0b0e14e8;color:#f2e6c8;border:1px solid #6b5a30;border-radius:8px;padding:6px 13px;font:13px Georgia,serif;display:none;max-width:86%;text-align:center';
     document.body.appendChild(this._toastEl);
+    // the war-cry, raised high in the sky as you take a body
+    this._cryEl = document.createElement('div');
+    this._cryEl.style.cssText = 'position:fixed;top:11%;left:50%;transform:translateX(-50%);z-index:61;pointer-events:none;display:none;opacity:0;width:92%;text-align:center;font:800 clamp(28px,6vw,54px) Georgia,serif;color:#ffe49a;text-shadow:0 2px 10px #000,0 0 26px rgba(255,180,60,0.55);letter-spacing:.5px';
+    document.body.appendChild(this._cryEl);
 
     const h = document.createElement('div'); h.id = 'field-hud';
     h.style.cssText = 'position:fixed;inset:0;z-index:60;display:none;color:#eee;user-select:none;-webkit-user-select:none;touch-action:none;overflow:hidden;pointer-events:none';
@@ -756,6 +796,15 @@ export class FieldView {
     if (this._rideBtn) this._rideBtn.style.display = show ? 'block' : 'none';
   }
   _updateRideLabel() { if (this._rideBtn) this._rideBtn.innerHTML = this._chosen ? `⚔ Ride with ${labelOf(this._chosen.type)}` : '⚔ Ride — pick a warrior'; }
+  _showCry() {
+    if (!this._cryEl) return;
+    this._lastCry = this._cryEl.textContent = CRIES[Math.floor(Math.random() * CRIES.length)];
+    this._cryEl.style.transition = 'none'; this._cryEl.style.opacity = '0'; this._cryEl.style.display = 'block';
+    requestAnimationFrame(() => { if (this._cryEl) { this._cryEl.style.transition = 'opacity .45s, transform .45s'; this._cryEl.style.opacity = '1'; } });
+    clearTimeout(this._cryTo); clearTimeout(this._cryHideTo);
+    this._cryTo = setTimeout(() => { if (this._cryEl) this._cryEl.style.opacity = '0'; }, 2800);
+    this._cryHideTo = setTimeout(() => { if (this._cryEl) this._cryEl.style.display = 'none'; }, 3350);
+  }
   _toast(text) {
     if (!this._toastEl) return;
     this._toastEl.textContent = text; this._toastEl.style.display = 'block';
