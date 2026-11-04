@@ -185,7 +185,7 @@ export class FieldView {
     fi.t += dt;
     const k = Math.min(1, fi.t / fi.dur);
     const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; // easeInOut
-    const eyeY = unitTall(u.type) * 0.92;
+    const eyeY = this.b._heightAt(u.pos.x, u.pos.z) + unitTall(u.type) * 0.92;
     const fx = u.pos.x * 0.4, fz = fi.fromZ, fy = fi.fromY; // swoop in from high behind your line
     this.pos.set(fx + (u.pos.x - fx) * e, fy + (eyeY - fy) * e, fz + (u.pos.z - fz) * e);
     this.yaw = 0; // settle looking toward the foe
@@ -235,7 +235,7 @@ export class FieldView {
     if (!fromEntry) { // a direct take-control: snap to their eye and begin the slow-mo + cry here
       this.yaw = Math.atan2(-(u._dx || 0), -(u._dz || -1)) || 0;
       this.pitch = 0;
-      this.pos.set(u.pos.x, unitTall(u.type) * 0.92, u.pos.z);
+      this.pos.set(u.pos.x, this.b._heightAt(u.pos.x, u.pos.z) + unitTall(u.type) * 0.92, u.pos.z);
       this.cam.position.copy(this.pos); this.cam.rotation.set(this.pitch, this.yaw, 0);
       this._slowT = SLOW_DUR; this._showCry();
     } // from the fly-in, the slow-mo + cry are already running and the camera has arrived
@@ -247,7 +247,7 @@ export class FieldView {
     this.possessed = null; u.possessed = false; this._slowT = 0;
     if (this._sword) this._sword.visible = false;
     const spr = u.mesh.userData.spr; if (spr && !u.dead) spr.visible = true;
-    if (!u.dead) { this._setUnitOrbVisible(u, true); this.pos.set(u.pos.x, unitTall(u.type) * 0.95 + 0.3, u.pos.z); }
+    if (!u.dead) { this._setUnitOrbVisible(u, true); this.pos.set(u.pos.x, this.b._heightAt(u.pos.x, u.pos.z) + unitTall(u.type) * 0.95 + 0.3, u.pos.z); }
     if (this.active && mode && mode !== 'silent') {
       this._setMode('free'); // drop to the battlefield (observer) view
       if (mode === 'fallen') {
@@ -298,7 +298,7 @@ export class FieldView {
     if (this._keys.has('shift') || this._keys.has('q') || this._fall) my -= 1;
     this.pos.addScaledVector(fwd, mz * FLY_SPD * dt);
     this.pos.addScaledVector(right, mx * FLY_SPD * dt);
-    this.pos.y = Math.max(1.2, Math.min(60, this.pos.y + my * FLY_SPD * dt));
+    this.pos.y = Math.max(this.b._heightAt(this.pos.x, this.pos.z) + 1.2, Math.min(60, this.pos.y + my * FLY_SPD * dt));
     const limX = this.b.map.halfX + 8, limZ = this.b.map.halfZ + 8;
     this.pos.x = Math.max(-limX, Math.min(limX, this.pos.x));
     this.pos.z = Math.max(-limZ, Math.min(limZ, this.pos.z));
@@ -322,7 +322,7 @@ export class FieldView {
       u.pos.x = Math.max(-limX, Math.min(limX, u.pos.x + (dx / m) * spd * dt));
       u.pos.z = Math.max(-limZ, Math.min(limZ, u.pos.z + (dz / m) * spd * dt));
     }
-    u.mesh.position.set(u.pos.x, 0, u.pos.z);
+    u.mesh.position.set(u.pos.x, this.b._heightAt(u.pos.x, u.pos.z), u.pos.z);
     const spr = u.mesh.userData.spr;
     if (spr) { u._dx = fwd.x; u._dz = fwd.z; if (spr.faceWorld) spr.faceWorld(fwd.x, fwd.z); if (spr.animate) spr.animate(dt, u._moving); }
   }
@@ -331,7 +331,7 @@ export class FieldView {
     if (this._shake > 0) this._shake = Math.max(0, this._shake - dt * 2.2);
     if (this.possessed && !this.possessed.dead) {
       const u = this.possessed;
-      this.pos.set(u.pos.x, unitTall(u.type) * 0.92, u.pos.z);
+      this.pos.set(u.pos.x, this.b._heightAt(u.pos.x, u.pos.z) + unitTall(u.type) * 0.92, u.pos.z);
     }
     const sx = this._shake ? (Math.random() - 0.5) * this._shake * 0.4 : 0;
     const sy = this._shake ? (Math.random() - 0.5) * this._shake * 0.4 : 0;
@@ -412,7 +412,7 @@ export class FieldView {
     const dir = new THREE.Vector3(-Math.sin(this.yaw), Math.sin(this.pitch) * 0.5, -Math.cos(this.yaw)).normalize();
     const mat = new THREE.SpriteMaterial({ map: this._orbTex, color: ORB_RGB[tierOf(u.type)], transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
     const s = new THREE.Sprite(mat); s.scale.set(0.5, 0.5, 1);
-    const eye = unitTall(u.type) * 0.8;
+    const eye = this.b._heightAt(u.pos.x, u.pos.z) + unitTall(u.type) * 0.8;
     s.position.set(u.pos.x + dir.x, eye + dir.y, u.pos.z + dir.z);
     this.scene.add(s);
     this._darts.push({ s, u, dir, life: 1.4, spd: 26 });
@@ -427,7 +427,7 @@ export class FieldView {
         const dx = o.pos.x - d.s.position.x, dz = o.pos.z - d.s.position.z;
         if (dx * dx + dz * dz < 0.9 * 0.9) {
           const killed = this._orbHit(o, d.u.atk * matchup(d.u.type, o.type) * 1.2);
-          this._hitSpark(o.pos.x, unitTall(o.type) * 0.5, o.pos.z, killed); hit = true; break;
+          this._hitSpark(o.pos.x, this.b._heightAt(o.pos.x, o.pos.z) + unitTall(o.type) * 0.5, o.pos.z, killed); hit = true; break;
         }
       }
       if (hit || d.life <= 0 || d.s.position.y < 0) { this.scene.remove(d.s); d.s.material.dispose(); this._darts.splice(i, 1); }
@@ -469,8 +469,8 @@ export class FieldView {
   }
   _fireShooter() {
     const sh = this._shooter, u = this.possessed; if (!sh || !u) return;
-    const eye = unitTall(sh.type) * 0.7;
-    const ty = unitTall(u.type) * 0.75;
+    const eye = this.b._heightAt(sh.pos.x, sh.pos.z) + unitTall(sh.type) * 0.7;
+    const ty = this.b._heightAt(u.pos.x, u.pos.z) + unitTall(u.type) * 0.75;
     const dir = new THREE.Vector3(u.pos.x - sh.pos.x, ty - eye, u.pos.z - sh.pos.z).normalize();
     const gold = isGod(sh.type);
     const mat = new THREE.SpriteMaterial({ map: this._orbTex, color: gold ? 0xffd34a : 0xff5a2a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
@@ -485,7 +485,7 @@ export class FieldView {
     for (let i = this._eDarts.length - 1; i >= 0; i--) {
       const d = this._eDarts[i]; d.life -= dt;
       if (inBattle && u && !u.dead) { // it homes toward the enchanted — but the shot still travels a line
-        const ty = unitTall(u.type) * 0.75;
+        const ty = this.b._heightAt(u.pos.x, u.pos.z) + unitTall(u.type) * 0.75;
         const want = new THREE.Vector3(u.pos.x - d.s.position.x, ty - d.s.position.y, u.pos.z - d.s.position.z).normalize();
         d.dir.lerp(want, Math.min(1, 1.8 * dt)).normalize();
       }
@@ -495,14 +495,14 @@ export class FieldView {
       let hitU = null, hd = 0.95 * 0.95;
       if (inBattle) for (const o of this.b.units) {
         if (o.dead || o.team !== 'player') continue;
-        const dx = o.pos.x - d.s.position.x, dy = unitTall(o.type) * 0.65 - d.s.position.y, dz = o.pos.z - d.s.position.z;
+        const dx = o.pos.x - d.s.position.x, dy = this.b._heightAt(o.pos.x, o.pos.z) + unitTall(o.type) * 0.65 - d.s.position.y, dz = o.pos.z - d.s.position.z;
         const dd = dx * dx + dy * dy + dz * dz;
         if (dd < hd) { hd = dd; hitU = o; }
       }
       if (hitU) {
         const killed = this._orbHit(hitU, d.atk * matchup(d.shType, hitU.type)); // enchanted → full; a screen → only a third
         if (hitU === u) { this._hurtT = 0.55; this._shake = Math.max(this._shake, killed ? 0.95 : 0.55); }
-        for (let k = 0; k < 5; k++) this._spawnSmoke(hitU.pos.x, unitTall(hitU.type) * 0.6, hitU.pos.z, tierOf(hitU.type), true);
+        for (let k = 0; k < 5; k++) this._spawnSmoke(hitU.pos.x, this.b._heightAt(hitU.pos.x, hitU.pos.z) + unitTall(hitU.type) * 0.6, hitU.pos.z, tierOf(hitU.type), true);
       }
       if (hitU || d.life <= 0 || d.s.position.y < -0.5) { this.scene.remove(d.s); d.s.material.dispose(); this._eDarts.splice(i, 1); }
     }
@@ -519,13 +519,13 @@ export class FieldView {
     if (this._shooter && (this._shooter.dead || this._shooter.company.routing)) this._shooter = null;
     if (this._shooter) {
       if (!this._xMarker) { this._xMarker = this._flatDecal(this._xTex, 2.1); this.scene.add(this._xMarker); }
-      this._xMarker.visible = true; this._xMarker.position.set(this._shooter.pos.x, 0.08, this._shooter.pos.z);
+      this._xMarker.visible = true; this._xMarker.position.set(this._shooter.pos.x, this.b._heightAt(this._shooter.pos.x, this._shooter.pos.z) + 0.08, this._shooter.pos.z);
     } else if (this._xMarker) this._xMarker.visible = false;
     // the warrior you have chosen to ride — a gold ring
     if (this._chosen && this._chosen.dead) { this._chosen = null; this._updateRideLabel(); }
     if (this._chosen) {
       if (!this._ringMarker) { this._ringMarker = this._flatDecal(this._ringTex, 1.4); this.scene.add(this._ringMarker); }
-      this._ringMarker.visible = true; this._ringMarker.position.set(this._chosen.pos.x, 0.07, this._chosen.pos.z);
+      this._ringMarker.visible = true; this._ringMarker.position.set(this._chosen.pos.x, this.b._heightAt(this._chosen.pos.x, this._chosen.pos.z) + 0.07, this._chosen.pos.z);
     } else if (this._ringMarker) this._ringMarker.visible = false;
   }
   _clearMarkers() {
@@ -564,7 +564,7 @@ export class FieldView {
     for (const u of this.b.units) {
       if (u._orbs) {
         if (u.dead) { for (const s of u._orbs) { this.scene.remove(s); s.material.dispose(); } u._orbs = null; continue; }
-        const h = unitTall(u.type), frac = Math.max(0, u.hp) / u.hp0;
+        const gy = this.b._heightAt(u.pos.x, u.pos.z), h = gy + unitTall(u.type), frac = Math.max(0, u.hp) / u.hp0;
         const n = frac > 0.66 ? 3 : frac > 0.33 ? 2 : frac > 0.12 ? 1 : 0; // high→3, low→1, very low→0
         const bob = Math.sin(this._orbT * 2 + u.id) * 0.06;
         for (let i = 0; i < 3; i++) {
@@ -575,7 +575,7 @@ export class FieldView {
       }
       const orb = u._orb; if (!orb) continue;
       if (u.dead) { this.scene.remove(orb); orb.material.dispose(); u._orb = null; continue; }
-      const h = unitTall(u.type);
+      const h = this.b._heightAt(u.pos.x, u.pos.z) + unitTall(u.type);
       orb.position.set(u.pos.x, h + 0.55 + Math.sin(this._orbT * 2 + u.id) * 0.08, u.pos.z);
       orb.material.opacity = 0.72 + Math.sin(this._orbT * 3 + u.id) * 0.18;
     }
@@ -595,7 +595,7 @@ export class FieldView {
       const base = tier === 'gold' ? 0.32 : tier === 'blue' ? 0.95 : 1.7;
       const iv = (this.possessed === u) ? 0.22 : base;
       u._smT = (u._smT || Math.random() * iv) - dt;
-      if (u._smT <= 0) { u._smT = iv; this._spawnSmoke(u.pos.x, unitTall(u.type) * 0.5, u.pos.z, tier, false); }
+      if (u._smT <= 0) { u._smT = iv; this._spawnSmoke(u.pos.x, this.b._heightAt(u.pos.x, u.pos.z) + unitTall(u.type) * 0.5, u.pos.z, tier, false); }
     }
   }
   _spawnSmoke(x, y, z, tier, burst) {

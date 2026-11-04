@@ -167,6 +167,20 @@ export class Battle {
     const shapes = [[20, 20], [22, 22], [16, 24], [18, 26], [16, 28], [24, 16], [26, 18], [28, 16]];
     return shapes[(Math.random() * shapes.length) | 0];
   }
+  // A few gentle rises scattered across the field — high ground that lends a
+  // combat edge and gives the ground some shape instead of a flat board.
+  _genHeightmap() {
+    this._hills = [];
+    const n = Math.random() < 0.28 ? 0 : 1 + ((Math.random() * 3) | 0);
+    const hx = this.map.halfX, hz = this.map.halfZ;
+    for (let i = 0; i < n; i++) this._hills.push({ x: (Math.random() * 2 - 1) * hx * 0.72, z: (Math.random() * 2 - 1) * hz * 0.6, amp: 1.3 + Math.random() * 2.2, r: 2.6 + Math.random() * 2.6 });
+  }
+  _heightAt(x, z) {
+    const hills = this._hills; if (!hills || !hills.length) return 0;
+    let y = 0;
+    for (const h of hills) { const dx = x - h.x, dz = z - h.z; y += h.amp * Math.exp(-(dx * dx + dz * dz) / (2 * h.r * h.r)); }
+    return y;
+  }
 
   // Tactical obstacle terrain: mires on the flanks, a boggy neck up the middle,
   // so a charge up the wings bogs down and the ground shapes the fight.
@@ -231,9 +245,11 @@ export class Battle {
     if (!this.map || this.map.w !== W || this.map.h !== H) {
       if (this.view) this.view.teardown();
       this.map = new Tilemap(W, 1, (Math.random() * 0x7fffffff) | 0, H);
-      this.view = new WorldView(this.scene, this.map);
+      this.view = new WorldView(this.scene, this.map, (wx, wz) => this._heightAt(wx, wz));
       this.pickPlane = this.view.pickPlane;
     }
+    this._genHeightmap();                 // a few gentle rises — high ground to take
+    this.view.heightFn = (wx, wz) => this._heightAt(wx, wz);
     this._musterMinZ = Math.max(4, Math.round(this.map.h * 0.3)); // the player musters in the back ~70%
     const ox = (this.map.w - 20) / 2; // keep the foe centred on wider/narrower fields
     this._randomTerrain((Math.random() * 0x7fffffff) | 0); // a different field every fight
@@ -376,8 +392,9 @@ export class Battle {
     }
     const chip = makeBuildingChip(d.role, d.w, d.h, this.map.tile);
     const cx = d.x - this.map.halfX + d.w / 2, cz = d.z - this.map.halfZ + d.h / 2;
-    chip.position.set(cx, 0, cz);
-    const bar = makeBar(1.4); bar.position.set(cx, 2.6, cz);
+    const cy = this._heightAt(cx, cz);
+    chip.position.set(cx, cy, cz);
+    const bar = makeBar(1.4); bar.position.set(cx, cy + 2.6, cz);
     this.buildingGroup.add(bar); this.buildingGroup.add(chip);
     const b = { id: ++_uid, team: d.team || 'enemy', kind: 'building', chip, bar, pos: { x: cx, z: cz }, w: d.w, h: d.h, hp: d.hp, hp0: d.hp, dead: false };
     drawBar(bar, 1, 0x6cc551); this.buildings.push(b); return b;
@@ -416,7 +433,7 @@ export class Battle {
     const u = { id: ++_uid, team, type, company: co, kind: 'unit', hp: t.hp, hp0: t.hp, atk: t.atk, build: t.build,
       pos: { x, z }, dead: false, mesh: null, slot: { dx: 0, dz: 0 } };
     const mesh = makeUnitVisual(type, team);
-    mesh.position.set(x, 0, z);
+    mesh.position.set(x, this._heightAt(x, z), z);
     u.mesh = mesh; u.ring = mesh.userData.ring; u.bar = mesh.userData.bar; u.tag = mesh.userData.tag;
     drawBar(u.bar, 1, 0x6cc551);
     this.unitGroup.add(mesh); this.units.push(u);
@@ -528,7 +545,7 @@ export class Battle {
       const dz = (u.team === 'player' ? this.map.halfZ + 3 : -this.map.halfZ - 3) - u.pos.z;
       u.pos.z += Math.sign(dz) * Math.min(spd * dt, Math.abs(dz));
       if (Math.abs(u.pos.z) > this.map.halfZ + 1) { u.dead = true; u.fled = true; this.unitGroup.remove(u.mesh); }
-      else { u.mesh.position.set(u.pos.x, 0, u.pos.z); u._moving = true; const spr = u.mesh.userData.spr; if (spr && spr.faceWorld) spr.faceWorld(0, Math.sign(dz)); }
+      else { u.mesh.position.set(u.pos.x, this._heightAt(u.pos.x, u.pos.z), u.pos.z); u._moving = true; const spr = u.mesh.userData.spr; if (spr && spr.faceWorld) spr.faceWorld(0, Math.sign(dz)); }
       return;
     }
     // hold to fight an enemy already in reach — turn to face the nearest foe
@@ -545,7 +562,7 @@ export class Battle {
     if (dist > stop) {
       const step = Math.min(spd * dt, dist);
       u.pos.x += (dx / dist) * step; u.pos.z += (dz / dist) * step;
-      u.mesh.position.set(u.pos.x, 0, u.pos.z);
+      u.mesh.position.set(u.pos.x, this._heightAt(u.pos.x, u.pos.z), u.pos.z);
       u._moving = true;
       if (u.mesh.userData.spr && u.mesh.userData.spr.faceWorld) u.mesh.userData.spr.faceWorld(dx, dz);
     } else if (c.target && c.target.point && this._companyArrived(c)) c.target = null;
@@ -556,7 +573,10 @@ export class Battle {
     const f = FORMATIONS[att.company.formation];
     const cry = att.company.cryT > 0 ? 1.25 : 1.0;
     if (def.kind === 'building') return att.build * (att.company.morale / 100) * f.atk * cry * KB * (att.company.bondPair ? BOND_BUILD : 1);
-    return att.atk * (att.company.morale / 100) * f.atk * matchup(att.type, def.type) * cry * KU;
+    // the high ground: an attacker above their foe strikes harder, below strikes softer
+    const dh = this._heightAt(att.pos.x, att.pos.z) - this._heightAt(def.pos.x, def.pos.z);
+    const ground = 1 + Math.max(-0.2, Math.min(0.35, dh * 0.14));
+    return att.atk * (att.company.morale / 100) * f.atk * matchup(att.type, def.type) * cry * ground * KU;
   }
 
   // The enemy reads the local fight and shifts its shape: a steady line while
@@ -819,7 +839,7 @@ export class Battle {
       this.scene.add(co.planArrow);
     }
     const dir = len > 0.001 ? new THREE.Vector3(dx / len, 0, dz / len) : new THREE.Vector3(0, 0, -1);
-    co.planArrow.position.set(from.x, 0.14, from.z);
+    co.planArrow.position.set(from.x, this._heightAt(from.x, from.z) + 0.14, from.z);
     co.planArrow.setDirection(dir);
     co.planArrow.setLength(Math.max(0.2, len), Math.min(1.5, len * 0.3), Math.min(1.0, len * 0.2));
     co.planArrow.setColor(col);

@@ -9,8 +9,9 @@ const TERR_FILE = {
 };
 
 export class WorldView {
-  constructor(scene, map) {
+  constructor(scene, map, heightFn = null) {
     this.map = map;
+    this.heightFn = heightFn; // optional (wx,wz)=>y for raised ground; flat when null (the settlement)
     this.ts = map.tile;
     this.half = map.half; this.halfX = map.halfX; this.halfZ = map.halfZ;
 
@@ -77,7 +78,9 @@ export class WorldView {
         const b = (buckets[t] = buckets[t] || { pos: [], uv: [], col: [], idx: [], vi: 0 });
         const y = t === T.WATER ? -0.18 : 0;
         const wx = x * ts - halfX, wz = z * ts - halfZ;
-        b.pos.push(wx, y, wz, wx + ts, y, wz, wx + ts, y, wz + ts, wx, y, wz + ts);
+        const hf = (this.heightFn && t !== T.WATER) ? this.heightFn : null; // raise the ground; keep water in its hollow
+        const y0 = hf ? y + hf(wx, wz) : y, y1 = hf ? y + hf(wx + ts, wz) : y, y2 = hf ? y + hf(wx + ts, wz + ts) : y, y3 = hf ? y + hf(wx, wz + ts) : y;
+        b.pos.push(wx, y0, wz, wx + ts, y1, wz, wx + ts, y2, wz + ts, wx, y3, wz + ts);
         const r = (Math.random() * 4) | 0, flip = Math.random() < 0.5; // 8 orientations
         for (let i = 0; i < 4; i++) { const c = CORN[(i + r) % 4]; b.uv.push(flip ? 1 - c[0] : c[0], c[1]); }
         const v = 0.9 + Math.random() * 0.16;          // brightness patchiness
