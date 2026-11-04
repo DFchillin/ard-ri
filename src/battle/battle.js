@@ -9,6 +9,7 @@ import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNic
 
 const MAP = 20;
 const SUMMONABLE = ['cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan']; // heroes/gods that only answer a hosted, favoured muster
+const SIM_RATE = 0.66; // the clash runs about a third slower than real time — more time to read it and react
 const CLASH_DT = 0.55;
 // Death is a render-side effect, not drawn art: the slain figure dissolves —
 // fading and burning from pale to red to ash — while a short burst of dark
@@ -436,7 +437,7 @@ export class Battle {
     if (!inBattle) { if (this.field && this.field.active) this.field.update(dt, false, dt); return; }
     const realDt = Math.min(dt, 0.05); // your own shooting runs in real time even during the slow-mo ride-in
     const slow = (this.field && this.field.active) ? this.field.consumeSlowmo(dt) : 1; // the ride-in plays in slow motion
-    dt = realDt * slow;
+    dt = realDt * slow * SIM_RATE; // the host marches and clashes about a third slower; your own actions stay real-time
     if (this.field) this.field.updateMarkers(); // the shooter's silver X and your chosen rider's ring, in both views
     for (const c of this.companies) if (c.cryT > 0) c.cryT -= dt;
     for (const u of this.units) if (!u.dead) this._move(u, dt);
