@@ -162,7 +162,11 @@ export class Battle {
     this.field = new FieldView(this); // the first-person Field View: free-cam + possession
   }
 
-  _worldOf(tx, tz) { return { x: tx - this.map.half + 0.5, z: tz - this.map.half + 0.5 }; }
+  _worldOf(tx, tz) { return { x: tx - this.map.halfX + 0.5, z: tz - this.map.halfZ + 0.5 }; }
+  _rollFieldShape() { // [w, h] in tiles — square, long (corridor), or wide (room to flank)
+    const shapes = [[20, 20], [22, 22], [16, 24], [18, 26], [16, 28], [24, 16], [26, 18], [28, 16]];
+    return shapes[(Math.random() * shapes.length) | 0];
+  }
 
   // Tactical obstacle terrain: mires on the flanks, a boggy neck up the middle,
   // so a charge up the wings bogs down and the ground shapes the fight.
@@ -180,14 +184,17 @@ export class Battle {
     let a = seed | 0;
     const rnd = () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     for (const tile of this.map.tiles) { tile.terrain = T.GRASS; tile.road = false; tile.occupant = null; tile.blocked = false; }
+    const W = this.map.w, H = this.map.h;
+    const bxo = Math.round((W - 20) / 2), bzo = H - 20; // same offset the ráth is spawned with
     const blocked = new Set();
-    for (const b of this.cfg.buildings || []) for (let dz = -1; dz <= b.h; dz++) for (let dx = -1; dx <= b.w; dx++) blocked.add((b.x + dx) + ',' + (b.z + dz));
+    for (const b of this.cfg.buildings || []) for (let dz = -1; dz <= b.h; dz++) for (let dx = -1; dx <= b.w; dx++) blocked.add((b.x + bxo + dx) + ',' + (b.z + bzo + dz));
     const kinds = [T.BOG, T.BOG, T.WATER, T.WOODS];
-    const patches = 5 + Math.floor(rnd() * 4);
+    const patches = 5 + Math.floor(rnd() * (3 + Math.round(W * H / 200))); // more scatter on bigger fields
+    const bandLo = Math.max(3, Math.round(H * 0.2)), bandHi = Math.min(H - 2, Math.round(H * 0.7)); // clear of the enemy line and the muster
     for (let p = 0; p < patches; p++) {
       const kind = kinds[Math.floor(rnd() * kinds.length)];
-      const cx = 2 + Math.floor(rnd() * (MAP - 4));
-      const cz = 4 + Math.floor(rnd() * 9); // clash-band only (rows 4..12): clear of muster (south) and the enemy back line
+      const cx = 2 + Math.floor(rnd() * (W - 4));
+      const cz = bandLo + Math.floor(rnd() * Math.max(1, bandHi - bandLo));
       const rw = 1 + Math.floor(rnd() * 3), rh = 1 + Math.floor(rnd() * 2);
       for (let dz = 0; dz < rh; dz++) for (let dx = 0; dx < rw; dx++) {
         const x = cx + dx, z = cz + dz; const tile = this.map.get(x, z);
@@ -218,12 +225,23 @@ export class Battle {
     this.units = []; this.companies = []; this.buildings = []; this.selected.clear();
     this._dying = [];
     this.fallen = [];
+    // a battlefield of a random shape each fight — some long (a charging corridor),
+    // some wide (room to flank), some square
+    const [W, H] = this._rollFieldShape();
+    if (!this.map || this.map.w !== W || this.map.h !== H) {
+      if (this.view) this.view.teardown();
+      this.map = new Tilemap(W, 1, (Math.random() * 0x7fffffff) | 0, H);
+      this.view = new WorldView(this.scene, this.map);
+      this.pickPlane = this.view.pickPlane;
+    }
+    this._musterMinZ = Math.max(4, Math.round(this.map.h * 0.3)); // the player musters in the back ~70%
+    const ox = (this.map.w - 20) / 2; // keep the foe centred on wider/narrower fields
     this._randomTerrain((Math.random() * 0x7fffffff) | 0); // a different field every fight
-    for (const d of this.cfg.buildings || []) this._spawnBuilding(d);
-    for (const c of this.cfg.enemyCompanies || []) this._placeCompany('enemy', c.name, c.formation, c.types, this._worldOf(c.x, c.z));
+    for (const d of this.cfg.buildings || []) this._spawnBuilding({ ...d, x: d.x + Math.round((this.map.w - 20) / 2), z: d.z + (this.map.h - 20) }); // ráth to the new back edge
+    for (const c of this.cfg.enemyCompanies || []) this._placeCompany('enemy', c.name, c.formation, c.types, this._worldOf(c.x + ox, c.z));
     this._menaceUnit = null;
     for (const [t, x, z] of this.cfg.enemyLone || []) {
-      const co = this._placeCompany('enemy', null, 'line', [t], this._worldOf(x, z));
+      const co = this._placeCompany('enemy', null, 'line', [t], this._worldOf(x + ox, z));
       // The Ollphéist carries his wounds between battles: he enters already hurt
       // by how much you bled him last time, so you wear him down and finish later.
       if (t === 'fomor' && this.menaceHp != null) { const u = co.units[0]; u.hp = Math.max(1, Math.min(u.hp0, this.menaceHp)); this._menaceUnit = u; drawBar(u.bar, u.hp / u.hp0, u.hp / u.hp0 > 0.5 ? 0x6cc551 : u.hp / u.hp0 > 0.25 ? 0xe0b83a : 0xe0563a); }
@@ -294,9 +312,9 @@ export class Battle {
     else if (this.cfg.defend) this.battleType = 'fort';               // a ráth-hold is a fort battle
     else { const r = Math.random(); this.battleType = r < 0.4 ? 'rout' : r < 0.7 ? 'surrender' : 'fort'; }
     if (this.battleType === 'fort') {
-      const half = Math.floor(MAP / 2) - 1;
-      if (!this.buildings.some((b) => b.team === 'player')) this._spawnBuilding({ role: 'dwelling', x: half, z: MAP - 3, w: 2, h: 2, hp: 44, team: 'player' });
-      if (!this.buildings.some((b) => b.team === 'enemy')) this._spawnBuilding({ role: 'dwelling', x: half, z: 2, w: 2, h: 2, hp: 44, team: 'enemy' });
+      const midx = Math.floor(this.map.w / 2) - 1;
+      if (!this.buildings.some((b) => b.team === 'player')) this._spawnBuilding({ role: 'dwelling', x: midx, z: this.map.h - 3, w: 2, h: 2, hp: 44, team: 'player' });
+      if (!this.buildings.some((b) => b.team === 'enemy')) this._spawnBuilding({ role: 'dwelling', x: midx, z: 2, w: 2, h: 2, hp: 44, team: 'enemy' });
     }
     this._hadPlayerFort = this.buildings.some((b) => b.team === 'player');
     this._hadEnemyFort = this.buildings.some((b) => b.team === 'enemy');
@@ -357,7 +375,7 @@ export class Battle {
       const t = this.map.get(d.x + dx, d.z + dz); if (t) { t.terrain = 0; t.road = false; t.occupant = null; }
     }
     const chip = makeBuildingChip(d.role, d.w, d.h, this.map.tile);
-    const cx = d.x - this.map.half + d.w / 2, cz = d.z - this.map.half + d.h / 2;
+    const cx = d.x - this.map.halfX + d.w / 2, cz = d.z - this.map.halfZ + d.h / 2;
     chip.position.set(cx, 0, cz);
     const bar = makeBar(1.4); bar.position.set(cx, 2.6, cz);
     this.buildingGroup.add(bar); this.buildingGroup.add(chip);
@@ -507,9 +525,9 @@ export class Battle {
     u._moving = false;
     if (c.routing) {
       const spd = UNIT_TYPES[u.type].speed * MOVE * 1.1;
-      const dz = (u.team === 'player' ? this.map.half + 3 : -this.map.half - 3) - u.pos.z;
+      const dz = (u.team === 'player' ? this.map.halfZ + 3 : -this.map.halfZ - 3) - u.pos.z;
       u.pos.z += Math.sign(dz) * Math.min(spd * dt, Math.abs(dz));
-      if (Math.abs(u.pos.z) > this.map.half + 1) { u.dead = true; u.fled = true; this.unitGroup.remove(u.mesh); }
+      if (Math.abs(u.pos.z) > this.map.halfZ + 1) { u.dead = true; u.fled = true; this.unitGroup.remove(u.mesh); }
       else { u.mesh.position.set(u.pos.x, 0, u.pos.z); u._moving = true; const spr = u.mesh.userData.spr; if (spr && spr.faceWorld) spr.faceWorld(0, Math.sign(dz)); }
       return;
     }
@@ -773,7 +791,7 @@ export class Battle {
   // muster: place the forming company where the player taps their side
   _musterTap(w) {
     if (!this.placing || !this.forming.types.length) return;
-    if (w.tile.z < this.cfg.musterMinZ) { this._flashMuster('Set your folk on your own side of the pitch.'); return; }
+    if (w.tile.z < (this._musterMinZ || this.cfg.musterMinZ)) { this._flashMuster('Set your folk on your own side of the pitch.'); return; }
     const co = this._placeCompany('player', this.forming.name, this.forming.formation, this.forming.types.slice(), { x: w.x, z: w.z });
     if (this.forming.enchant && co) this._markEnchant(co);
     for (const k of this.forming.types) if (this.pool[k] != null) this.pool[k] = Math.max(0, this.pool[k] - 1); // spend from the muster

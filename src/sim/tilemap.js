@@ -50,24 +50,30 @@ function makeNoise(rand, size, cells) {
 }
 
 export class Tilemap {
-  constructor(size = 32, tile = 1, seed = 7) {
-    this.size = size;
+  // Square by default (h defaults to the width), so every existing caller is
+  // unchanged; the battle passes a separate h for long/wide fields.
+  constructor(size = 32, tile = 1, seed = 7, h = size) {
+    this.w = size; this.h = h;
+    this.size = size;                 // back-compat: width (== h for square maps)
     this.tile = tile;
-    this.half = (size * tile) / 2;
-    this.tiles = new Array(size * size);
+    this.halfX = (this.w * tile) / 2;
+    this.halfZ = (this.h * tile) / 2;
+    this.half = this.halfX;           // back-compat alias (== halfZ for square maps)
+    this.tiles = new Array(this.w * this.h);
     this.generate(seed);
   }
 
-  idx(x, z) { return z * this.size + x; }
-  inBounds(x, z) { return x >= 0 && z >= 0 && x < this.size && z < this.size; }
+  idx(x, z) { return z * this.w + x; }
+  inBounds(x, z) { return x >= 0 && z >= 0 && x < this.w && z < this.h; }
   get(x, z) { return this.inBounds(x, z) ? this.tiles[this.idx(x, z)] : null; }
 
   generate(seed) {
-    const elev = makeNoise(mulberry32(seed), this.size, 6);
-    const moist = makeNoise(mulberry32(seed * 7 + 1), this.size, 5);
+    const ns = Math.max(this.w, this.h);
+    const elev = makeNoise(mulberry32(seed), ns, 6);
+    const moist = makeNoise(mulberry32(seed * 7 + 1), ns, 5);
     const scatter = mulberry32(seed * 13 + 3);
-    for (let z = 0; z < this.size; z++) {
-      for (let x = 0; x < this.size; x++) {
+    for (let z = 0; z < this.h; z++) {
+      for (let x = 0; x < this.w; x++) {
         const e = elev(x + 0.5, z + 0.5);
         const m = moist(x + 0.5, z + 0.5);
         let terrain = T.GRASS;
@@ -85,13 +91,13 @@ export class Tilemap {
   // Tile (x,z) centre in world space.
   tileToWorld(x, z) {
     return {
-      x: x * this.tile - this.half + this.tile / 2,
-      z: z * this.tile - this.half + this.tile / 2,
+      x: x * this.tile - this.halfX + this.tile / 2,
+      z: z * this.tile - this.halfZ + this.tile / 2,
     };
   }
   worldToTile(wx, wz) {
-    const x = Math.floor((wx + this.half) / this.tile);
-    const z = Math.floor((wz + this.half) / this.tile);
+    const x = Math.floor((wx + this.halfX) / this.tile);
+    const z = Math.floor((wz + this.halfZ) / this.tile);
     return this.inBounds(x, z) ? { x, z } : null;
   }
 

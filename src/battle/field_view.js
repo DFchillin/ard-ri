@@ -176,7 +176,7 @@ export class FieldView {
     if (!this.active) this._enterField();
     this.release('silent');
     this._slowT = SLOW_DUR; this._showCry();
-    this._flyIn = { u, t: 0, dur: 2.3, fromY: 26, fromZ: this.b.map.half + 14, fromPitch: -0.78 };
+    this._flyIn = { u, t: 0, dur: 2.3, fromY: 26, fromZ: this.b.map.halfZ + 14, fromPitch: -0.78 };
     this._setMode('fly');
   }
   _updateFlyIn(dt) {
@@ -196,7 +196,7 @@ export class FieldView {
     this.active = true;
     this.scene.add(this.cam); // so the held sword (a camera child) renders
     this._ensureOrbs();
-    this.pos.set(0, 10, this.b.map.half + 3); this.yaw = 0; this.pitch = -0.55;
+    this.pos.set(0, 10, this.b.map.halfZ + 3); this.yaw = 0; this.pitch = -0.55;
     this._applyAtmosphere(true);
     this._hud.style.display = 'block';
     this._showPlanButtons(false);
@@ -299,9 +299,9 @@ export class FieldView {
     this.pos.addScaledVector(fwd, mz * FLY_SPD * dt);
     this.pos.addScaledVector(right, mx * FLY_SPD * dt);
     this.pos.y = Math.max(1.2, Math.min(60, this.pos.y + my * FLY_SPD * dt));
-    const lim = this.b.map.half + 8;
-    this.pos.x = Math.max(-lim, Math.min(lim, this.pos.x));
-    this.pos.z = Math.max(-lim, Math.min(lim, this.pos.z));
+    const limX = this.b.map.halfX + 8, limZ = this.b.map.halfZ + 8;
+    this.pos.x = Math.max(-limX, Math.min(limX, this.pos.x));
+    this.pos.z = Math.max(-limZ, Math.min(limZ, this.pos.z));
   }
 
   _driveUnit(u, dt) {
@@ -318,9 +318,9 @@ export class FieldView {
     const m = Math.hypot(dx, dz);
     u._moving = m > 0.05;
     if (u._moving) {
-      const lim = this.b.map.half - 0.4;
-      u.pos.x = Math.max(-lim, Math.min(lim, u.pos.x + (dx / m) * spd * dt));
-      u.pos.z = Math.max(-lim, Math.min(lim, u.pos.z + (dz / m) * spd * dt));
+      const limX = this.b.map.halfX - 0.4, limZ = this.b.map.halfZ - 0.4;
+      u.pos.x = Math.max(-limX, Math.min(limX, u.pos.x + (dx / m) * spd * dt));
+      u.pos.z = Math.max(-limZ, Math.min(limZ, u.pos.z + (dz / m) * spd * dt));
     }
     u.mesh.position.set(u.pos.x, 0, u.pos.z);
     const spr = u.mesh.userData.spr;
@@ -634,13 +634,13 @@ export class FieldView {
     this._fog = new THREE.Fog(wintry ? 0xaab6c0 : 0xc3cbb6, 24, 170);
   }
   _buildSurround() {
-    if (this._surround) return;
-    const g = new THREE.Group(); g.visible = false; this._surround = g; this.scene.add(g);
-    const half = this.b.map.half;
+    const hx = this.b.map.halfX, hz = this.b.map.halfZ, key = hx + 'x' + hz;
+    if (this._surround) { if (this._surroundKey === key) return; this.scene.remove(this._surround); this._surround.traverse((n) => { if (n.material) n.material.dispose && n.material.dispose(); if (n.geometry) n.geometry.dispose(); }); this._surround = null; }
+    const g = new THREE.Group(); g.visible = false; this._surround = g; this._surroundKey = key; this.scene.add(g);
     const tl = new THREE.TextureLoader();
     const grass = tl.load('assets/terrain/tiles/pasture.png?v=CBUST');
     grass.wrapS = grass.wrapT = THREE.RepeatWrapping; grass.repeat.set(70, 70); grass.colorSpace = THREE.SRGBColorSpace;
-    const apron = new THREE.Mesh(new THREE.PlaneGeometry(560, 560), new THREE.MeshLambertMaterial({ map: grass, fog: true }));
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(620, 620), new THREE.MeshLambertMaterial({ map: grass, fog: true }));
     apron.rotation.x = -Math.PI / 2; apron.position.y = -0.25; g.add(apron);
     const mats = {};
     const matOf = (name) => {
@@ -655,22 +655,20 @@ export class FieldView {
       const s = new THREE.Sprite(matOf(name)); s.center.set(0.5, 0);
       s.scale.set(h * (aspect || 0.75), h, 1); s.position.set(x, -0.1, z); g.add(s);
     };
-    const R = half + 22;
+    const R = Math.max(hx, hz) + 22;
+    const out = (x, z) => Math.abs(x) >= hx + 1.4 || Math.abs(z) >= hz + 1.4; // outside the rectangular pitch
     const canopy = ['oak', 'pine', 'birch', 'rowan', 'hawthorn', 'willow'];
     const fringe = ['gorse', 'bramble', 'fern', 'reeds', 'hawthorn'];
-    for (let i = 0; i < 200; i++) {
-      let x, z, tries = 0;
-      do { x = (Math.random() * 2 - 1) * R; z = (Math.random() * 2 - 1) * R; } while (Math.max(Math.abs(x), Math.abs(z)) < half + 1.4 && ++tries < 8);
-      if (Math.max(Math.abs(x), Math.abs(z)) < half + 1.4) continue;
-      const back = Math.max(Math.abs(x), Math.abs(z)) - half;
+    for (let i = 0; i < 220; i++) {
+      const x = (Math.random() * 2 - 1) * R, z = (Math.random() * 2 - 1) * R;
+      if (!out(x, z)) continue;
+      const back = Math.max(Math.abs(x) - hx, Math.abs(z) - hz, 0);
       addProp(x, z, canopy[(Math.random() * canopy.length) | 0], 4.5 + Math.random() * 3.5 + back * 0.12, 0.72);
     }
-    for (let i = 0; i < 120; i++) {
-      const edge = half + 0.4 + Math.random() * 1.8;
-      const along = (Math.random() * 2 - 1) * (half + 1.5);
-      const side = Math.floor(Math.random() * 4);
-      const x = side === 2 ? -edge : side === 3 ? edge : along;
-      const z = side === 0 ? -edge : side === 1 ? edge : along;
+    for (let i = 0; i < 140; i++) {
+      const side = Math.floor(Math.random() * 4); const off = 0.4 + Math.random() * 1.8;
+      const x = side === 2 ? -(hx + off) : side === 3 ? (hx + off) : (Math.random() * 2 - 1) * (hx + 1.5);
+      const z = side === 0 ? -(hz + off) : side === 1 ? (hz + off) : (Math.random() * 2 - 1) * (hz + 1.5);
       addProp(x, z, fringe[(Math.random() * fringe.length) | 0], 1.1 + Math.random() * 1.3, 0.9);
     }
   }
