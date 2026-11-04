@@ -224,7 +224,7 @@ export class Battle {
       // by how much you bled him last time, so you wear him down and finish later.
       if (t === 'fomor' && this.menaceHp != null) { const u = co.units[0]; u.hp = Math.max(1, Math.min(u.hp0, this.menaceHp)); this._menaceUnit = u; drawBar(u.bar, u.hp / u.hp0, u.hp / u.hp0 > 0.5 ? 0x6cc551 : u.hp / u.hp0 > 0.25 ? 0xe0b83a : 0xe0563a); }
     }
-    this.forming = { types: [], name: nextNickname(), formation: 'line' };
+    this.forming = { types: [], name: nextNickname(), formation: 'line', enchant: false };
     this.pool = Object.assign({}, this.roster); // muster draws from your war-band
     document.getElementById('battle-ui').classList.remove('hidden');
     document.getElementById('battle-sidebar').classList.remove('hidden');
@@ -260,7 +260,11 @@ export class Battle {
       if (c.team === 'enemy' && this.cfg.defend) { const b = pick(c, this.buildings.filter((x) => !x.dead)); if (b) c.target = { foe: b }; }
       if (c.team === 'player' && this.cfg.defend) c.morale = Math.min(100, c.morale + 6);
     }
-    if (this.field) this.field.onBattleStart(); // the Field View becomes available now that folk are on the pitch
+    if (this.field) {
+      this.field.onBattleStart(); // the Field View becomes available now that folk are on the pitch
+      const candidates = this.units.filter((u) => u.team === 'player' && u.enchantable && !u.dead);
+      this.field.beginBattle(candidates); // one marked warrior, chosen at random, is your vessel — and you fly into them
+    }
     this._showPhase();
   }
 
@@ -692,15 +696,6 @@ export class Battle {
     }
     const w = this._worldAt(e); if (!w) return;
     if (this.phase === 'muster') { this._musterTap(w); return; }
-    // double-tap one of your own to pick who you'll ride with when you take the field
-    if (this.phase === 'battle') {
-      const fu = this._nearestUnit(w, 'player');
-      if (fu) {
-        const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-        if (this._lastRiderU === fu && now - (this._lastRiderT || 0) < 450) { this._lastRiderU = null; if (this.field) this.field.chooseRider(fu); return; }
-        this._lastRiderT = now; this._lastRiderU = fu;
-      }
-    }
     // battle tap: command or select
     const foeCo = this._companyAt(w, 'enemy'); const bld = this._buildingAt(w); const friendCo = this._companyAt(w, 'player');
     if (this.selected.size && (foeCo || bld)) { const tgt = foeCo ? foeCo.units.find((u) => !u.dead) : bld; for (const c of this.selected) c.target = { foe: tgt }; }
@@ -722,10 +717,21 @@ export class Battle {
   _musterTap(w) {
     if (!this.placing || !this.forming.types.length) return;
     if (w.tile.z < this.cfg.musterMinZ) { this._flashMuster('Set your folk on your own side of the pitch.'); return; }
-    this._placeCompany('player', this.forming.name, this.forming.formation, this.forming.types.slice(), { x: w.x, z: w.z });
+    const co = this._placeCompany('player', this.forming.name, this.forming.formation, this.forming.types.slice(), { x: w.x, z: w.z });
+    if (this.forming.enchant && co) this._markEnchant(co);
     for (const k of this.forming.types) if (this.pool[k] != null) this.pool[k] = Math.max(0, this.pool[k] - 1); // spend from the muster
-    this.forming = { types: [], name: nextNickname(), formation: this.forming.formation };
+    this.forming = { types: [], name: nextNickname(), formation: this.forming.formation, enchant: this.forming.enchant };
     this.placing = false; this._renderMuster();
+  }
+  // Mark a mustered company as enchant-worthy: its warriors wear a gold ring, and
+  // one marked warrior (across all such companies) becomes the player's vessel at
+  // random when battle is joined.
+  _markEnchant(co) {
+    co.enchant = true;
+    for (const u of co.units) {
+      u.enchantable = true;
+      if (u.ring) { u.ring.userData.team = 0xffd24a; u.ring.material.color.setHex(0xffd24a); u.ring.material.opacity = 0.85; }
+    }
   }
 
   setLivery(pair) { if (Array.isArray(pair) && pair.length === 2) LIVERY.player = pair.map((c) => typeof c === 'string' ? parseInt(c.replace('#', ''), 16) : c); }
@@ -796,6 +802,7 @@ export class Battle {
     document.getElementById('bs-place').addEventListener('click', () => { if (this.forming.types.length) { this.placing = true; this._renderMuster(); } });
     document.getElementById('bs-clear').addEventListener('click', () => { this.forming.types = []; this.placing = false; this._renderMuster(); });
     document.getElementById('bs-reroll').addEventListener('click', () => { this.forming.name = nextNickname(); this._renderMuster(); });
+    { const en = document.getElementById('bs-enchant'); if (en) en.addEventListener('click', () => { this.forming.enchant = !this.forming.enchant; this._renderMuster(); }); }
     document.getElementById('bs-cry').addEventListener('click', () => this.battleCry());
     document.getElementById('bs-marquee').addEventListener('click', () => this._setMarquee(!this.marquee));
     document.querySelectorAll('#bs-formations [data-form]').forEach((b) => b.addEventListener('click', () => {
@@ -829,6 +836,7 @@ export class Battle {
       s.title = 'remove'; s.addEventListener('click', () => { this.forming.types.splice(i, 1); this._renderMuster(); }); tray.appendChild(s); });
     if (!this.forming.types.length) tray.innerHTML = '<span class="dim">tap folk above to raise a company (up to 6)</span>';
     document.querySelectorAll('#bs-formations [data-form]').forEach((b) => b.classList.toggle('on', b.dataset.form === this.forming.formation));
+    { const en = document.getElementById('bs-enchant'); if (en) { en.textContent = this.forming.enchant ? '⚡ Enchant: ON' : '⚡ Enchant: off'; en.classList.toggle('on', !!this.forming.enchant); } }
     const hint = document.getElementById('bs-form-hint'); if (hint) hint.textContent = FORM_OWN_HINT[this.forming.formation] || '';
     // Read the foe: their companies and the shape each has taken, so you can answer it.
     const foe = document.getElementById('bs-foe');

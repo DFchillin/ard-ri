@@ -103,7 +103,8 @@ export class FieldView {
     this.pos = new THREE.Vector3(0, 10, 12);
     this.yaw = 0; this.pitch = -0.5;
     this.possessed = null;          // the enchanted warrior you are riding
-    this._chosen = null;            // the warrior picked (double-tap) from the plan view
+    this._chosen = null;            // the current vessel (marked ⚡ at muster, picked at random)
+    this._vessel = null; this._candidates = []; this._flyIn = null; // the fly-in-to-battle transition
     this._shooter = null;           // the foe's one appointed shooter
     this._shooterCd = 0;
     this._keys = new Set();
@@ -136,7 +137,21 @@ export class FieldView {
     this.scene.fog = on ? this._fog : (this._origFog || null);
     this.scene.background = on ? new THREE.Color(0x9fb4c2) : (this._origBg || new THREE.Color(0x1d2a19));
   }
-  reset() { this._clearOrbs(); this._clearSmoke(); this._clearDarts(); this._clearEnemyFire(); this._clearMarkers(); this._chosen = null; this._updateRideLabel(); if (this.active) this._leaveField(); }
+  reset() { this._clearOrbs(); this._clearSmoke(); this._clearDarts(); this._clearEnemyFire(); this._clearMarkers(); this._chosen = this._vessel = null; this._candidates = []; this._flyIn = null; this._updateRideLabel(); if (this.active) this._leaveField(); }
+  // Battle is joined: one of the ⚡-marked warriors becomes your vessel at random,
+  // and you fly down into them. With none marked, you stay on the plan (you can
+  // still Observe the field).
+  beginBattle(candidates) {
+    this._candidates = (candidates || []).filter((u) => u && !u.dead);
+    this._vessel = this._chosen = null;
+    if (this._candidates.length) {
+      this._vessel = this._chosen = this._candidates[Math.floor(Math.random() * this._candidates.length)];
+      this._updateRideLabel();
+      this._startEntry();
+    } else {
+      this._updateRideLabel();
+    }
+  }
   teardown() {
     if (this.active) this._leaveField();
     this._clearOrbs(); this._clearSmoke(); this._clearDarts(); this._clearEnemyFire(); this._clearMarkers();
@@ -147,11 +162,35 @@ export class FieldView {
   }
 
   // ---- entering / leaving the field ---------------------------------------
-  observe() { if (!this.active) this._enterField(); this.release('silent'); this._setMode('free'); }
-  ride() {
-    if (!this._chosen || this._chosen.dead) { this._toast('Double-tap one of your warriors on the map to choose who you ride with.'); return; }
+  observe() { this._flyIn = null; if (!this.active) this._enterField(); this.release('silent'); this._setMode('free'); }
+  takeControl() { this._startEntry(); }
+  // Fly down into your vessel and take it. Picks another live ⚡ warrior if the
+  // chosen one fell before you arrive.
+  _startEntry() {
+    let u = this._vessel;
+    if (!u || u.dead) {
+      const live = this._candidates.filter((x) => x && !x.dead);
+      if (!live.length) { this._toast('No enchanted warrior stands — observe the field.'); this.observe(); return; }
+      u = this._vessel = this._chosen = live[Math.floor(Math.random() * live.length)]; this._updateRideLabel();
+    }
     if (!this.active) this._enterField();
-    this.possess(this._chosen);
+    this.release('silent');
+    this._slowT = SLOW_DUR; this._showCry();
+    this._flyIn = { u, t: 0, dur: 2.3, fromY: 26, fromZ: this.b.map.half + 14, fromPitch: -0.78 };
+    this._setMode('fly');
+  }
+  _updateFlyIn(dt) {
+    const fi = this._flyIn, u = fi.u;
+    if (!u || u.dead) { this._flyIn = null; this.release('fallen'); return; } // the vessel fell mid-descent
+    fi.t += dt;
+    const k = Math.min(1, fi.t / fi.dur);
+    const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; // easeInOut
+    const eyeY = unitTall(u.type) * 0.92;
+    const fx = u.pos.x * 0.4, fz = fi.fromZ, fy = fi.fromY; // swoop in from high behind your line
+    this.pos.set(fx + (u.pos.x - fx) * e, fy + (eyeY - fy) * e, fz + (u.pos.z - fz) * e);
+    this.yaw = 0; // settle looking toward the foe
+    this.pitch = fi.fromPitch * (1 - e);
+    if (k >= 1) { this._flyIn = null; this.possess(u, true); }
   }
   _enterField() {
     this.active = true;
@@ -185,30 +224,22 @@ export class FieldView {
     if (this._stick) this._stick.style.display = 'none';
   }
 
-  // ---- choosing a rider (from the iso plan view) --------------------------
-  chooseRider(u) {
-    if (!u || u.dead || u.team !== 'player') return;
-    this._chosen = u;
-    this._updateRideLabel();
-    this.updateMarkers();
-    this._toast(`${labelOf(u.type)} will answer your enchantment.`);
-  }
-
   // ---- possession ---------------------------------------------------------
-  possess(u) {
+  possess(u, fromEntry) {
     if (!u || u.dead || u.team !== 'player') return;
     this.release('silent');
     this.possessed = u; u.possessed = true;
     const spr = u.mesh.userData.spr; if (spr) spr.visible = false; // first person
     if (this._sword) this._sword.visible = true;
     this._setUnitOrbVisible(u, false);
-    this.yaw = Math.atan2(-(u._dx || 0), -(u._dz || -1)) || 0;
-    this.pitch = 0; // gaze to the horizon, not down
-    this.pos.set(u.pos.x, unitTall(u.type) * 0.92, u.pos.z); // enter exactly at their eye, from frame one
-    this.cam.position.copy(this.pos); this.cam.rotation.set(this.pitch, this.yaw, 0);
-    this._slowT = SLOW_DUR; // the ride-in runs in slow motion
+    if (!fromEntry) { // a direct take-control: snap to their eye and begin the slow-mo + cry here
+      this.yaw = Math.atan2(-(u._dx || 0), -(u._dz || -1)) || 0;
+      this.pitch = 0;
+      this.pos.set(u.pos.x, unitTall(u.type) * 0.92, u.pos.z);
+      this.cam.position.copy(this.pos); this.cam.rotation.set(this.pitch, this.yaw, 0);
+      this._slowT = SLOW_DUR; this._showCry();
+    } // from the fly-in, the slow-mo + cry are already running and the camera has arrived
     this._setMode('possess');
-    this._showCry();
     this._banner(`Enchanted — you ride ${labelOf(u.type)}.`, ORB_RGB[tierOf(u.type)]);
   }
   release(mode) {
@@ -218,8 +249,14 @@ export class FieldView {
     const spr = u.mesh.userData.spr; if (spr && !u.dead) spr.visible = true;
     if (!u.dead) { this._setUnitOrbVisible(u, true); this.pos.set(u.pos.x, unitTall(u.type) * 0.95 + 0.3, u.pos.z); }
     if (this.active && mode && mode !== 'silent') {
-      this._setMode('free');
-      if (mode === 'fallen') this._banner('Your enchanted warrior has fallen — return to the plan to ride another.', 0xe0563a);
+      this._setMode('free'); // drop to the battlefield (observer) view
+      if (mode === 'fallen') {
+        // if another ⚡-marked warrior still stands, make them the next vessel you can take
+        const live = (this._candidates || []).filter((x) => x && !x.dead);
+        if (live.length) { this._vessel = this._chosen = live[Math.floor(Math.random() * live.length)]; this._updateRideLabel(); }
+        else { this._vessel = this._chosen = null; this._updateRideLabel(); }
+        this._banner(live.length ? 'Your vessel has fallen — observe, or take the plan to ride another ⚡.' : 'Your vessel has fallen — observe the battle.', 0xe0563a);
+      }
     }
   }
 
@@ -232,7 +269,8 @@ export class FieldView {
     if (this._throwCd > 0) this._throwCd -= rdt;
     if (this.possessed && this.possessed.dead) this.release('fallen');
 
-    if (this.possessed && inBattle) this._driveUnit(this.possessed, rdt);
+    if (this._flyIn) this._updateFlyIn(rdt);               // the swoop into your vessel
+    else if (this.possessed && inBattle) this._driveUnit(this.possessed, rdt);
     else this._flyCam(rdt);
 
     this._placeCam(dt);
@@ -675,6 +713,7 @@ export class FieldView {
   pointerDown(e) {
     const t = e.target;
     if (t && t.closest && t.closest('button')) return;
+    if (this._flyIn) { e.preventDefault(); return; } // the fly-in plays uninterrupted
     e.preventDefault();
     try { t.setPointerCapture(e.pointerId); } catch (_) {}
     if (e.clientX < window.innerWidth * 0.42) {
@@ -725,15 +764,15 @@ export class FieldView {
 
   _setMode(mode) {
     this._mode = mode;
-    const poss = mode === 'possess';
+    const poss = mode === 'possess', free = mode === 'free', fly = mode === 'fly';
     this._btnStrike.style.display = poss ? 'flex' : 'none';
     this._btnThrow.style.display = poss ? 'flex' : 'none';
     this._btnRelease.style.display = poss ? 'flex' : 'none';
-    this._btnUp.style.display = poss ? 'none' : 'flex';
-    this._btnDown.style.display = poss ? 'none' : 'flex';
+    this._btnUp.style.display = free ? 'flex' : 'none';
+    this._btnDown.style.display = free ? 'flex' : 'none';
     this._cross.style.display = poss ? 'block' : 'none';
-    this._hint.textContent = poss ? '' : 'Observing — fly freely. Return to the plan to ride a warrior.';
-    this._hint.style.opacity = poss ? '0' : '0.9';
+    this._hint.textContent = free ? 'Observing — fly freely. Take control to ride your vessel; Battle map for the plan.' : '';
+    this._hint.style.opacity = free ? '0.9' : '0';
   }
 
   // ---- DOM ----------------------------------------------------------------
@@ -744,11 +783,11 @@ export class FieldView {
       b.style.cssText = `position:fixed;top:10px;left:${left};transform:translateX(-50%);z-index:62;background:#13110bdd;color:#f2e6c8;border:1px solid #b89a52;border-radius:9px;padding:7px 15px;font:600 14px Georgia,serif;cursor:pointer;display:none`;
       document.body.appendChild(b); return b;
     };
-    this._observeBtn = topBtn('field-observe', 'calc(50% - 96px)', '👁 Observe the field');
-    this._rideBtn = topBtn('field-ride', 'calc(50% + 96px)', '⚔ Ride — pick a warrior');
+    this._observeBtn = topBtn('field-observe', 'calc(50% - 100px)', '👁 Observe the field');
+    this._rideBtn = topBtn('field-ride', 'calc(50% + 100px)', '⚡ Take control');
     this._returnBtn = topBtn('field-return', '50%', '🗺 Battle map');
     this._observeBtn.addEventListener('click', () => this.observe());
-    this._rideBtn.addEventListener('click', () => this.ride());
+    this._rideBtn.addEventListener('click', () => this.takeControl());
     this._returnBtn.addEventListener('click', () => this._leaveField());
     this._toastEl = document.createElement('div');
     this._toastEl.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:62;background:#0b0e14e8;color:#f2e6c8;border:1px solid #6b5a30;border-radius:8px;padding:6px 13px;font:13px Georgia,serif;display:none;max-width:86%;text-align:center';
@@ -803,9 +842,11 @@ export class FieldView {
   }
   _showPlanButtons(show) {
     if (this._observeBtn) this._observeBtn.style.display = show ? 'block' : 'none';
-    if (this._rideBtn) this._rideBtn.style.display = show ? 'block' : 'none';
+    const hasVessel = !!(this._vessel && !this._vessel.dead); // Take control only when a vessel still stands
+    if (this._rideBtn) this._rideBtn.style.display = (show && hasVessel) ? 'block' : 'none';
+    if (this._observeBtn) this._observeBtn.style.left = (show && hasVessel) ? 'calc(50% - 100px)' : '50%';
   }
-  _updateRideLabel() { if (this._rideBtn) this._rideBtn.innerHTML = this._chosen ? `⚔ Ride with ${labelOf(this._chosen.type)}` : '⚔ Ride — pick a warrior'; }
+  _updateRideLabel() { if (this._rideBtn) this._rideBtn.innerHTML = this._vessel ? `⚡ Take control (${labelOf(this._vessel.type)})` : '⚡ Take control'; }
   _showCry() {
     if (!this._cryEl) return;
     this._lastCry = this._cryEl.textContent = CRIES[Math.floor(Math.random() * CRIES.length)];
