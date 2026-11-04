@@ -207,6 +207,8 @@ export class Battle {
     this.cfg = SCENARIOS[scenario] || SCENARIOS.defend;
     this.active = true; this.started = false; this.phase = 'muster';
     if (this.field) this.field.reset();
+    this._planCo = null; this._orderDrag = null;
+    for (const c of this.companies) if (c.planArrow) { this.scene.remove(c.planArrow); c.planArrow = null; }
     for (const u of this.units) this.unitGroup.remove(u.mesh);
     for (const c of this._dying || []) this.unitGroup.remove(c.u.mesh);
     for (const e of this._embers || []) { this.fxGroup.remove(e.s); e.s.material.dispose(); }
@@ -261,6 +263,12 @@ export class Battle {
       if (c.team === 'enemy' && this.cfg.defend) { const b = pick(c, this.buildings.filter((x) => !x.dead)); if (b) c.target = { foe: b }; }
       if (c.team === 'player' && this.cfg.defend) c.morale = Math.min(100, c.morale + 6);
     }
+    // put the battle plan into effect: each company marches to the arrow you drew
+    for (const c of this.companies) if (c.team === 'player') {
+      if (c.planTarget) c.target = { point: { x: c.planTarget.x, z: c.planTarget.z } };
+      if (c.planArrow) { this.scene.remove(c.planArrow); c.planArrow = null; }
+    }
+    this._planCo = null; this._renderOrders();
     if (this.field) {
       this.field.onBattleStart(); // the Field View becomes available now that folk are on the pitch
       const candidates = this.units.filter((u) => u.team === 'player' && u.enchantable && !u.dead);
@@ -337,7 +345,7 @@ export class Battle {
   _placeCompany(team, name, formation, types, at) {
     const bondPair = BOND_TYPES.every((t) => types.includes(t)); // both craftsfolk mustered together
     if (bondPair) { name = BOND_PAIR; types = [...types, 'warrior']; } // Lucht Ceirde march with a free forge-guard so the craftsfolk aren't alone
-    const co = { id: ++_uid, team, name: name || null, formation, units: [], leader: null, morale: 0, target: null, routing: false, lone: types.length === 1, bondPair };
+    const co = { id: ++_uid, team, name: name || null, formation, units: [], leader: null, morale: 0, target: null, routing: false, lone: types.length === 1, bondPair, stance: 'engage', planTarget: null, planArrow: null };
     const slots = formationSlots(types.length, formation, types);
     types.forEach((type, i) => {
       const s = slots[i];
@@ -533,6 +541,7 @@ export class Battle {
     for (const c of [...this._liveCompanies('player'), ...this._liveCompanies('enemy')]) {
       const stale = !c.target || (c.target.foe && c.target.foe.dead);
       if (!stale) continue;
+      if (c.team === 'player' && c.stance === 'hold') { c.target = null; continue; } // a holding company does not go looking for a fight
       let n = null;
       if (this.cfg.defend && c.team === 'enemy') n = pick(c, this.buildings.filter((b) => !b.dead && b.team !== 'enemy'));
       if (!n) { const cp = this._companyPos(c); if (cp) n = nearest({ pos: cp }, (c.team === 'player' ? E : F)); }
@@ -654,13 +663,19 @@ export class Battle {
   pointerDown(e) {
     if (this.field && this.field.active) { this.field.pointerDown(e); return; }
     this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (this._pointers.size >= 2) { this._pinch = this._pointerDist(); this._panMid = this._pointerMid(); this._dragStart = null; return; }
+    if (this._pointers.size >= 2) { this._pinch = this._pointerDist(); this._panMid = this._pointerMid(); this._dragStart = null; this._orderDrag = null; return; }
     if (e.button === 2) { this._panLast = { x: e.clientX, y: e.clientY }; return; } // right-drag pans
+    // muster planning: pressing on a placed company (when not setting one down) begins a march-order drag
+    if (this.phase === 'muster' && !this.placing) {
+      const w = this._worldAt(e); const co = w && this._companyAt(w, 'player');
+      if (co) { this._orderDrag = { co, from: this._companyPos(co) || { x: w.x, z: w.z }, moved: false }; this._planCo = co; this._renderOrders(); this._dragStart = null; this._panLast = null; return; }
+    }
     this._dragStart = { x: e.clientX, y: e.clientY }; this._dragging = false;
     this._panLast = { x: e.clientX, y: e.clientY }; // one-finger drag pans, like the city map
   }
   pointerMove(e) {
     if (this.field && this.field.active) { this.field.pointerMove(e); return; }
+    if (this._orderDrag) { const w = this._worldAt(e); if (w) { const od = this._orderDrag; if (Math.hypot(w.x - od.from.x, w.z - od.from.z) > 0.5) od.moved = true; this._drawPlanArrow(od.co, od.from, w, true); } return; }
     if (this._pointers.has(e.pointerId)) this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (this._pointers.size >= 2) { const d = this._pointerDist(); if (this._pinch && d > 0) this.zoom(this._pinch / d); this._pinch = d;
       const m = this._pointerMid(); if (this._panMid) this._panScreen(m.x - this._panMid.x, m.y - this._panMid.y); this._panMid = m; return; }
@@ -677,6 +692,14 @@ export class Battle {
   }
   pointerUp(e) {
     if (this.field && this.field.active) { this.field.pointerUp(e); return; }
+    if (this._orderDrag) {
+      const od = this._orderDrag; this._orderDrag = null; this._pointers.delete(e.pointerId); this._panLast = null; this._dragStart = null;
+      const w = this._worldAt(e);
+      if (od.moved && w) { od.co.planTarget = { x: w.x, z: w.z }; this._drawPlanArrow(od.co, this._companyPos(od.co) || od.from, w, false); } // set the march order
+      // a tap (no drag) just selects the company — its existing order is left as is
+      this._renderOrders();
+      return;
+    }
     const wasMulti = this._pointers.size >= 2;
     this._pointers.delete(e.pointerId);
     if (e.button === 2) { this._panLast = null; return; }
@@ -733,6 +756,33 @@ export class Battle {
       u.enchantable = true;
       if (u.ring) { u.ring.userData.team = 0xffd24a; u.ring.material.color.setHex(0xffd24a); u.ring.material.opacity = 0.85; }
     }
+  }
+
+  // ---------- battle plan (orders set during placement) ----------
+  _drawPlanArrow(co, from, to, live) {
+    const dx = to.x - from.x, dz = to.z - from.z, len = Math.hypot(dx, dz);
+    const col = co.stance === 'hold' ? 0xff9a3a : 0xffd24a;
+    if (!co.planArrow) {
+      co.planArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(from.x, 0.14, from.z), Math.max(0.2, len), col, 1, 0.6);
+      co.planArrow.line.material.transparent = true; co.planArrow.line.material.opacity = 0.95;
+      this.scene.add(co.planArrow);
+    }
+    const dir = len > 0.001 ? new THREE.Vector3(dx / len, 0, dz / len) : new THREE.Vector3(0, 0, -1);
+    co.planArrow.position.set(from.x, 0.14, from.z);
+    co.planArrow.setDirection(dir);
+    co.planArrow.setLength(Math.max(0.2, len), Math.min(1.5, len * 0.3), Math.min(1.0, len * 0.2));
+    co.planArrow.setColor(col);
+    co.planArrow.visible = len > 0.4;
+  }
+  _clearPlanArrow(co) { co.planTarget = null; if (co.planArrow) { this.scene.remove(co.planArrow); if (co.planArrow.dispose) co.planArrow.dispose(); co.planArrow = null; } }
+  _renderOrders() {
+    const panel = document.getElementById('bs-orders'); if (!panel) return;
+    const co = (this._planCo && this.phase === 'muster' && !this.placing && this._planCo.units.some((u) => !u.dead)) ? this._planCo : null;
+    panel.classList.toggle('hidden', !co);
+    if (!co) return;
+    document.getElementById('bs-order-co').textContent = co.name ? co.name[0] : UNIT_TYPES[co.leader.type].label;
+    document.getElementById('bs-stance-engage').classList.toggle('on', co.stance === 'engage');
+    document.getElementById('bs-stance-hold').classList.toggle('on', co.stance === 'hold');
   }
 
   setLivery(pair) { if (Array.isArray(pair) && pair.length === 2) LIVERY.player = pair.map((c) => typeof c === 'string' ? parseInt(c.replace('#', ''), 16) : c); }
@@ -804,6 +854,9 @@ export class Battle {
     document.getElementById('bs-clear').addEventListener('click', () => { this.forming.types = []; this.placing = false; this._renderMuster(); });
     document.getElementById('bs-reroll').addEventListener('click', () => { this.forming.name = nextNickname(); this._renderMuster(); });
     { const en = document.getElementById('bs-enchant'); if (en) en.addEventListener('click', () => { this.forming.enchant = !this.forming.enchant; this._renderMuster(); }); }
+    { const se = document.getElementById('bs-stance-engage'); if (se) se.addEventListener('click', () => { if (this._planCo) { this._planCo.stance = 'engage'; if (this._planCo.planArrow) this._planCo.planArrow.setColor(0xffd24a); this._renderOrders(); } }); }
+    { const sh = document.getElementById('bs-stance-hold'); if (sh) sh.addEventListener('click', () => { if (this._planCo) { this._planCo.stance = 'hold'; if (this._planCo.planArrow) this._planCo.planArrow.setColor(0xff9a3a); this._renderOrders(); } }); }
+    { const oc = document.getElementById('bs-order-clear'); if (oc) oc.addEventListener('click', () => { if (this._planCo) { this._clearPlanArrow(this._planCo); this._renderOrders(); } }); }
     document.getElementById('bs-cry').addEventListener('click', () => this.battleCry());
     document.getElementById('bs-marquee').addEventListener('click', () => this._setMarquee(!this.marquee));
     document.querySelectorAll('#bs-formations [data-form]').forEach((b) => b.addEventListener('click', () => {
@@ -858,9 +911,11 @@ export class Battle {
     const list = document.getElementById('bs-companies'); list.innerHTML = '';
     for (const c of this.companies.filter((x) => x.team === 'player')) {
       const d = document.createElement('div'); d.className = 'bs-co';
-      d.innerHTML = `<b>${c.name ? c.name[0] : 'lone'}</b> <small>×${c.units.length} · ${FORMATIONS[c.formation].label} · led by ${UNIT_TYPES[c.leader.type].label}</small>`;
+      const ord = c.planTarget ? (c.stance === 'hold' ? ' · 🛡 hold' : ' · ⚔ march') : '';
+      d.innerHTML = `<b>${c.name ? c.name[0] : 'lone'}</b> <small>×${c.units.length} · ${FORMATIONS[c.formation].label} · led by ${UNIT_TYPES[c.leader.type].label}${ord}</small>`;
       list.appendChild(d);
     }
+    this._renderOrders();
   }
   _renderCommand() {
     const info = document.getElementById('bs-sel-info');
