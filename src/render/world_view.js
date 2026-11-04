@@ -54,16 +54,23 @@ export class WorldView {
 
   _buildTerrain() {
     const { map, ts, half } = this;
-    // One textured mesh per terrain type; each tile samples the full texture.
+    // One textured mesh per terrain type; each tile samples the full texture. Each
+    // tile's UVs are randomly rotated/flipped and tinted a touch, so a field of the
+    // same texture reads as varied ground, not a repeated chessboard.
+    const CORN = [[0, 0], [1, 0], [1, 1], [0, 1]];
     const buckets = {};
     for (let z = 0; z < map.size; z++) {
       for (let x = 0; x < map.size; x++) {
         const t = map.get(x, z).terrain;
-        const b = (buckets[t] = buckets[t] || { pos: [], uv: [], idx: [], vi: 0 });
+        const b = (buckets[t] = buckets[t] || { pos: [], uv: [], col: [], idx: [], vi: 0 });
         const y = t === T.WATER ? -0.18 : 0;
         const wx = x * ts - half, wz = z * ts - half;
         b.pos.push(wx, y, wz, wx + ts, y, wz, wx + ts, y, wz + ts, wx, y, wz + ts);
-        b.uv.push(0, 0, 1, 0, 1, 1, 0, 1);
+        const r = (Math.random() * 4) | 0, flip = Math.random() < 0.5; // 8 orientations
+        for (let i = 0; i < 4; i++) { const c = CORN[(i + r) % 4]; b.uv.push(flip ? 1 - c[0] : c[0], c[1]); }
+        const v = 0.9 + Math.random() * 0.16;          // brightness patchiness
+        const cr = v * (1 + (Math.random() - 0.5) * 0.06), cg = v * (1 + (Math.random() - 0.5) * 0.05), cb = v * (1 + (Math.random() - 0.5) * 0.07);
+        for (let i = 0; i < 4; i++) b.col.push(cr, cg, cb);
         b.idx.push(b.vi, b.vi + 2, b.vi + 1, b.vi, b.vi + 3, b.vi + 2);
         b.vi += 4;
       }
@@ -74,11 +81,12 @@ export class WorldView {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
       geo.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
       geo.setIndex(b.idx);
       geo.computeVertexNormals();
       const file = TERR_FILE[t] || 'pasture';
       group.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-        map: tex('assets/terrain/tiles/' + file + '.png'), side: THREE.DoubleSide,
+        map: tex('assets/terrain/tiles/' + file + '.png'), side: THREE.DoubleSide, vertexColors: true,
       })));
     }
     return group;
