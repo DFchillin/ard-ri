@@ -10,6 +10,7 @@ import { UNIT_TYPES, FORMATIONS, FORMATION_KEYS, matchup, ROUT_MISNEACH, nextNic
 const MAP = 20;
 const SUMMONABLE = ['cuchulainn', 'fionn', 'lugh', 'nuada', 'manannan', 'brigid', 'dagda', 'morrigan']; // heroes/gods that only answer a hosted, favoured muster
 const SIM_RATE = 0.66; // the clash runs about a third slower than real time — more time to read it and react
+const SURRENDER_FRAC = 0.22; // a side yields (white flag) once its strength falls this low, with no god/hero to rally it
 const CLASH_DT = 0.55;
 // Death is a render-side effect, not drawn art: the slain figure dissolves —
 // fading and burning from pale to red to ash — while a short burst of dark
@@ -227,6 +228,7 @@ export class Battle {
       // by how much you bled him last time, so you wear him down and finish later.
       if (t === 'fomor' && this.menaceHp != null) { const u = co.units[0]; u.hp = Math.max(1, Math.min(u.hp0, this.menaceHp)); this._menaceUnit = u; drawBar(u.bar, u.hp / u.hp0, u.hp / u.hp0 > 0.5 ? 0x6cc551 : u.hp / u.hp0 > 0.25 ? 0xe0b83a : 0xe0563a); }
     }
+    this._rollBattleType(); // to-the-death, white-flag surrender, or raze-the-fort — chosen now, shown at muster
     this.forming = { types: [], name: nextNickname(), formation: 'line', enchant: false };
     this.pool = Object.assign({}, this.roster); // muster draws from your war-band
     document.getElementById('battle-ui').classList.remove('hidden');
@@ -259,8 +261,10 @@ export class Battle {
     // the mustered folk march out of the war-band; survivors return after the battle
     for (const u of this.units) if (u.team === 'player' && !u.bondGuard) this.roster[u.type] = Math.max(0, (this.roster[u.type] || 0) - 1); // the bond's free guard isn't drawn from the war-band
     this.phase = 'battle'; this.started = true;
+    this._startStr = { player: this._strength('player'), enemy: this._strength('enemy') }; // for the surrender threshold
+    const fortFight = this.cfg.defend || this.battleType === 'fort';
     for (const c of this.companies) {
-      if (c.team === 'enemy' && this.cfg.defend) { const b = pick(c, this.buildings.filter((x) => !x.dead)); if (b) c.target = { foe: b }; }
+      if (c.team === 'enemy' && fortFight) { const b = pick(c, this.buildings.filter((x) => !x.dead && x.team === 'player')); if (b) c.target = { foe: b }; } // the foe makes for your stronghold
       if (c.team === 'player' && this.cfg.defend) c.morale = Math.min(100, c.morale + 6);
     }
     // put the battle plan into effect: each company marches to the arrow you drew
@@ -281,6 +285,26 @@ export class Battle {
     let s = 0;
     for (const u of this.units) if (u.team === team && !u.dead) { const t = UNIT_TYPES[u.type]; s += t.atk * t.hp * (1 + (t.aura || 0) / 15); }
     return Math.round(s);
+  }
+  _strengthFrac(team) { return this._strength(team) / Math.max(1, (this._startStr ? this._startStr[team] : this._strength(team))); }
+  _hasPower(team) { return this.units.some((u) => u.team === team && !u.dead && (UNIT_TYPES[u.type].cat === 'hero' || UNIT_TYPES[u.type].cat === 'god')); }
+  // Roll the kind of battle, and make sure a 'fort' fight has a stronghold at BOTH ends.
+  _rollBattleType() {
+    if (this.scenario === 'menace') this.battleType = 'rout';         // the Ollphéist is a fight to the death
+    else if (this.cfg.defend) this.battleType = 'fort';               // a ráth-hold is a fort battle
+    else { const r = Math.random(); this.battleType = r < 0.4 ? 'rout' : r < 0.7 ? 'surrender' : 'fort'; }
+    if (this.battleType === 'fort') {
+      const half = Math.floor(MAP / 2) - 1;
+      if (!this.buildings.some((b) => b.team === 'player')) this._spawnBuilding({ role: 'dwelling', x: half, z: MAP - 3, w: 2, h: 2, hp: 44, team: 'player' });
+      if (!this.buildings.some((b) => b.team === 'enemy')) this._spawnBuilding({ role: 'dwelling', x: half, z: 2, w: 2, h: 2, hp: 44, team: 'enemy' });
+    }
+    this._hadPlayerFort = this.buildings.some((b) => b.team === 'player');
+    this._hadEnemyFort = this.buildings.some((b) => b.team === 'enemy');
+  }
+  _typeLabel() {
+    return this.battleType === 'fort' ? 'An Dún — raze their fort, hold your own'
+      : this.battleType === 'surrender' ? 'Géilleadh — break their nerve, or yield'
+      : 'Cath go Bás — to the last that stands';
   }
   _hostLines(team) {
     return this.companies.filter((c) => c.team === team).map((c) => {
@@ -543,7 +567,7 @@ export class Battle {
       if (!stale) continue;
       if (c.team === 'player' && c.stance === 'hold') { c.target = null; continue; } // a holding company does not go looking for a fight
       let n = null;
-      if (this.cfg.defend && c.team === 'enemy') n = pick(c, this.buildings.filter((b) => !b.dead && b.team !== 'enemy'));
+      if ((this.cfg.defend || this.battleType === 'fort') && c.team === 'enemy') n = pick(c, this.buildings.filter((b) => !b.dead && b.team === 'player'));
       if (!n) { const cp = this._companyPos(c); if (cp) n = nearest({ pos: cp }, (c.team === 'player' ? E : F)); }
       c.target = n ? { foe: n } : null;
     }
@@ -616,10 +640,19 @@ export class Battle {
 
   _checkEnd() {
     if (!this.started) return;
-    const rath = this.buildings.some((b) => !b.dead && b.team === 'player');
-    if (this._liveCompanies('enemy').length === 0) { this.started = false; const s = this._resolveRoster(true); this.onVictory({ sub: 'The enemy slua is broken and flees the field. ' + s }); }
-    else if (this._liveCompanies('player').length === 0) { this.started = false; this._defeat('Your slua is broken. ' + this._resolveRoster(false)); }
-    else if (this.cfg.defend && !rath) { this.started = false; this._defeat('Your ráth is burned. ' + this._resolveRoster(false)); }
+    // annihilation ends any battle
+    if (this._liveCompanies('enemy').length === 0) { this.started = false; const s = this._resolveRoster(true); this.onVictory({ sub: 'The enemy slua is broken and flees the field. ' + s }); return; }
+    if (this._liveCompanies('player').length === 0) { this.started = false; this._defeat('Your slua is broken. ' + this._resolveRoster(false)); return; }
+    const T = this.battleType;
+    if (T === 'fort') {
+      const ef = this.buildings.some((b) => !b.dead && b.team === 'enemy');
+      const pf = this.buildings.some((b) => !b.dead && b.team === 'player');
+      if (this._hadEnemyFort && !ef) { this.started = false; const s = this._resolveRoster(true); this.onVictory({ sub: 'Their fort is thrown down — the field is yours. ' + s }); return; }
+      if (this._hadPlayerFort && !pf) { this.started = false; this._defeat('Your fort is burned. ' + this._resolveRoster(false)); return; }
+    } else if (T === 'surrender') {
+      if (this._strengthFrac('enemy') < SURRENDER_FRAC && !this._hasPower('enemy')) { this.started = false; const s = this._resolveRoster(true); this.onVictory({ sub: 'The foe throws down their spears and yields — a white flag over the field. ' + s }); return; }
+      if (this._strengthFrac('player') < SURRENDER_FRAC && !this._hasPower('player')) { this.started = false; this._defeat('Your slua breaks and sues for terms. ' + this._resolveRoster(false)); return; }
+    }
   }
 
   // After a battle the survivors return to the war-band; on a win some grow a
@@ -866,8 +899,10 @@ export class Battle {
   _showPhase() {
     const label = this.phase === 'muster' ? 'An Cruinniú · Muster' : this.phase === 'parley' ? 'An Idirbheartaíocht · Parley' : this.cfg.title;
     const f = this._liveCompanies('player').length, e = this._liveCompanies('enemy').length;
+    const type = this.battleType ? `<br><small class="bs-type">${this._typeLabel()}</small>` : '';
     document.getElementById('bs-phase').innerHTML = this.phase === 'battle'
-      ? `${label}<br><small>${f} vs ${e} companies</small>` : label;
+      ? `${label}<br><small>${f} vs ${e} companies</small>${type}`
+      : this.phase === 'muster' ? `${label}${type}` : label;
     document.getElementById('bs-muster').classList.toggle('hidden', this.phase !== 'muster');
     document.getElementById('bs-command').classList.toggle('hidden', this.phase !== 'battle');
   }
